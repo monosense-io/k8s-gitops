@@ -1,0 +1,28 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+components:
+  - ../../components/common
+resources:
+  # ═══════════════════════════════════════════════════════════
+  # VISUALIZATION & ALERTING
+  # ═══════════════════════════════════════════════════════════
+  - ./grafana/ks.yaml                 # Dashboards and visualization
+  - ./gatus/ks.yaml                   # Uptime monitoring and status page
+  - ./silence-operator/ks.yaml        # Alert silence management
+
+  # ═══════════════════════════════════════════════════════════
+  # AUTOSCALING & PUBLIC METRICS
+  # ═══════════════════════════════════════════════════════════
+  - ./keda/ks.yaml                    # Event-driven autoscaling
+  - ./kromgo/ks.yaml                  # Public metrics endpoint
+
+  # ═══════════════════════════════════════════════════════════
+  # EXPORTERS (Metrics Collection)
+  # ═══════════════════════════════════════════════════════════
+  - ./blackbox-exporter/ks.yaml       # Endpoint probing (HTTP/HTTPS/TCP/ICMP)
+  - ./omada-exporter/ks.yaml          # TP-Link Omada controller metrics
+  - ./smartctl-exporter/ks.yaml       # Disk health metrics (SMART)
+  - ./snmp-exporter/ks.yaml           # Network device metrics (SNMP)
+  - ./speedtest-exporter/ks.yaml      # Internet speed metrics

@@ -1,0 +1,55 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: keycloak-alerts
+  namespace: security
+spec:
+  groups:
+    - name: keycloak
+      interval: 30s
+      rules:
+        - alert: KeycloakDown
+          expr: up{job="keycloak"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Keycloak instance is down"
+            description: "Keycloak instance {{ $labels.instance }} is down for more than 5 minutes"
+
+        - alert: KeycloakHighMemoryUsage
+          expr: (jvm_memory_used_bytes{job="keycloak", area="heap"} / jvm_memory_max_bytes{job="keycloak", area="heap"}) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Keycloak high memory usage"
+            description: "Keycloak instance {{ $labels.instance }} memory usage is above 85%"
+
+        - alert: KeycloakHighCPUUsage
+          expr: rate(process_cpu_seconds_total{job="keycloak"}[5m]) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Keycloak high CPU usage"
+            description: "Keycloak instance {{ $labels.instance }} CPU usage is above 80%"
+
+        - alert: KeycloakDatabaseConnectionErrors
+          expr: increase(keycloak_database_connection_errors_total{job="keycloak"}[5m]) > 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Keycloak database connection errors"
+            description: "Keycloak instance {{ $labels.instance }} has {{ $value }} database connection errors in the last 5 minutes"
+
+        - alert: KeycloakLoginFailures
+          expr: rate(keycloak_login_attempts{outcome="error"}[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High rate of Keycloak login failures"
+            description: "Keycloak realm {{ $labels.realm }} has {{ $value }} failed login attempts per second"

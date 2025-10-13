@@ -1,0 +1,20 @@
+{
+  "files.associations": {
+      "**/*.json5": "jsonc",
+      "**/terraform/**/*.tf": "terraform"
+  },
+  "sops.defaults.ageKeyFile": "age.key",
+  "yaml.schemas": {
+      "Kubernetes": "./kubernetes/*.yaml"
+  },
+  "vs-kubernetes": {
+      "vs-kubernetes.kubeconfig": "./kubeconfig",
+      "vs-kubernetes.knownKubeconfigs": [
+        "./kubeconfig"
+    ]
+  },
+  "go.goroot": "/Users/monosense/.local/share/mise/installs/go/1.23.11",
+  "go.alternateTools": {
+    "go": "/Users/monosense/.local/share/mise/shims/go"
+  }
+}

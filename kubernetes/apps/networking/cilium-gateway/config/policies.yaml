@@ -1,0 +1,36 @@
+---
+# CiliumEnvoyConfig for compression (equivalent to BackendTrafficPolicy)
+apiVersion: cilium.io/v2
+kind: CiliumEnvoyConfig
+metadata:
+  name: gateway-compression
+  namespace: networking
+spec:
+  services:
+    - name: cilium-gateway-cilium-external
+      namespace: networking
+    - name: cilium-gateway-cilium-internal
+      namespace: networking
+  resources:
+    - "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v3.HttpConnectionManager
+      name: envoy.filters.network.http_connection_manager
+      http_filters:
+        - name: envoy.filters.http.compressor
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+            response_direction_config:
+              common_config:
+                min_content_length: 256
+            compressor_library:
+              name: text_optimized
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+                compression_level: BEST_SPEED
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+---
+# Note: TLS configuration, ALPN, and other client settings are configured
+# directly in the Gateway listener configuration above.
+# Cilium Gateway API doesn't use separate "ClientTrafficPolicy" CRDs like Envoy Gateway.
+# Instead, these are configured via Gateway.spec.listeners[] settings.

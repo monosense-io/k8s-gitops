@@ -1,0 +1,9 @@
+endpoints:
+  - name: "${APP}"
+    group: external
+    url: "https://${GATUS_SUBDOMAIN:=${APP}}.monosense.dev${GATUS_PATH:=/}"
+    interval: 1m
+    client:
+      dns-resolver: tcp://172.17.13.100:53
+    conditions:
+      - "[STATUS] == ${GATUS_STATUS:=200}"

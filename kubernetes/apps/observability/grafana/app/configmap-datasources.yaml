@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+  labels:
+    grafana_datasource: "1"
+data:
+  victoriametrics.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics
+        type: prometheus
+        access: proxy
+        url: http://stack-vmsingle-victoria-metrics-k8s-stack.observability.svc:8428
+        isDefault: true
+        jsonData:
+          timeInterval: 30s
+          httpMethod: POST
+          manageAlerts: false
+          prometheusType: Prometheus
+          prometheusVersion: 2.40.0
+          cacheLevel: 'High'
+          incrementalQuerying: true
+          incrementalQueryOverlapWindow: 10m
+        editable: false
+
+      - name: VictoriaLogs
+        type: prometheus  # Use Prometheus type for now, VL is compatible
+        access: proxy
+        url: http://victoria-logs-server.observability.svc:9428
+        jsonData:
+          timeInterval: 30s
+          httpMethod: POST
+          manageAlerts: false
+        editable: false
