@@ -2,12 +2,14 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# RBAC disabled for bootstrap - RoleBindings reference namespaces that don't exist yet
+# Will be enabled in Day 2 after all infrastructure namespaces are created
 resources:
   # Flux Kustomization resources for security components
-  - rbac/ks.yaml
-  - external-secrets/ks.yaml
-  - cert-manager/ks.yaml
+  # - rbac/ks.yaml  # Disabled - references non-existent namespaces
+  # - external-secrets/ks.yaml  # Disabled for bootstrap
+  # - cert-manager/ks.yaml  # Disabled for bootstrap
   # Component directories (contain actual manifests)
-  - rbac  # Security BLOCKER #1 - RBAC Model (Added: 2025-10-14)
-  - external-secrets
-  - cert-manager
+  # - rbac  # Disabled - RoleBindings reference monitoring, databases, rook-ceph namespaces
+  # - external-secrets  # Disabled for bootstrap
+  # - cert-manager  # Disabled for bootstrap
