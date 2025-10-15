@@ -33,7 +33,7 @@ spec:
       # Flux distribution artifact
       distribution:
         artifact: oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests
-        version: v2.4.x
+        version: v2.7.2
 
       # Cluster configuration
       cluster:
