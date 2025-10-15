@@ -3,8 +3,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: flux-system
+# Note: HTTPRoute disabled for bootstrap - requires Gateway API CRDs (Day 2)
+# Note: PrometheusRule disabled for bootstrap - requires monitoring stack (Day 2)
 resources:
   - externalsecret.yaml
   - receiver.yaml
-  - httproute.yaml
-  - prometheusrule.yaml
+  # - httproute.yaml  # Day 2 - requires Gateway API CRDs
+  # - prometheusrule.yaml  # Day 2 - requires Prometheus/monitoring stack
