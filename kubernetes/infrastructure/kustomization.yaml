@@ -3,11 +3,12 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
-# Note: storage and databases commented out - will be enabled in Week 2
+# Note: All infrastructure components disabled for bootstrap - deployed via Helmfile
+# Day 2 operations will enable these incrementally via Flux
 resources:
-  - networking
-  - gitops
-  - security
-  # - storage  # OpenEBS/Rook-Ceph - enable after bootstrap
+  # - networking  # Cilium/CoreDNS/Spegel already deployed via Helmfile
+  - gitops  # Flux GitOps infrastructure Kustomizations
+  - security  # RBAC and security policies
+  # - storage  # OpenEBS/Rook-Ceph - enable in Week 2
   # - databases  # CloudNativePG - enable after storage is ready
-  # - cilium  # Day 2 service mesh features - enable after testing
+  # - cilium  # Day 2 service mesh features - enable after Gateway API CRDs
