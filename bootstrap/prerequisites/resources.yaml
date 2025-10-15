@@ -1,5 +1,4 @@
 ---
-# yaml-language-server: $schema=https://kubernetesjsonschema.dev/v1.34.0-standalone-strict/secret-v1.json
 # Bootstrap Prerequisites
 # Apply these resources manually before running helmfile:
 # kubectl apply -f bootstrap/prerequisites/resources.yaml
