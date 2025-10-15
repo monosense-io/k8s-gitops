@@ -40,7 +40,7 @@ spec:
   interval: 1h
   path: ./kubernetes/infrastructure/repositories
   prune: true
-  wait: true
+  wait: false  # Don't wait for repository health - components already deployed via Helmfile
   timeout: 5m
   sourceRef:
     kind: GitRepository
