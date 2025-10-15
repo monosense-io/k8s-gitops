@@ -3,10 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
+# Note: storage and databases commented out - will be enabled in Week 2
 resources:
   - networking
   - gitops
   - security
-  - storage
-  - databases
-  - cilium
+  # - storage  # OpenEBS/Rook-Ceph - enable after bootstrap
+  # - databases  # CloudNativePG - enable after storage is ready
+  # - cilium  # Day 2 service mesh features - enable after testing
