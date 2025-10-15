@@ -3,12 +3,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
-# Note: All infrastructure components disabled for bootstrap - deployed via Helmfile
-# Day 2 operations will enable these incrementally via Flux
 resources:
-  # - networking  # Cilium/CoreDNS/Spegel already deployed via Helmfile
+  # - networking  # Day 2 - Cilium/CoreDNS/Spegel already deployed via Helmfile
   - gitops  # Flux GitOps infrastructure Kustomizations
-  # - security  # RBAC disabled - RoleBindings reference non-existent namespaces
-  # - storage  # OpenEBS/Rook-Ceph - enable in Week 2
-  # - databases  # CloudNativePG - enable after storage is ready
-  # - cilium  # Day 2 service mesh features - enable after Gateway API CRDs
+  - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
+  # - storage  # Day 2 - OpenEBS/Rook-Ceph
+  # - databases  # Day 2 - CloudNativePG
+  # - cilium  # Day 2 - service mesh features

@@ -2,14 +2,10 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# RBAC disabled for bootstrap - RoleBindings reference namespaces that don't exist yet
-# Will be enabled in Day 2 after all infrastructure namespaces are created
+# Note: RBAC and cert-manager disabled for bootstrap
+# Note: external-secrets enabled - required for ClusterSecretStore (needed by flux-instance)
 resources:
-  # Flux Kustomization resources for security components
-  # - rbac/ks.yaml  # Disabled - references non-existent namespaces
-  # - external-secrets/ks.yaml  # Disabled for bootstrap
-  # - cert-manager/ks.yaml  # Disabled for bootstrap
   # Component directories (contain actual manifests)
-  # - rbac  # Disabled - RoleBindings reference monitoring, databases, rook-ceph namespaces
-  # - external-secrets  # Disabled for bootstrap
-  # - cert-manager  # Disabled for bootstrap
+  # - rbac  # Day 2 - RoleBindings reference monitoring, databases, rook-ceph namespaces
+  - external-secrets  # Required for ClusterSecretStore
+  # - cert-manager  # Day 2 - cert-manager already deployed via Helmfile
