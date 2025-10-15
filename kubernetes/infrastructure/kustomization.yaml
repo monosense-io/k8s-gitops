@@ -8,7 +8,7 @@ kind: Kustomization
 resources:
   # - networking  # Cilium/CoreDNS/Spegel already deployed via Helmfile
   - gitops  # Flux GitOps infrastructure Kustomizations
-  - security  # RBAC and security policies
+  # - security  # RBAC disabled - RoleBindings reference non-existent namespaces
   # - storage  # OpenEBS/Rook-Ceph - enable in Week 2
   # - databases  # CloudNativePG - enable after storage is ready
   # - cilium  # Day 2 service mesh features - enable after Gateway API CRDs
