@@ -1,0 +1,32 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/notification.toolkit.fluxcd.io/receiver_v1.json
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Receiver
+metadata:
+  name: flux-system
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: flux-receiver
+    app.kubernetes.io/component: gitops
+spec:
+  type: github
+  events:
+    - ping
+    - push
+  secretRef:
+    name: github-webhook-token-secret
+  resources:
+    # Reconcile GitRepository first
+    - apiVersion: source.toolkit.fluxcd.io/v1
+      kind: GitRepository
+      name: flux-system
+      namespace: flux-system
+    # Then reconcile cluster infrastructure Kustomizations
+    - apiVersion: kustomize.toolkit.fluxcd.io/v1
+      kind: Kustomization
+      name: cluster-infra-infrastructure
+      namespace: flux-system
+    - apiVersion: kustomize.toolkit.fluxcd.io/v1
+      kind: Kustomization
+      name: cluster-apps-infrastructure
+      namespace: flux-system

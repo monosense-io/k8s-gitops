@@ -1,0 +1,22 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: echo-require-auth
+  namespace: mesh-demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: echo
+  ingress:
+    - toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+          rules:
+            http:
+              - {}
+  # Require authenticated (SPIFFE/SPIRE) connections to the selected endpoints
+  authentication:
+    mode: "required"
+

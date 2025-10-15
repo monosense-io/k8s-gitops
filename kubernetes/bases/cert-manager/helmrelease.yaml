@@ -1,0 +1,36 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: cert-manager
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+    createNamespace: true
+    crds: Create
+  upgrade:
+    remediation:
+      retries: 2
+      strategy: rollback
+    cleanupOnFail: true
+    crds: CreateReplace
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    installCRDs: true
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true
+    global:
+      leaderElection:
+        namespace: cert-manager

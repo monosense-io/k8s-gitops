@@ -1,0 +1,100 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloudnative-pg
+  namespace: cnpg-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: cloudnative-pg
+      version: ${CNPG_OPERATOR_VERSION:=1.25.1}
+      sourceRef:
+        kind: HelmRepository
+        name: cloudnative-pg
+        namespace: flux-system
+      interval: 12h
+  install:
+    crds: Skip
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  values:
+    # Operator Configuration
+    replicaCount: 2
+
+    # Resource Management
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+    # High Availability
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - cloudnative-pg
+              topologyKey: kubernetes.io/hostname
+
+    # Monitoring
+    monitoring:
+      podMonitorEnabled: true
+      podMonitorAdditionalLabels:
+        prometheus: victoria-metrics
+      grafanaDashboard:
+        create: false  # We'll use pre-built dashboards
+
+    # Webhook Configuration
+    webhook:
+      port: 9443
+      mutating:
+        create: true
+      validating:
+        create: true
+      livenessProbe:
+        initialDelaySeconds: 3
+      readinessProbe:
+        initialDelaySeconds: 3
+
+    # Security Context
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 10001
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+
+    # Logging
+    config:
+      data:
+        INHERITED_ANNOTATIONS: "service.cilium.io/*"
+        INHERITED_LABELS: "app.kubernetes.io/*"
+        WATCH_NAMESPACE: ""  # Watch all namespaces
+
+    # Service Account
+    serviceAccount:
+      create: true
+      name: cloudnative-pg

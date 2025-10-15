@@ -1,0 +1,13 @@
+---
+# Pod Disruption Budget - Max 1 Pod Unavailable
+# Prevents voluntary disruptions from taking down all replicas
+# Automatically configured via Kustomize replacements
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: placeholder  # Replaced by Deployment name
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: placeholder  # Replaced by Deployment label

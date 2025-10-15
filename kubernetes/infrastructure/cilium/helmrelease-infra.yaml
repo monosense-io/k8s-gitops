@@ -1,0 +1,300 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 30m
+  timeout: 15m
+  chart:
+    spec:
+      chart: cilium
+      version: ">=1.16.0 <1.17.0"
+      sourceRef:
+        kind: OCIRepository
+        name: cilium-charts
+        namespace: flux-system
+      interval: 12h
+
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+
+  values:
+    # Cluster identification
+    cluster:
+      name: infra
+      id: 1
+
+    # ==============================================================================
+    # SERVICE MESH CONFIGURATION
+    # ==============================================================================
+
+    # CRITICAL: Enable full kube-proxy replacement for service mesh capabilities
+    kubeProxyReplacement: "true"
+
+    # CNI Configuration
+    cni:
+      exclusive: true  # Cilium is the only CNI
+      install: true
+
+    # ==============================================================================
+    # NETWORKING
+    # ==============================================================================
+
+    # IP Address Management
+    ipam:
+      mode: kubernetes
+
+    # Pod CIDR for infra cluster
+    ipv4NativeRoutingCIDR: "10.244.0.0/16"
+
+    # Enable IPv4
+    ipv4:
+      enabled: true
+
+    # Direct routing mode (no encapsulation overhead)
+    routingMode: native
+    autoDirectNodeRoutes: true
+
+    # Tunnel protocol (only used if direct routing unavailable)
+    tunnelProtocol: vxlan
+
+    # ==============================================================================
+    # ENCRYPTION & SECURITY
+    # ==============================================================================
+
+    # WireGuard transparent encryption (automatic mTLS for all pod traffic)
+    encryption:
+      enabled: true
+      type: wireguard
+      nodeEncryption: false  # Encrypt pod-to-pod only (not node-to-pod)
+      wireguard:
+        persistentKeepalive: 25s
+
+    # SPIRE-based identity and authentication
+    authentication:
+      enabled: true
+      mutual:
+        spire:
+          enabled: true
+          install:
+            enabled: true
+            server:
+              dataStorage:
+                size: 1Gi
+            agent: {}
+
+    # ==============================================================================
+    # HUBBLE OBSERVABILITY
+    # ==============================================================================
+
+    hubble:
+      enabled: true
+
+      # Hubble Relay (cluster-wide visibility aggregator)
+      relay:
+        enabled: true
+        replicas: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+
+      # Hubble UI (service map and flow visualization)
+      ui:
+        enabled: true
+        replicas: 1
+        ingress:
+          enabled: false  # Configure via Gateway API if needed
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+      # Metrics export (Prometheus format)
+      metrics:
+        enabled:
+        - dns:query;ignoreAAAA
+        - drop
+        - tcp
+        - flow
+        - port-distribution
+        - icmp
+        - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+
+        # Enable ServiceMonitor for Victoria Metrics
+        serviceMonitor:
+          enabled: true
+          labels:
+            prometheus: kube-prometheus
+
+        # Dashboards
+        enableOpenMetrics: true
+
+      # Hubble export to external systems (e.g., Jaeger)
+      # Note: This will be enabled in Week 3 after Jaeger is deployed
+      export:
+        dynamic:
+          enabled: false  # Will enable after Jaeger deployment
+          config:
+            configMapName: hubble-export-config
+            createConfigMap: false
+
+    # ==============================================================================
+    # CLUSTER MESH (Multi-Cluster)
+    # ==============================================================================
+
+    clustermesh:
+      useAPIServer: true
+
+      apiserver:
+        replicas: 2
+
+        service:
+          type: LoadBalancer  # Exposes clustermesh-apiserver for remote clusters
+          annotations: {}
+
+        tls:
+          auto:
+            enabled: true
+            method: cronJob
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+      # Cluster mesh will be connected via CLI in Week 3
+      config:
+        enabled: false
+
+    # ==============================================================================
+    # BGP CONTROL PLANE
+    # ==============================================================================
+
+    bgpControlPlane:
+      enabled: true
+
+    # ==============================================================================
+    # GATEWAY API
+    # ==============================================================================
+
+    gatewayAPI:
+      enabled: true
+
+    # ==============================================================================
+    # OPERATOR
+    # ==============================================================================
+
+    operator:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    # ==============================================================================
+    # CILIUM AGENT (runs on each node)
+    # ==============================================================================
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    # ==============================================================================
+    # MONITORING
+    # ==============================================================================
+
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        labels:
+          prometheus: kube-prometheus
+
+    # ==============================================================================
+    # POLICY ENFORCEMENT
+    # ==============================================================================
+
+    policyEnforcementMode: "default"  # Policies enforced when explicitly defined
+
+    # L7 proxy configuration
+    proxy:
+      prometheus:
+        enabled: true
+
+    # Enable L7 protocol parsers
+    enableL7Proxy: true
+
+    # ==============================================================================
+    # PERFORMANCE TUNING
+    # ==============================================================================
+
+    # BPF Map sizes
+    bpf:
+      monitorAggregation: medium
+      monitorInterval: "5s"
+      monitorFlags: "all"
+      # Increase map sizes for larger deployments
+      ctTcpMax: 524288
+      ctAnyMax: 262144
+      natMax: 524288
+      neighMax: 524288
+      policyMapMax: 16384
+
+    # ==============================================================================
+    # HIGH AVAILABILITY
+    # ==============================================================================
+
+    # Enable endpoint health checking
+    enableEndpointHealthChecking: true
+
+    # Enable connection tracking
+    enableIPv4Masquerade: true
+
+    # Enable bandwidth manager for better QoS
+    bandwidthManager:
+      enabled: true
+      bbr: true
+
+    # ==============================================================================
+    # SECURITY FEATURES
+    # ==============================================================================
+
+    # Enable host firewall
+    hostFirewall:
+      enabled: false  # Enable if you need node-level protection
+
+    # Enable pod security policies
+    enableCiliumEndpointSlice: true
+
+    # ==============================================================================
+    # DEBUGGING (disable in production)
+    # ==============================================================================
+
+    debug:
+      enabled: false  # Set to true for troubleshooting

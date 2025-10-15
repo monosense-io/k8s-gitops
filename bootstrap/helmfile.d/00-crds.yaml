@@ -1,29 +1,79 @@
 ---
-# This helmfile is for installing Custom Resource Definitions (CRDs) from Helm charts.
-# It is not intended to be used with helmfile apply or sync.
+# Phase 0: CRD Extraction Bootstrap
+# This file extracts ONLY CustomResourceDefinitions from charts
+# CRDs are filtered using yq after template rendering
+#
+# Usage (with yq filtering):
+#   helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template | \
+#     yq ea 'select(.kind == "CustomResourceDefinition")' | \
+#     kubectl apply -f -
+#
+#   helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template | \
+#     yq ea 'select(.kind == "CustomResourceDefinition")' | \
+#     kubectl apply -f -
+#
+# Note: postRenderer doesn't work with 'helmfile template', so we pipe to yq externally
 
 helmDefaults:
-  args: ['--include-crds', '--no-hooks'] # Prevent helmfile apply or sync
-  postRenderer: bash
-  postRendererArgs: [-c, "yq ea --exit-status 'select(.kind == \"CustomResourceDefinition\")'"]
+  # Critical: Include CRDs and disable hooks for extraction
+  args: ['--include-crds', '--no-hooks']
+  cleanupOnFail: false
+  wait: false
+  timeout: 300
 
+---
+# Cluster-specific environments
+environments:
+  infra:
+    values:
+      - ../clusters/infra/values.yaml
+  apps:
+    values:
+      - ../clusters/apps/values.yaml
+
+---
 releases:
-  - name: external-secrets
+  # cert-manager CRDs
+  # Provides: Certificate, CertificateRequest, Issuer, ClusterIssuer, etc.
+  - name: cert-manager-crds
+    namespace: cert-manager
+    chart: oci://quay.io/jetstack/charts/cert-manager
+    version: v1.19.0
+    set:
+      - name: crds.enabled
+        value: true
+
+  # external-secrets CRDs
+  # Provides: ExternalSecret, SecretStore, ClusterSecretStore, etc.
+  - name: external-secrets-crds
     namespace: external-secrets
     chart: oci://ghcr.io/external-secrets/charts/external-secrets
-    version: 0.20.2
+    version: 0.20.3
+    set:
+      - name: installCRDs
+        value: true
 
-  - name: envoy-gateway
-    namespace: networking
-    chart: oci://docker.io/envoyproxy/gateway-helm
-    version: 1.5.2
+  # victoria-metrics-operator CRDs
+  # Provides: VMAgent, VMAlert, VMAlertmanager, VMSingle, VMCluster, VMRule, VMServiceScrape, VMPodScrape, VMProbe, VMNodeScrape, VMStaticScrape, VMAuth, VMUser, VMAlertmanagerConfig, VLAgent, VLSingle, VLCluster, VMAnomaly, VMAuth, VMScrapeConfig, VMUser, VTCluster, VTSingle
+  - name: victoria-metrics-operator-crds
+    namespace: victoria-metrics
+    chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator-crds
+    version: 0.5.1
 
-  - name: keda
-    namespace: observability
-    chart: oci://ghcr.io/home-operations/charts-mirror/keda
-    version: 2.17.2
+  # prometheus-operator CRDs (for Prometheus-compatible resources)
+  # Provides: PrometheusRule, ServiceMonitor, PodMonitor, Probe
+  # Victoria Metrics operator can convert these to VMRule, VMServiceScrape, VMPodScrape, VMProbe
+  - name: prometheus-operator-crds
+    namespace: monitoring
+    chart: oci://ghcr.io/prometheus-community/charts/prometheus-operator-crds
+    version: 24.0.1
 
-  - name: kube-prometheus-stack
-    namespace: observability
-    chart: oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack
-    version: 77.14.0
+  # cloudnative-pg CRDs
+  # Provides: Cluster, Pooler, Backup, ScheduledBackup, ImageCatalog, ClusterImageCatalog
+  - name: cloudnative-pg-crds
+    namespace: cnpg-system
+    chart: oci://ghcr.io/cloudnative-pg/charts/cloudnative-pg
+    version: 0.26.0
+    set:
+      - name: crds.create
+        value: true

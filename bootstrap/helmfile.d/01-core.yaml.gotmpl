@@ -1,0 +1,224 @@
+---
+# Phase 1: Core Infrastructure Bootstrap
+# Deploys core infrastructure components WITHOUT inline CRDs
+# CRDs are pre-installed via 00-crds.yaml
+#
+# Usage:
+#   helmfile -e infra sync    # Bootstrap infra cluster
+#   helmfile -e apps sync     # Bootstrap apps cluster
+
+helmDefaults:
+  cleanupOnFail: true
+  wait: true
+  waitForJobs: true
+  timeout: 600
+  createNamespace: true
+
+---
+# Helm repositories
+repositories:
+  - name: cilium
+    url: https://helm.cilium.io/
+  - name: coredns
+    url: https://coredns.github.io/helm
+
+---
+# Cluster-specific environments
+environments:
+  infra:
+    values:
+      - ../clusters/infra/values.yaml
+  apps:
+    values:
+      - ../clusters/apps/values.yaml
+
+---
+releases:
+  # 1. Cilium CNI + Service Mesh - MUST BE FIRST (no networking without CNI)
+  # Full service mesh features enabled: WireGuard encryption, SPIRE identity,
+  # Hubble observability, Cluster Mesh multi-cluster
+  - name: cilium
+    namespace: kube-system
+    chart: cilium/cilium
+    version: 1.18.2
+    values:
+      # Load cluster-specific service mesh configuration
+      - ../clusters/{{ .Environment.Name }}/cilium-values.yaml
+    set:
+      # Override with environment-specific k8sServiceHost
+      - name: k8sServiceHost
+        value: {{ .Values.k8sServiceHost }}
+    hooks:
+      - events: ['postsync']
+        showlogs: true
+        command: kubectl
+        args:
+          - rollout
+          - status
+          - daemonset/cilium
+          - -n
+          - kube-system
+          - --timeout=300s
+
+  # 2. CoreDNS - DNS resolution
+  - name: coredns
+    namespace: kube-system
+    chart: oci://ghcr.io/coredns/charts/coredns
+    version: 1.44.3
+    needs: ['kube-system/cilium']
+    values:
+      - service:
+          clusterIP: {{ .Values.corednsClusterIP }}
+      - replicaCount: {{ .Values.corednsReplicas | default 2 }}
+      - resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+  # 3. Spegel - Local registry mirror (DISABLED - incompatible with Talos read-only filesystem)
+  # Re-enable via Flux after bootstrap if needed with proper Talos configuration
+  # - name: spegel
+  #   namespace: kube-system
+  #   chart: oci://ghcr.io/spegel-org/helm-charts/spegel
+  #   version: 0.4.0
+  #   needs: ['kube-system/coredns']
+
+  # 4. cert-manager - Certificate management
+  # CRDs pre-installed via 00-crds.yaml
+  - name: cert-manager
+    namespace: cert-manager
+    chart: oci://quay.io/jetstack/charts/cert-manager
+    version: v1.19.0
+    needs: ['kube-system/coredns']
+    values:
+      # IMPORTANT: Disable inline CRD installation
+      - crds:
+          enabled: false
+      - global:
+          leaderElection:
+            namespace: cert-manager
+      - prometheus:
+          enabled: true
+          servicemonitor:
+            enabled: true
+      - resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+
+  # 5. external-secrets - Secret management
+  # CRDs pre-installed via 00-crds.yaml
+  - name: external-secrets
+    namespace: external-secrets
+    chart: oci://ghcr.io/external-secrets/charts/external-secrets
+    version: 0.20.3
+    needs: ['cert-manager/cert-manager']
+    values:
+      # IMPORTANT: CRDs already installed
+      - crds:
+          createClusterSecretStore: false
+      - webhook:
+          create: true
+      - certController:
+          create: true
+
+  # 6. Flux Operator - Flux lifecycle manager
+  - name: flux-operator
+    namespace: flux-system
+    chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+    version: 0.32.0
+    needs: ['cert-manager/cert-manager']
+    values:
+      - serviceMonitor:
+          create: true
+      - resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+  # 7. Flux Instance - Flux controllers
+  - name: flux-instance
+    namespace: flux-system
+    chart: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-instance
+    version: 0.32.0
+    needs: ['flux-system/flux-operator']
+    values:
+      - instance:
+          distribution:
+            artifact: oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests
+            version: v2.7.2
+          cluster:
+            domain: cluster.local
+            networkPolicy: false
+            type: kubernetes
+          sync:
+            interval: 1m
+            kind: GitRepository
+            url: https://github.com/monosense-io/k8s-gitops
+            ref: main
+            path: kubernetes/clusters/{{ .Environment.Name }}
+          components:
+            - source-controller
+            - kustomize-controller
+            - helm-controller
+            - notification-controller
+            - image-reflector-controller
+            - image-automation-controller
+          sourceController:
+            resources:
+              limits:
+                memory: 1Gi
+              requests:
+                cpu: 100m
+                memory: 256Mi
+          kustomizeController:
+            resources:
+              limits:
+                memory: 2Gi
+              requests:
+                cpu: 200m
+                memory: 512Mi
+          helmController:
+            resources:
+              limits:
+                memory: 1Gi
+              requests:
+                cpu: 100m
+                memory: 256Mi
+          notificationController:
+            resources:
+              limits:
+                memory: 256Mi
+              requests:
+                cpu: 50m
+                memory: 128Mi
+          imageReflectorController:
+            resources:
+              limits:
+                memory: 512Mi
+              requests:
+                cpu: 50m
+                memory: 128Mi
+          imageAutomationController:
+            resources:
+              limits:
+                memory: 512Mi
+              requests:
+                cpu: 50m
+                memory: 128Mi
+    hooks:
+      # After flux-instance is deployed, apply GitRepository and initial Kustomization
+      - events: ['postsync']
+        showlogs: true
+        command: kubectl
+        args:
+          - apply
+          - --server-side
+          - -f
+          - ../../kubernetes/clusters/{{ .Environment.Name }}/flux-system/gotk-sync.yaml

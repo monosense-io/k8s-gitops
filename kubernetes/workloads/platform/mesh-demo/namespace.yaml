@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mesh-demo
+  labels:
+    # Intentionally minimal; PSA/NetPols can be layered later
+    kubernetes.io/metadata.name: mesh-demo
+

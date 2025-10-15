@@ -1,0 +1,12 @@
+---
+# Infra Cluster Bootstrap Values
+# Used by helmfile to customize chart installations
+
+# Kubernetes API
+k8sServiceHost: "infra-k8s.monosense.io"
+
+# CoreDNS
+corednsClusterIP: "10.245.0.10"
+corednsReplicas: 2
+
+# Note: Cilium service mesh configuration moved to cilium-values.yaml

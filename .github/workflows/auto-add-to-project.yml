@@ -1,0 +1,83 @@
+name: Auto-add issues to Project
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add labeled issues to Projects v2 and set Area field
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const targetLabels = ['security','backups','reliability','observability','governance','performance'];
+            const labels = (context.payload.issue.labels || []).map(l => l.name);
+            const area = labels.find(l => targetLabels.includes(l));
+            if (!area) {
+              core.info('No matching label on issue; skipping.');
+              return;
+            }
+
+            const org = 'monosense-io';
+            const number = 2; // Project number
+            const issueNodeId = context.payload.issue.node_id;
+
+            const result = await github.graphql(`
+              query($org: String!, $number: Int!){
+                organization(login: $org){
+                  projectV2(number: $number){
+                    id
+                    fields(first: 50){
+                      nodes{
+                        ... on ProjectV2Field { id name }
+                        ... on ProjectV2SingleSelectField { id name options { id name } }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { org, number });
+
+            const project = result.organization?.projectV2;
+            if (!project?.id) {
+              core.setFailed('Project not found');
+              return;
+            }
+
+            // Add issue to project
+            let itemId;
+            try {
+              const add = await github.graphql(`
+                mutation($project:ID!, $content:ID!){
+                  addProjectV2ItemById(input:{ projectId:$project, contentId:$content }){
+                    item { id }
+                  }
+                }
+              `, { project: project.id, content: issueNodeId });
+              itemId = add.addProjectV2ItemById.item.id;
+            } catch (e) {
+              core.warning(`addProjectV2ItemById failed (maybe already exists): ${e.message}`);
+              return;
+            }
+
+            // Set Area field based on label
+            const areaField = project.fields.nodes.find(f => f.name === 'Area' && f.options);
+            const areaOption = areaField?.options?.find(o => o.name === area);
+            if (areaField?.id && areaOption?.id) {
+              await github.graphql(`
+                mutation($project:ID!, $item:ID!, $field:ID!, $option:String!){
+                  updateProjectV2ItemFieldValue(input:{
+                    projectId:$project, itemId:$item, fieldId:$field,
+                    value:{ singleSelectOptionId:$option }
+                  }) { projectV2Item { id } }
+                }
+              `, { project: project.id, item: itemId, field: areaField.id, option: areaOption.id });
+            }
+

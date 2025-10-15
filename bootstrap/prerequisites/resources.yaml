@@ -1,0 +1,38 @@
+---
+# Bootstrap Prerequisites
+# Apply these resources manually before running helmfile:
+# kubectl apply -f bootstrap/prerequisites/resources.yaml
+
+# External Secrets namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-secrets
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+# 1Password Connect Token secret
+# Note: Update token value with actual credentials or use 'op inject' to populate
+# This token is used by ESO to authenticate to your local 1Password Connect Server
+apiVersion: v1
+kind: Secret
+metadata:
+  name: onepassword-connect-token
+  namespace: external-secrets
+type: Opaque
+stringData:
+  # Placeholder token - update this with your actual 1Password Connect token
+  # Or use: op inject -i prerequisites/resources.yaml | kubectl apply -f -
+  token: "PLACEHOLDER_TOKEN_UPDATE_AFTER_BOOTSTRAP"
+---
+# Flux System namespace (will be created by helmfile but including here for completeness)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flux-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

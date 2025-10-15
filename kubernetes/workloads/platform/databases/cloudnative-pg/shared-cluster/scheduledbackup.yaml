@@ -1,0 +1,31 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: shared-postgres-daily-backup
+  namespace: cnpg-system
+spec:
+  # Schedule: Daily at 2 AM UTC
+  schedule: "0 2 * * *"
+
+  # Backup window
+  immediate: false
+
+  # Target cluster
+  cluster:
+    name: shared-postgres
+
+  # Retention policy (overrides cluster setting for scheduled backups)
+  backupOwnerReference: self
+
+  # Method
+  method: barmanObjectStore
+
+  # Online backup (no downtime)
+  online: true
+  onlineConfiguration:
+    immediateCheckpoint: true
+    waitForArchive: true
+
+  # Suspend if needed (for maintenance)
+  suspend: false

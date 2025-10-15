@@ -1,0 +1,85 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-settings
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/managed-by: flux
+    cluster: apps
+data:
+  # Cluster Identity
+  CLUSTER: apps
+  CLUSTER_ID: "2"
+
+  # Network Configuration
+  POD_CIDR: '["10.246.0.0/16"]'
+  POD_CIDR_STRING: "10.246.0.0/16"
+  SERVICE_CIDR: '["10.247.0.0/16"]'
+  K8S_SERVICE_HOST: "apps-k8s.monosense.io"
+
+  # Cilium Configuration
+  CLUSTERMESH_IP: "10.25.12.100"
+  CILIUM_GATEWAY_LB_IP: "10.25.12.120"
+  CILIUM_BGP_LOCAL_ASN: "64513"
+  CILIUM_BGP_PEER_ASN: "64501"
+  CILIUM_BGP_PEER_ADDRESS: "10.25.12.1/32"
+
+  # CoreDNS Configuration
+  COREDNS_CLUSTER_IP: "10.247.0.10"
+  COREDNS_REPLICAS: "2"
+
+  # External Secrets Configuration
+  EXTERNAL_SECRET_STORE: "onepassword"
+  ONEPASSWORD_CONNECT_HOST: "http://opconnect.monosense.dev"
+  ONEPASSWORD_CONNECT_TOKEN_SECRET: "onepassword-connect-token"
+  CILIUM_CLUSTERMESH_SECRET_PATH: "kubernetes/apps/cilium-clustermesh"
+  CERTMANAGER_CLOUDFLARE_SECRET_PATH: "kubernetes/apps/cert-manager/cloudflare"
+
+  # Domain Configuration
+  SECRET_DOMAIN: "monosense.io"
+
+  # Rook-Ceph Configuration
+  ROOK_CEPH_NAMESPACE: "rook-ceph"
+  ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
+  ROOK_CEPH_BLOCKPOOL_NAME: "rook-ceph-block"
+  ROOK_CEPH_IMAGE_TAG: v18.2.2
+  ROOK_CEPH_DEVICE_FILTER: "^nvme[0-9]+n1$"
+  ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
+  ROOK_CEPH_MON_COUNT: "3"
+  CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
+
+  # OpenEBS Configuration
+  OPENEBS_BASEPATH: "/var/openebs/local"
+  OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
+
+  # Observability Configuration
+  OBSERVABILITY_BLOCK_SC: "rook-ceph-block"
+  OBSERVABILITY_METRICS_RETENTION: "30d"
+  OBSERVABILITY_LOGS_RETENTION: "14d"
+  OBSERVABILITY_LOG_ENDPOINT_HOST: "victorialogs-vmauth.observability.svc.cluster.local"
+  OBSERVABILITY_LOG_ENDPOINT_PORT: "9428"
+  OBSERVABILITY_LOG_ENDPOINT_PATH: "/insert"
+  OBSERVABILITY_LOG_ENDPOINT_TLS: "Off"
+  OBSERVABILITY_LOG_TENANT: "apps"
+  OBSERVABILITY_GRAFANA_SECRET_PATH: "kubernetes/apps/grafana-admin"
+
+  # CloudNative-PG Configuration
+  CNPG_STORAGE_CLASS: "openebs-local-nvme"
+  CNPG_DATA_SIZE: "200Gi"
+  CNPG_WAL_SIZE: "100Gi"
+  CNPG_BACKUP_BUCKET: "monosense-cnpg-apps"
+  CNPG_MINIO_SECRET_PATH: "kubernetes/apps/cloudnative-pg/minio"
+  CNPG_SUPERUSER_SECRET_PATH: "kubernetes/apps/cloudnative-pg/superuser"
+
+  # Dragonfly Configuration
+  DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
+  DRAGONFLY_DATA_SIZE: "50Gi"
+  DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/apps/dragonfly/auth"
+
+  # GitLab Configuration
+  GITLAB_DB_SECRET_PATH: "kubernetes/apps/gitlab/db"
+  GITLAB_REDIS_SECRET_PATH: "kubernetes/apps/gitlab/redis"
+  GITLAB_S3_SECRET_PATH: "kubernetes/apps/gitlab/s3"
+  GITLAB_ROOT_SECRET_PATH: "kubernetes/apps/gitlab/root"

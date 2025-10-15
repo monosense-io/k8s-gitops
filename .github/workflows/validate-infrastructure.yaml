@@ -1,0 +1,248 @@
+---
+name: Validate Infrastructure
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kubernetes/**'
+      - 'talos/**'
+      - '.github/workflows/validate-infrastructure.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'kubernetes/**'
+      - 'talos/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-kubernetes-manifests:
+    name: Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@main
+
+      - name: Validate Infra Cluster Infrastructure
+        run: |
+          echo "::group::Validating infra cluster infrastructure stack"
+          flux build kustomization cluster-infra-infrastructure \
+            --path ./kubernetes/infrastructure \
+            --kustomization-file ./kubernetes/clusters/infra/infrastructure.yaml
+          echo "::endgroup::"
+
+      - name: Validate Infra Cluster Workloads
+        run: |
+          echo "::group::Validating infra cluster workloads stack"
+          flux build kustomization cluster-infra-workloads \
+            --path ./kubernetes/workloads/platform \
+            --kustomization-file ./kubernetes/clusters/infra/workloads.yaml
+          echo "::endgroup::"
+
+      - name: Validate Apps Cluster Infrastructure
+        run: |
+          echo "::group::Validating apps cluster infrastructure stack"
+          flux build kustomization cluster-apps-infrastructure \
+            --path ./kubernetes/infrastructure \
+            --kustomization-file ./kubernetes/clusters/apps/infrastructure.yaml
+          echo "::endgroup::"
+
+      - name: Validate Apps Cluster Workloads
+        run: |
+          echo "::group::Validating apps cluster workloads stack"
+          flux build kustomization cluster-apps-workloads \
+            --path ./kubernetes/workloads/tenants \
+            --kustomization-file ./kubernetes/clusters/apps/workloads.yaml
+          echo "::endgroup::"
+
+      - name: Check for Flux Drift
+        run: |
+          echo "::group::Checking for configuration drift"
+          flux diff kustomization cluster-infra-infrastructure \
+            --path ./kubernetes/infrastructure \
+            --kustomization-file ./kubernetes/clusters/infra/infrastructure.yaml || true
+          echo "::endgroup::"
+
+  lint-yaml:
+    name: Lint YAML Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint with yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: kubernetes/
+          config_data: |
+            extends: default
+            rules:
+              line-length:
+                max: 160
+                level: warning
+              document-start: disable
+              truthy:
+                allowed-values: ['true', 'false', 'on', 'off']
+
+  validate-schemas:
+    name: Validate Kubernetes Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate with kubeconform
+        uses: docker://ghcr.io/yannh/kubeconform:latest-alpine
+        with:
+          entrypoint: '/kubeconform'
+          args: >
+            -summary
+            -strict
+            -ignore-missing-schemas
+            -schema-location default
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+            -skip HelmRelease,OCIRepository,GitRepository,Kustomization,ImageRepository,ImagePolicy,ImageUpdateAutomation
+            kubernetes/
+
+  check-secrets:
+    name: Check for Leaked Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  scan-container-images:
+    name: Scan Container Images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract Container Images
+        id: extract
+        run: |
+          # Extract unique images from all manifests
+          images=$(grep -r "image:" kubernetes/ \
+            | grep -v "^#" \
+            | grep -v "kube-schemas" \
+            | awk '{print $NF}' \
+            | tr -d '"' \
+            | sort -u)
+
+          # Convert to JSON array for matrix
+          echo "images=$(echo "$images" | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+
+          # Count images
+          count=$(echo "$images" | wc -l)
+          echo "Found $count unique container images to scan"
+
+      - name: Scan Images with Trivy
+        run: |
+          images='${{ steps.extract.outputs.images }}'
+          echo "$images" | jq -r '.[]' | while read -r image; do
+            if [ -n "$image" ]; then
+              echo "::group::Scanning $image"
+              docker run --rm \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                aquasec/trivy:latest image \
+                --severity HIGH,CRITICAL \
+                --exit-code 0 \
+                --no-progress \
+                "$image" || echo "Warning: Vulnerabilities found in $image"
+              echo "::endgroup::"
+            fi
+          done
+
+  validate-talos-configs:
+    name: Validate Talos Machine Configs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Talos CLI
+        run: |
+          curl -sL https://github.com/siderolabs/talos/releases/latest/download/talosctl-linux-amd64 -o /usr/local/bin/talosctl
+          chmod +x /usr/local/bin/talosctl
+
+      - name: Validate Talos Config Syntax
+        run: |
+          echo "::group::Validating Talos machine config template"
+          # Check if template is valid Jinja2
+          python3 -c "
+          from jinja2 import Environment, FileSystemLoader
+          import sys
+          try:
+              env = Environment(loader=FileSystemLoader('talos'))
+              template = env.get_template('machineconfig.yaml.j2')
+              print('✅ Talos config template is valid Jinja2')
+          except Exception as e:
+              print(f'❌ Error: {e}')
+              sys.exit(1)
+          "
+          echo "::endgroup::"
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-kubernetes-manifests, lint-yaml, validate-schemas, check-secrets, validate-talos-configs]
+    if: always()
+    steps:
+      - name: Check Results
+        run: |
+          echo "## Infrastructure Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.validate-kubernetes-manifests.result }}" == "success" ]; then
+            echo "✅ Kubernetes Manifests: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Kubernetes Manifests: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.lint-yaml.result }}" == "success" ]; then
+            echo "✅ YAML Linting: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ YAML Linting: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-schemas.result }}" == "success" ]; then
+            echo "✅ Schema Validation: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Schema Validation: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.check-secrets.result }}" == "success" ]; then
+            echo "✅ Secret Scanning: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Secret Scanning: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.validate-talos-configs.result }}" == "success" ]; then
+            echo "✅ Talos Configs: PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Talos Configs: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if any check failed
+        if: |
+          needs.validate-kubernetes-manifests.result != 'success' ||
+          needs.lint-yaml.result != 'success' ||
+          needs.validate-schemas.result != 'success' ||
+          needs.check-secrets.result != 'success' ||
+          needs.validate-talos-configs.result != 'success'
+        run: exit 1

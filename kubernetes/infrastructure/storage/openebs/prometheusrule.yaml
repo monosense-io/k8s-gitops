@@ -1,0 +1,107 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openebs
+  namespace: openebs
+  labels:
+    app.kubernetes.io/name: openebs
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: openebs.rules
+      interval: 30s
+      rules:
+        - alert: OpenEBSAbsent
+          expr: |
+            absent(up{job="openebs-localpv-provisioner"})
+          for: 5m
+          annotations:
+            summary: OpenEBS metrics are absent
+            description: |
+              OpenEBS LocalPV provisioner has not reported metrics for 5 minutes.
+              Volume provisioning may not be working.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: OpenEBSProvisionerDown
+          expr: |
+            up{job="openebs-localpv-provisioner"} == 0
+          for: 5m
+          annotations:
+            summary: OpenEBS provisioner is down
+            description: |
+              OpenEBS LocalPV provisioner on {{ $labels.instance }} has been down for 5 minutes.
+              New volume creation will fail on this node.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: OpenEBSVolumeProvisioningFailures
+          expr: |
+            rate(openebs_volume_provision_errors_total[5m]) > 0
+          for: 10m
+          annotations:
+            summary: OpenEBS volume provisioning failures
+            description: |
+              OpenEBS is experiencing {{ $value | humanize }} volume provisioning failures/sec.
+              Check provisioner logs for details.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: OpenEBSHighDiskUsage
+          expr: |
+            (node_filesystem_size_bytes{mountpoint="/var/openebs/local"} - node_filesystem_avail_bytes{mountpoint="/var/openebs/local"})
+            / node_filesystem_size_bytes{mountpoint="/var/openebs/local"} > 0.85
+          for: 15m
+          annotations:
+            summary: OpenEBS high disk usage
+            description: |
+              OpenEBS storage on {{ $labels.instance }} is at {{ $value | humanizePercentage }} capacity (>85%).
+              Consider adding more storage or cleaning up volumes.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: OpenEBSDiskFull
+          expr: |
+            (node_filesystem_size_bytes{mountpoint="/var/openebs/local"} - node_filesystem_avail_bytes{mountpoint="/var/openebs/local"})
+            / node_filesystem_size_bytes{mountpoint="/var/openebs/local"} > 0.95
+          for: 5m
+          annotations:
+            summary: OpenEBS disk almost full
+            description: |
+              OpenEBS storage on {{ $labels.instance }} is at {{ $value | humanizePercentage }} capacity (>95%).
+              Immediate action required - volume operations will fail.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: OpenEBSVolumeAttachmentFailures
+          expr: |
+            rate(openebs_volume_attach_errors_total[5m]) > 0
+          for: 10m
+          annotations:
+            summary: OpenEBS volume attachment failures
+            description: |
+              OpenEBS is experiencing {{ $value | humanize }} volume attachment failures/sec.
+              Pods may fail to start.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: OpenEBSHighMemoryUsage
+          expr: |
+            process_resident_memory_bytes{job="openebs-localpv-provisioner"} > 268435456
+          for: 15m
+          annotations:
+            summary: OpenEBS provisioner high memory usage
+            description: |
+              OpenEBS provisioner memory usage is {{ humanize $value }} (>256Mi)
+              for 15 minutes. Consider increasing resource limits.
+          labels:
+            severity: warning
+            component: storage

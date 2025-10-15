@@ -1,0 +1,119 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: cert-manager.rules
+      interval: 30s
+      rules:
+        - alert: CertManagerAbsent
+          expr: |
+            absent(up{job="cert-manager"})
+          for: 5m
+          annotations:
+            summary: cert-manager is absent
+            description: |
+              cert-manager has not reported metrics for 5 minutes.
+              Certificate management and renewal may not be working.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: CertManagerWebhookDown
+          expr: |
+            up{job="cert-manager-webhook"} == 0
+          for: 5m
+          annotations:
+            summary: cert-manager webhook is down
+            description: |
+              cert-manager webhook has been down for 5 minutes.
+              Certificate requests will fail validation.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: CertManagerCertificateExpiringSoon
+          expr: |
+            certmanager_certificate_expiration_timestamp_seconds - time() < (7 * 24 * 3600)
+          for: 1h
+          annotations:
+            summary: Certificate expiring soon
+            description: |
+              Certificate {{ $labels.name }} in namespace {{ $labels.namespace }}
+              will expire in {{ $value | humanizeDuration }}.
+          labels:
+            severity: warning
+            component: security
+
+        - alert: CertManagerCertificateExpiringCritical
+          expr: |
+            certmanager_certificate_expiration_timestamp_seconds - time() < (24 * 3600)
+          for: 1h
+          annotations:
+            summary: Certificate expiring in 24 hours
+            description: |
+              Certificate {{ $labels.name }} in namespace {{ $labels.namespace }}
+              will expire in {{ $value | humanizeDuration }}.
+              Immediate action required.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: CertManagerCertificateNotReady
+          expr: |
+            certmanager_certificate_ready_status{condition="False"} == 1
+          for: 15m
+          annotations:
+            summary: Certificate not ready
+            description: |
+              Certificate {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has not been ready for 15 minutes.
+          labels:
+            severity: warning
+            component: security
+
+        - alert: CertManagerCertificateRenewalFailed
+          expr: |
+            rate(certmanager_http_acme_client_request_count{status!~"2.."}[5m]) > 0
+          for: 15m
+          annotations:
+            summary: Certificate renewal failures
+            description: |
+              cert-manager is experiencing ACME renewal failures at {{ $value | humanize }} failures/sec.
+              Certificate renewals may fail.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: CertManagerHighMemoryUsage
+          expr: |
+            process_resident_memory_bytes{job="cert-manager"} > 268435456
+          for: 15m
+          annotations:
+            summary: cert-manager high memory usage
+            description: |
+              cert-manager memory usage is {{ humanize $value }} (>256Mi)
+              for 15 minutes. Consider increasing resource limits.
+          labels:
+            severity: warning
+            component: security
+
+        - alert: CertManagerCertificateRequestFailed
+          expr: |
+            certmanager_certificate_request_controller_sync_call_count{result="error"} > 0
+          for: 10m
+          annotations:
+            summary: Certificate request failures
+            description: |
+              cert-manager is failing to process certificate requests.
+              New certificate issuance will fail.
+          labels:
+            severity: critical
+            component: security

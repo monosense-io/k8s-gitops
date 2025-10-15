@@ -1,0 +1,13 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Flux Kustomization resources for networking components
+  - cilium/ks.yaml
+  - coredns/ks.yaml
+  - spegel/ks.yaml
+  # Component directories (contain actual manifests)
+  - cilium
+  - coredns
+  - spegel

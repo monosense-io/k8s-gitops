@@ -1,0 +1,118 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-secrets
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/name: external-secrets
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: external-secrets.rules
+      interval: 30s
+      rules:
+        - alert: ExternalSecretsAbsent
+          expr: |
+            absent(up{job="external-secrets"})
+          for: 5m
+          annotations:
+            summary: external-secrets is absent
+            description: |
+              external-secrets operator has not reported metrics for 5 minutes.
+              Secret synchronization from external providers has stopped.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: ExternalSecretsDown
+          expr: |
+            up{job="external-secrets"} == 0
+          for: 5m
+          annotations:
+            summary: external-secrets is down
+            description: |
+              external-secrets operator has been down for 5 minutes.
+              Secrets will not be synchronized from 1Password or other providers.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: ExternalSecretsWebhookDown
+          expr: |
+            up{job="external-secrets-webhook"} == 0
+          for: 5m
+          annotations:
+            summary: external-secrets webhook is down
+            description: |
+              external-secrets webhook has been down for 5 minutes.
+              ExternalSecret validation will fail.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: ExternalSecretSyncFailure
+          expr: |
+            externalsecrets_sync_calls_error > 0
+          for: 15m
+          annotations:
+            summary: ExternalSecret sync failures
+            description: |
+              ExternalSecret {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has failed to sync for 15 minutes. Secrets may be stale.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: ExternalSecretStatusError
+          expr: |
+            externalsecrets_externalsecret_status_condition{condition="Ready",status="False"} == 1
+          for: 15m
+          annotations:
+            summary: ExternalSecret not ready
+            description: |
+              ExternalSecret {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has not been ready for 15 minutes.
+          labels:
+            severity: warning
+            component: security
+
+        - alert: ExternalSecretsHighSyncDuration
+          expr: |
+            histogram_quantile(0.99, rate(externalsecrets_sync_calls_duration_bucket[5m])) > 10
+          for: 15m
+          annotations:
+            summary: ExternalSecret sync duration high
+            description: |
+              ExternalSecret p99 sync duration is {{ $value | humanizeDuration }} (>10s).
+              Secret provider API may be slow or rate-limiting.
+          labels:
+            severity: warning
+            component: security
+
+        - alert: ExternalSecretsStoreConnectionFailure
+          expr: |
+            rate(externalsecrets_externalsecret_status_condition{condition="Ready",status="False",reason="SecretStoreError"}[5m]) > 0
+          for: 10m
+          annotations:
+            summary: SecretStore connection failures
+            description: |
+              SecretStore {{ $labels.secretstore }} is failing to connect.
+              ExternalSecrets using this store will fail to sync.
+          labels:
+            severity: critical
+            component: security
+
+        - alert: ExternalSecretsHighMemoryUsage
+          expr: |
+            process_resident_memory_bytes{job="external-secrets"} > 268435456
+          for: 15m
+          annotations:
+            summary: external-secrets high memory usage
+            description: |
+              external-secrets memory usage is {{ humanize $value }} (>256Mi)
+              for 15 minutes. Consider increasing resource limits.
+          labels:
+            severity: warning
+            component: security

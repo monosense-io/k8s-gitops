@@ -1,0 +1,20 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: apps-wildcard
+  namespace: gateway-system
+spec:
+  secretName: apps-wildcard-tls
+  # Let's Encrypt issues 90-day certs. These values are safe defaults.
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days
+  issuerRef:
+    # Use staging first to avoid rate limits; switch to letsencrypt-prod after validation.
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: "*.apps.${SECRET_DOMAIN}"
+  dnsNames:
+    - "*.apps.${SECRET_DOMAIN}"
+    - "apps.${SECRET_DOMAIN}"
+

@@ -1,0 +1,97 @@
+---
+# Fluent Bit Audit Log Configuration
+# Purpose: Forward Kubernetes API audit logs to Victoria Logs
+# Security: BLOCKER #2 - Talos Audit Logging
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-audit-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: audit-logging
+    monosense.io/security-blocker: audit-logging
+data:
+  # Input: Tail API server audit logs from host filesystem
+  audit-input.conf: |
+    [INPUT]
+        Name              tail
+        Tag               audit.kube-apiserver
+        Path              /var/log/audit/kube-apiserver-audit.log
+        Parser            json
+        DB                /var/fluent-bit/state/audit-kube-apiserver.db
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+        Read_from_Head    False
+
+  # Filter: Parse JSON audit logs and enrich
+  audit-filter.conf: |
+    [FILTER]
+        Name          parser
+        Match         audit.kube-apiserver
+        Key_Name      log
+        Parser        json
+        Reserve_Data  On
+
+    [FILTER]
+        Name    modify
+        Match   audit.kube-apiserver
+        Add     cluster ${CLUSTER_NAME}
+        Add     stream audit.kube-apiserver
+        Add     log_type kubernetes-audit
+
+    [FILTER]
+        Name    nest
+        Match   audit.kube-apiserver
+        Operation lift
+        Nested_under kubernetes
+        Add_prefix k8s_
+
+  # Output: Forward to Victoria Logs
+  audit-output.conf: |
+    [OUTPUT]
+        Name                 http
+        Match                audit.kube-apiserver
+        Host                 victoria-logs.monitoring.svc.cluster.local
+        Port                 9428
+        URI                  /insert/jsonline?_stream_fields=stream,cluster,namespace
+        Format               json_lines
+        Header               AccountID 0
+        Header               ProjectID 0
+        Json_date_key        timestamp
+        Json_date_format     iso8601
+        compress             gzip
+        Retry_Limit          3
+
+  # Parser: JSON parser for audit logs
+  audit-parser.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+        Time_Keep   On
+---
+# DaemonSet patch to mount audit log directory
+# This will be merged with the main Fluent Bit HelmRelease
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-audit-volumes
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: audit-logging
+data:
+  volumes.yaml: |
+    # Add to Fluent Bit DaemonSet spec.template.spec.volumes
+    - name: varlogaudit
+      hostPath:
+        path: /var/log/audit
+        type: DirectoryOrCreate
+
+    # Add to Fluent Bit DaemonSet spec.template.spec.containers[0].volumeMounts
+    - name: varlogaudit
+      mountPath: /var/log/audit
+      readOnly: true

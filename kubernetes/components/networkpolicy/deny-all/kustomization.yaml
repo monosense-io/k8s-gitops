@@ -1,0 +1,19 @@
+---
+# NetworkPolicy Component - Deny All
+# Default deny policy for namespace security
+# Blocks all ingress and egress traffic by default
+#
+# Usage:
+#   apiVersion: kustomize.config.k8s.io/v1beta1
+#   kind: Kustomization
+#   namespace: my-namespace
+#   components:
+#     - ../../../components/networkpolicy/deny-all
+#
+# Important: Add allow policies after this to permit required traffic
+
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - networkpolicy.yaml

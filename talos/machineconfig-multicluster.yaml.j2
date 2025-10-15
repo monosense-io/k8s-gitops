@@ -1,0 +1,178 @@
+---
+version: v1alpha1
+machine:
+  type: {{ machinetype }}
+  token: op://Prod/{{ cluster }}-talos/MACHINE_TOKEN
+  ca:
+    crt: op://Prod/{{ cluster }}-talos/MACHINE_CA_CRT
+    {% if machinetype == 'controlplane' %}
+    key: op://Prod/{{ cluster }}-talos/MACHINE_CA_KEY
+    {% endif %}
+  features:
+    rbac: true
+    stableHostname: true
+    {% if machinetype == 'controlplane' %}
+    kubernetesTalosAPIAccess:
+      enabled: true
+      allowedRoles: ["os:admin"]
+      allowedKubernetesNamespaces: ["actions-runner-system", "system-upgrade"]
+    {% endif %}
+    apidCheckExtKeyUsage: true
+    diskQuotaSupport: true
+    kubePrism:
+      enabled: true
+      port: 7445
+    hostDNS:
+      enabled: true
+      resolveMemberNames: true
+      forwardKubeDNSToHost: false
+  files:
+    - op: create
+      path: /etc/cri/conf.d/20-customization.part
+      content: |
+        [plugins."io.containerd.cri.v1.images"]
+          discard_unpacked_layers = false
+        [plugins."io.containerd.cri.v1.runtime"]
+          device_ownership_from_security_context = true
+    - op: overwrite
+      path: /etc/nfsmount.conf
+      permissions: 0o644
+      content: |
+        [ NFSMount_Global_Options ]
+        nfsvers=4.1
+        hard=True
+        nconnect=8
+        noatime=True
+        rsize=1048576
+        wsize=1048576
+  install:
+    diskSelector:
+      model: Samsung SSD 860
+    image: factory.talos.dev/metal-installer/d60a9a96a6bbc418c786ee44fd5c01137d9a02497012cf080722ee79d3ee6d7e:v1.11.2
+  kernel:
+    modules:
+      - name: nbd
+  kubelet:
+    image: ghcr.io/siderolabs/kubelet:v1.34.1
+    extraConfig:
+      featureGates:
+        ImageVolume: true
+      serializeImagePulls: false
+    defaultRuntimeSeccompProfileEnabled: true
+    nodeIP:
+      validSubnets: ["10.25.11.0/24"]
+    disableManifestsDirectory: true
+  network:
+    interfaces:
+      - interface: eno1
+        ignore: true
+    nameservers: ["10.25.10.30"]
+    disableSearchDomain: true
+  nodeLabels:
+    topology.kubernetes.io/region: {{ cluster }}
+    topology.kubernetes.io/zone: {{ 'm' if machinetype == 'controlplane' else 'w' }}
+    cluster: {{ cluster }}
+  sysctls:
+    fs.inotify.max_user_watches: 1048576
+    fs.inotify.max_user_instances: 8192
+    net.core.default_qdisc: fq
+    net.core.rmem_max: 67108864
+    net.core.wmem_max: 67108864
+    net.ipv4.tcp_congestion_control: bbr
+    net.ipv4.tcp_fastopen: 3
+    net.ipv4.tcp_mtu_probing: 1
+    net.ipv4.tcp_rmem: 4096 87380 33554432
+    net.ipv4.tcp_wmem: 4096 65536 33554432
+    net.ipv4.tcp_window_scaling: 1
+    sunrpc.tcp_slot_table_entries: 128
+    sunrpc.tcp_max_slot_table_entries: 128
+    user.max_user_namespaces: 11255
+    vm.nr_hugepages: 1024
+  time:
+    disabled: false
+    servers: ["time.cloudflare.com"]
+cluster:
+  ca:
+    crt: op://Prod/{{ cluster }}-talos/CLUSTER_CA_CRT
+    {% if machinetype == 'controlplane' %}
+    key: op://Prod/{{ cluster }}-talos/CLUSTER_CA_KEY
+    {% endif %}
+  clusterName: {{ cluster }}
+  controlPlane:
+    endpoint: https://{{ cluster }}-k8s.monosense.io:6443
+  discovery:
+    enabled: true
+    registries:
+      kubernetes: { disabled: true }
+      service: { disabled: false }
+  id: op://Prod/{{ cluster }}-talos/CLUSTER_ID
+  network:
+    cni:
+      name: none
+    dnsDomain: cluster.local
+    podSubnets: {{ pod_subnets }}
+    serviceSubnets: {{ service_subnets }}
+  secret: op://Prod/{{ cluster }}-talos/CLUSTER_SECRET
+  token: op://Prod/{{ cluster }}-talos/CLUSTER_TOKEN
+  {% if machinetype == 'controlplane' %}
+  aggregatorCA:
+    crt: op://Prod/{{ cluster }}-talos/CLUSTER_AGGREGATORCA_CRT
+    key: op://Prod/{{ cluster }}-talos/CLUSTER_AGGREGATORCA_KEY
+  allowSchedulingOnControlPlanes: true
+  apiServer:
+    image: registry.k8s.io/kube-apiserver:v1.34.1
+    extraArgs:
+      enable-aggregator-routing: true
+      feature-gates: ImageVolume=true
+    certSANs: ["{{ cluster }}-k8s.monosense.io"]
+    disablePodSecurityPolicy: true
+  controllerManager:
+    image: registry.k8s.io/kube-controller-manager:v1.34.1
+    extraArgs: { bind-address: 0.0.0.0 }
+  coreDNS: { disabled: true }
+  etcd:
+    advertisedSubnets: ["10.25.11.0/24"]
+    ca:
+      crt: op://Prod/{{ cluster }}-talos/CLUSTER_ETCD_CA_CRT
+      key: op://Prod/{{ cluster }}-talos/CLUSTER_ETCD_CA_KEY
+    extraArgs: { listen-metrics-urls: http://0.0.0.0:2381 }
+  proxy:
+    disabled: true
+    image: registry.k8s.io/kube-proxy:v1.34.1
+  secretboxEncryptionSecret: op://Prod/{{ cluster }}-talos/CLUSTER_SECRETBOXENCRYPTIONSECRET
+  scheduler:
+    image: registry.k8s.io/kube-scheduler:v1.34.1
+    extraArgs: { bind-address: 0.0.0.0 }
+    config:
+      apiVersion: kubescheduler.config.k8s.io/v1
+      kind: KubeSchedulerConfiguration
+      profiles:
+        - schedulerName: default-scheduler
+          plugins:
+            score:
+              disabled: [{ name: ImageLocality }]
+          pluginConfig:
+            - name: PodTopologySpread
+              args:
+                defaultingType: List
+                defaultConstraints:
+                  - maxSkew: 1
+                    topologyKey: kubernetes.io/hostname
+                    whenUnsatisfiable: ScheduleAnyway
+  serviceAccount:
+    key: op://Prod/{{ cluster }}-talos/CLUSTER_SERVICEACCOUNT_KEY
+  {% endif %}
+---
+apiVersion: v1alpha1
+kind: UserVolumeConfig
+name: openebs
+provisioning:
+  diskSelector:
+    match: disk.model == "TEAM TM8FP6512G"
+  minSize: 100GiB
+  maxSize: 500GiB
+---
+apiVersion: v1alpha1
+kind: WatchdogTimerConfig
+device: /dev/watchdog0
+timeout: 5m

@@ -1,0 +1,37 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rook-ceph-operator
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: rook-ceph-operator
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: rook-ceph
+    cluster: ${CLUSTER}
+spec:
+  dependsOn:
+    - name: cilium
+      namespace: flux-system
+  interval: 10m
+  timeout: 5m
+  retryInterval: 1m
+  path: ./kubernetes/infrastructure/storage/rook-ceph/operator
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: rook-ceph
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: rook-ceph-operator
+      namespace: rook-ceph
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false

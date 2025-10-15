@@ -1,0 +1,40 @@
+---
+# ServiceMonitor Component
+# Creates a ServiceMonitor for Prometheus metrics scraping
+#
+# Usage:
+#   apiVersion: kustomize.config.k8s.io/v1beta1
+#   kind: Kustomization
+#   components:
+#     - ../../../components/monitoring/servicemonitor
+#   resources:
+#     - service.yaml  # Must have app.kubernetes.io/name label
+#
+# The ServiceMonitor will automatically match the Service's labels
+
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - servicemonitor.yaml
+
+replacements:
+  # Auto-populate ServiceMonitor name from Service
+  - source:
+      kind: Service
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: ServiceMonitor
+        fieldPaths:
+          - metadata.name
+
+  # Copy app label from Service to ServiceMonitor selector
+  - source:
+      kind: Service
+      fieldPath: metadata.labels.[app.kubernetes.io/name]
+    targets:
+      - select:
+          kind: ServiceMonitor
+        fieldPaths:
+          - spec.selector.matchLabels.[app.kubernetes.io/name]

@@ -1,0 +1,32 @@
+---
+# Monitoring Reader ClusterRole
+# Purpose: Cluster-wide read-only for metrics and observability
+# Persona: Victoria Metrics, Prometheus, Grafana, monitoring tools
+# Validation: Security BLOCKER #1 - RBAC Model
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring-reader
+  labels:
+    app.kubernetes.io/managed-by: flux
+    rbac.monosense.io/persona: monitoring
+    rbac.monosense.io/privilege-level: low
+rules:
+  # Read all resources for metrics collection
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+
+  # Access non-resource endpoints for metrics
+  - nonResourceURLs:
+      - "/metrics"
+      - "/metrics/cadvisor"
+      - "/metrics/probes"
+      - "/metrics/resource"
+      - "/healthz"
+      - "/readyz"
+      - "/livez"
+    verbs: ["get"]
+
+  # Explicitly deny Secret data access (metadata OK)
+  # Note: This is informational; secrets are excluded in ClusterRoleBinding

@@ -1,0 +1,638 @@
+---
+version: '3'
+
+vars:
+  DEFAULT_CLUSTERS: infra,apps
+
+tasks:
+  # ============================================================================
+  # Complete End-to-End Cluster Creation
+  # ============================================================================
+
+  create-infra:
+    desc: 🚀 Create complete infra cluster from scratch (Talos → K8s → Flux)
+    prompt: Create infra cluster from scratch? This will bootstrap Talos, Kubernetes, and Flux.
+    cmds:
+      - task: create
+        vars: {CLUSTER: infra, CONTEXT: infra}
+
+  create-apps:
+    desc: 🚀 Create complete apps cluster from scratch (Talos → K8s → Flux)
+    prompt: Create apps cluster from scratch? This will bootstrap Talos, Kubernetes, and Flux.
+    cmds:
+      - task: create
+        vars: {CLUSTER: apps, CONTEXT: apps}
+
+  create:
+    desc: Complete cluster creation workflow
+    cmds:
+      - task: preflight
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+      - echo "🎯 Creating {{.CLUSTER}} cluster from scratch..."
+      - echo "  This will take approximately 15-20 minutes"
+      - echo ""
+
+      # Layer 1: Talos Cluster Bootstrap
+      - task: layer:1-talos
+        vars: {CLUSTER: "{{.CLUSTER}}"}
+
+      # Layer 2: Kubernetes Waiting
+      - task: layer:2-kubernetes
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      # Layer 3: CRD Bootstrap
+      - task: layer:3-crds
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      # Layer 4: Core Infrastructure
+      - task: layer:4-infrastructure
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      # Layer 5: Complete Validation
+      - task: layer:5-validation
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      - echo ""
+      - echo "✅ Cluster {{.CLUSTER}} created successfully!"
+      - echo ""
+      - task: status
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+    vars:
+      CLUSTER: '{{.CLUSTER | default ""}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+    requires:
+      vars: [CLUSTER]
+
+  # ============================================================================
+  # Individual Bootstrap Layers
+  # ============================================================================
+
+  layer:1-talos:
+    desc: 🔧 Layer 1 - Bootstrap Talos cluster
+    internal: true
+    cmds:
+      - echo "=============================================="
+      - 'echo "🔧 Layer 1: Bootstrapping Talos Cluster"'
+      - echo "=============================================="
+      - 'echo "  Cluster: {{.CLUSTER}}"'
+      - 'echo "  Bootstrap node: {{.BOOTSTRAP_NODE}}"'
+      - 'echo "  Additional nodes: {{.ADDITIONAL_NODES}}"'
+      - echo ""
+
+      # Step 1: Bootstrap first control plane (etcd init)
+      - 'echo "📦 Step 1/6: Bootstrapping first control plane..."'
+      - task: :talos:apply-node
+        vars:
+          NODE: "{{.BOOTSTRAP_NODE}}"
+          CLUSTER: "{{.CLUSTER}}"
+          MACHINE_TYPE: controlplane
+
+      # Step 2: Wait for Talos API
+      - echo ""
+      - 'echo "⏳ Step 2/6: Waiting for Talos API to be ready..."'
+      - sleep 15
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} health --wait-timeout 2m --server=false
+
+      # Step 3: Bootstrap etcd
+      - echo ""
+      - 'echo "🔧 Step 3/6: Bootstrapping etcd on first node..."'
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} bootstrap
+      - sleep 10
+
+      # Step 4: Apply config to remaining nodes
+      - echo ""
+      - 'echo "📦 Step 4/6: Configuring additional control plane nodes..."'
+      - |
+        NODE_COUNT=0
+        for node in {{.ADDITIONAL_NODES}}; do
+          if [ -n "$node" ]; then
+            NODE_COUNT=$((NODE_COUNT + 1))
+            echo "  → Applying config to node $NODE_COUNT: $node"
+            task :talos:apply-node NODE=$node CLUSTER={{.CLUSTER}} MACHINE_TYPE=controlplane
+            sleep 5
+          fi
+        done
+
+      # Step 5: Wait for etcd cluster
+      - echo ""
+      - 'echo "⏳ Step 5/6: Waiting for etcd cluster formation..."'
+      - sleep 20
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+
+      # Step 6: Wait for all nodes healthy
+      - echo ""
+      - 'echo "⏳ Step 6/6: Waiting for all Talos nodes to be healthy..."'
+      - talosctl --nodes {{.ALL_NODES}} health --wait-timeout 5m
+
+      # Step 7: Generate kubeconfig
+      - echo ""
+      - echo "📝 Generating kubeconfig..."
+      - task: :talos:generate-kubeconfig
+
+      - echo ""
+      - 'echo "✅ Layer 1 Complete: Talos cluster is running"'
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      BOOTSTRAP_NODE:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//'
+      ADDITIONAL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | tail -n +2 | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ' '
+      ALL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ','
+
+  layer:2-kubernetes:
+    desc: ⏳ Layer 2 - Wait for Kubernetes to be ready
+    internal: true
+    cmds:
+      - echo ""
+      - echo "=============================================="
+      - 'echo "⏳ Layer 2: Waiting for Kubernetes"'
+      - echo "=============================================="
+
+      # Wait for API server
+      - echo "📡 Waiting for Kubernetes API server..."
+      - |
+        for i in {1..60}; do
+          if kubectl --context={{.CONTEXT}} cluster-info &> /dev/null; then
+            echo "  ✅ API server is responding"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "  ❌ Timeout waiting for API server"
+            exit 1
+          fi
+          echo "  → Attempt $i/60: API server not ready yet..."
+          sleep 5
+        done
+
+      # Wait for nodes
+      - echo ""
+      - echo "🖥️  Waiting for control plane nodes to be Ready..."
+      - kubectl --context={{.CONTEXT}} wait --for=condition=Ready \
+          nodes --selector=node-role.kubernetes.io/control-plane \
+          --timeout=5m
+
+      # Display nodes
+      - echo ""
+      - echo "📋 Cluster nodes:"
+      - kubectl --context={{.CONTEXT}} get nodes -o wide
+
+      # Verify etcd
+      - echo ""
+      - echo "🔍 Verifying etcd health..."
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+
+      - echo ""
+      - 'echo "✅ Layer 2 Complete: Kubernetes is ready"'
+    vars:
+      CONTEXT: '{{.CONTEXT}}'
+      BOOTSTRAP_NODE:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//'
+
+  layer:3-crds:
+    desc: 🔧 Layer 3 - Install CRDs
+    internal: true
+    cmds:
+      - echo ""
+      - echo "=============================================="
+      - 'echo "🔧 Layer 3: Installing CRDs"'
+      - echo "=============================================="
+
+      - task: :bootstrap:phase:0
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      - echo ""
+      - task: :bootstrap:phase:1
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      - echo ""
+      - 'echo "✅ Layer 3 Complete: CRDs installed"'
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      CONTEXT: '{{.CONTEXT}}'
+
+  layer:4-infrastructure:
+    desc: 🚀 Layer 4 - Deploy core infrastructure
+    internal: true
+    cmds:
+      - echo ""
+      - echo "=============================================="
+      - 'echo "🚀 Layer 4: Deploying Core Infrastructure"'
+      - echo "=============================================="
+
+      - task: :bootstrap:phase:2
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      - echo ""
+      - 'echo "✅ Layer 4 Complete: Core infrastructure deployed"'
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      CONTEXT: '{{.CONTEXT}}'
+
+  layer:5-validation:
+    desc: ✅ Layer 5 - Validate complete cluster
+    internal: true
+    cmds:
+      - echo ""
+      - echo "=============================================="
+      - 'echo "✅ Layer 5: Validating Complete Cluster"'
+      - echo "=============================================="
+
+      - task: validate:all
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+
+      - echo ""
+      - 'echo "✅ Layer 5 Complete: All validations passed"'
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      CONTEXT: '{{.CONTEXT}}'
+
+  # ============================================================================
+  # Validation Tasks
+  # ============================================================================
+
+  validate:all:
+    desc: 🔍 Validate complete cluster across all layers
+    cmds:
+      - task: validate:talos
+        vars: {CLUSTER: "{{.CLUSTER}}"}
+      - task: validate:kubernetes
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+      - task: validate:crds
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+      - task: validate:networking
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+      - task: validate:flux
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+
+  validate:talos:
+    internal: true
+    cmds:
+      - echo "🔍 Validating Talos layer..."
+      - talosctl --nodes {{.ALL_NODES}} health --wait-timeout 30s
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+      - echo "  ✅ Talos health check passed"
+    vars:
+      BOOTSTRAP_NODE:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//'
+      ALL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ','
+
+  validate:kubernetes:
+    internal: true
+    cmds:
+      - echo "🔍 Validating Kubernetes layer..."
+      - kubectl --context={{.CONTEXT}} get nodes
+      - |
+        FAILED_PODS=$(kubectl --context={{.CONTEXT}} get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')
+        if [ "$FAILED_PODS" -gt 0 ]; then
+          echo "  ⚠️  Warning: $FAILED_PODS pods not in Running/Succeeded state"
+        else
+          echo "  ✅ All pods are healthy"
+        fi
+    vars:
+      CONTEXT: '{{.CONTEXT}}'
+
+  validate:crds:
+    internal: true
+    cmds:
+      - task: :bootstrap:validate:crds
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+    vars:
+      CONTEXT: '{{.CONTEXT}}'
+
+  validate:networking:
+    internal: true
+    cmds:
+      - echo "🔍 Validating networking layer..."
+      - kubectl --context={{.CONTEXT}} wait --for=condition=Ready \
+          pod -l app.kubernetes.io/name=cilium -n kube-system \
+          --timeout=2m 2>/dev/null || echo "  ⚠️  Cilium not yet ready"
+      - echo "  ✅ Networking check passed"
+    vars:
+      CONTEXT: '{{.CONTEXT}}'
+
+  validate:flux:
+    internal: true
+    cmds:
+      - task: :bootstrap:validate:flux
+        vars: {CONTEXT: "{{.CONTEXT}}"}
+    vars:
+      CONTEXT: '{{.CONTEXT}}'
+
+  # ============================================================================
+  # Cluster Status & Monitoring
+  # ============================================================================
+
+  status:
+    desc: 📊 Show complete cluster status (all layers)
+    cmds:
+      - echo "=============================================="
+      - 'echo "📊 Complete Cluster Status: {{.CLUSTER}}"'
+      - echo "=============================================="
+
+      - echo ""
+      - echo "🔧 Talos Layer:"
+      - echo "  Nodes:"
+      - |
+        for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
+          if [ -n "$node" ]; then
+            if talosctl --nodes $node get members --output json &> /dev/null; then
+              VERSION=$(talosctl --nodes $node version --short 2>/dev/null | grep 'Tag:' | awk '{print $2}' || echo "unknown")
+              echo "    - $node: ✅ Online (Talos $VERSION)"
+            else
+              echo "    - $node: ❌ Offline"
+            fi
+          fi
+        done
+
+      - echo ""
+      - echo "  Etcd:"
+      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | head -10 || echo "    ❌ Not available"
+
+      - echo ""
+      - echo "🖥️  Kubernetes Layer:"
+      - kubectl --context={{.CONTEXT}} get nodes 2>/dev/null || echo "  ❌ Cluster not ready"
+
+      - echo ""
+      - echo "📦 Core Components:"
+      - kubectl --context={{.CONTEXT}} get pods -n kube-system -o wide 2>/dev/null | grep -E "(NAME|cilium|coredns)" | head -10 || echo "  Not deployed yet"
+
+      - echo ""
+      - echo "📊 Flux Layer:"
+      - flux --context={{.CONTEXT}} get kustomizations -A 2>/dev/null || echo "  Flux not installed yet"
+
+      - echo ""
+      - echo "⚠️  CRDs:"
+      - |
+        VM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | grep -c victoriametrics || echo "0")
+        PROM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | grep -c monitoring.coreos || echo "0")
+        echo "  VictoriaMetrics CRDs: $VM_CRDS"
+        echo "  Prometheus CRDs: $PROM_CRDS"
+
+      - echo "=============================================="
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+      BOOTSTRAP_NODE:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f 2>/dev/null | sort | head -1 | xargs basename 2>/dev/null | sed 's/.yaml//' || echo "unknown"
+      ALL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/.yaml//' | tr '\n' ',' || echo "unknown"
+
+  status-infra:
+    desc: 📊 Show infra cluster status
+    cmds:
+      - task: status
+        vars: {CLUSTER: infra, CONTEXT: infra}
+
+  status-apps:
+    desc: 📊 Show apps cluster status
+    cmds:
+      - task: status
+        vars: {CLUSTER: apps, CONTEXT: apps}
+
+  health:
+    desc: 🏥 Quick health check across all layers
+    cmds:
+      - 'echo "🏥 Health Check: {{.CLUSTER}}"'
+      - echo ""
+      - 'talosctl --nodes {{.ALL_NODES}} health --wait-timeout 10s && echo "✅ Talos: Healthy" || echo "❌ Talos: Unhealthy"'
+      - 'kubectl --context={{.CONTEXT}} get nodes &> /dev/null && echo "✅ Kubernetes: Healthy" || echo "❌ Kubernetes: Unhealthy"'
+      - 'kubectl --context={{.CONTEXT}} get crd prometheusrules.monitoring.coreos.com &> /dev/null && echo "✅ CRDs: Installed" || echo "❌ CRDs: Not installed"'
+      - 'flux --context={{.CONTEXT}} check --pre &> /dev/null && echo "✅ Flux: Healthy" || echo "❌ Flux: Not installed"'
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+      ALL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f 2>/dev/null | xargs -n1 basename 2>/dev/null | sed 's/.yaml//' | tr '\n' ',' || echo "unknown"
+
+  # ============================================================================
+  # Cluster Destruction
+  # ============================================================================
+
+  destroy-infra:
+    desc: 🔥 Destroy complete infra cluster (DANGEROUS!)
+    cmds:
+      - task: destroy
+        vars: {CLUSTER: infra, CONTEXT: infra}
+
+  destroy-apps:
+    desc: 🔥 Destroy complete apps cluster (DANGEROUS!)
+    cmds:
+      - task: destroy
+        vars: {CLUSTER: apps, CONTEXT: apps}
+
+  destroy:
+    desc: Complete cluster destruction
+    prompt: "DESTROY {{.CLUSTER}} cluster? This will WIPE ALL DATA including Talos!"
+    cmds:
+      - 'echo "🔥 Destroying cluster: {{.CLUSTER}}"'
+      - echo "  This will:"
+      - echo "  - Delete all Kubernetes resources"
+      - echo "  - Reset Talos (wipe disks)"
+      - echo "  - Remove local kubeconfig"
+      - echo ""
+
+      # Step 1: Try to delete Kubernetes resources gracefully
+      - 'echo "📦 Step 1/4: Deleting Kubernetes resources..."'
+      - kubectl --context={{.CONTEXT}} delete kustomization --all -A --timeout=2m 2>/dev/null || true
+      - flux uninstall --context={{.CONTEXT}} --silent 2>/dev/null || true
+
+      # Step 2: Reset all Talos nodes
+      - echo ""
+      - 'echo "🔥 Step 2/4: Resetting Talos nodes..."'
+      - |
+        for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
+          if [ -n "$node" ]; then
+            echo "  → Resetting node: $node"
+            talosctl --nodes $node reset --graceful=false --reboot 2>/dev/null || true
+          fi
+        done
+
+      # Step 3: Clean local artifacts
+      - echo ""
+      - 'echo "🧹 Step 3/4: Cleaning local artifacts..."'
+      - rm -f {{.KUBERNETES_DIR}}/kubeconfig 2>/dev/null || true
+      - kubectl config delete-context {{.CONTEXT}} 2>/dev/null || true
+
+      # Step 4: Verify destruction
+      - echo ""
+      - 'echo "🔍 Step 4/4: Verifying destruction..."'
+      - sleep 5
+      - |
+        for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
+          if [ -n "$node" ]; then
+            if talosctl --nodes $node health --wait-timeout 5s &> /dev/null; then
+              echo "  ⚠️  Node $node is still responding (may be rebooting)"
+            else
+              echo "  ✅ Node $node is offline"
+            fi
+          fi
+        done
+
+      - echo ""
+      - echo "✅ Cluster destroyed. Nodes will reboot to maintenance mode."
+      - echo "   Run 'task cluster:create-{{.CLUSTER}}' to recreate the cluster."
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      CONTEXT: '{{.CONTEXT}}'
+      ALL_NODES:
+        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ','
+
+  soft-destroy:
+    desc: 🧹 Soft destroy - Remove Kubernetes apps (keep Talos running)
+    prompt: "Remove all Kubernetes applications from {{.CLUSTER}} cluster?"
+    cmds:
+      - 'echo "🧹 Soft destroying cluster: {{.CLUSTER}}"'
+      - echo "  This will remove Kubernetes apps but keep Talos running"
+      - echo ""
+
+      - echo "📦 Deleting Flux resources..."
+      - kubectl --context={{.CONTEXT}} delete kustomization --all -A --timeout=2m || true
+
+      - echo ""
+      - echo "📦 Uninstalling Flux..."
+      - flux uninstall --context={{.CONTEXT}} --silent || true
+
+      - echo ""
+      - echo "📦 Deleting namespaces..."
+      - |
+        kubectl --context={{.CONTEXT}} delete namespace \
+          cert-manager \
+          external-secrets \
+          flux-system \
+          observability \
+          --wait=false 2>/dev/null || true
+
+      - echo ""
+      - echo "✅ Soft destroy complete. Talos cluster is still running."
+      - echo "   Run 'task bootstrap:{{.CLUSTER}}' to re-bootstrap Kubernetes."
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+
+  # ============================================================================
+  # Pre-Flight Checks
+  # ============================================================================
+
+  preflight:
+    desc: 🔍 Pre-flight checks for cluster creation
+    cmds:
+      - task: preflight:tools
+      - task: preflight:talos
+        vars: {CLUSTER: "{{.CLUSTER}}"}
+      - task: preflight:1password
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+
+  preflight:tools:
+    internal: true
+    cmds:
+      - echo "🔍 Checking required tools..."
+      - |
+        MISSING=""
+        for tool in kubectl helmfile yq talosctl minijinja-cli flux op; do
+          if ! command -v $tool &> /dev/null; then
+            echo "  ❌ $tool"
+            MISSING="$MISSING $tool"
+          else
+            echo "  ✅ $tool"
+          fi
+        done
+
+        if [ -n "$MISSING" ]; then
+          echo ""
+          echo "❌ Missing required tools:$MISSING"
+          echo "Install with: brew install$MISSING"
+          exit 1
+        fi
+
+  preflight:talos:
+    internal: true
+    cmds:
+      - echo ""
+      - echo "🔍 Checking Talos configuration..."
+      - test -f {{.TALOS_DIR}}/machineconfig.yaml.j2 || (echo "  ❌ machineconfig.yaml.j2 not found" && exit 1)
+      - test -d {{.TALOS_DIR}}/{{.CLUSTER}} || (echo "  ❌ {{.CLUSTER}} directory not found" && exit 1)
+      - |
+        NODE_COUNT=$(find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | wc -l | tr -d ' ')
+        if [ "$NODE_COUNT" -eq 0 ]; then
+          echo "  ❌ No node configurations found in {{.CLUSTER}} directory"
+          exit 1
+        fi
+        echo "  ✅ Found $NODE_COUNT node configuration(s)"
+        find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/^/    - /'
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+
+  preflight:1password:
+    internal: true
+    cmds:
+      - echo ""
+      - echo "🔍 Checking 1Password connectivity..."
+      - |
+        if command -v op &> /dev/null; then
+          if op account list &> /dev/null 2>&1; then
+            echo "  ✅ 1Password CLI authenticated"
+          else
+            echo "  ⚠️  1Password CLI not authenticated"
+            echo "     Run: eval \$(op signin)"
+          fi
+        else
+          echo "  ⚠️  1Password CLI not installed (optional)"
+        fi
+
+  # ============================================================================
+  # Utility Tasks
+  # ============================================================================
+
+  list-nodes:
+    desc: 📋 List all nodes for a cluster
+    cmds:
+      - echo "Nodes for {{.CLUSTER}} cluster:"
+      - |
+        find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | \
+          xargs -n1 basename | sed 's/.yaml//' | nl
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
+
+  dry-run:
+    desc: 🔍 Show what cluster creation would do
+    cmds:
+      - echo "=== Cluster Creation Dry-Run for {{.CLUSTER}} ==="
+      - echo ""
+      - 'echo "Layer 1: Talos Cluster Bootstrap"'
+      - echo "  Bootstrap node:"
+      - find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//' | sed 's/^/    - /'
+      - echo "  Additional nodes:"
+      - find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | tail -n +2 | xargs -n1 basename | sed 's/.yaml//' | sed 's/^/    - /'
+      - echo ""
+      - 'echo "Layer 2: Kubernetes Waiting"'
+      - echo "  - Wait for API server"
+      - echo "  - Wait for nodes Ready"
+      - echo "  - Verify etcd health"
+      - echo ""
+      - 'echo "Layer 3: CRD Bootstrap"'
+      - echo "  - Install prerequisites"
+      - echo "  - Install VictoriaMetrics CRDs"
+      - echo "  - Install cert-manager CRDs"
+      - echo "  - Install external-secrets CRDs"
+      - echo ""
+      - 'echo "Layer 4: Core Infrastructure"'
+      - echo "  - Deploy Cilium CNI"
+      - echo "  - Deploy CoreDNS"
+      - echo "  - Deploy cert-manager"
+      - echo "  - Deploy external-secrets"
+      - echo "  - Deploy Flux"
+      - echo ""
+      - 'echo "Layer 5: Validation"'
+      - echo "  - Validate Talos health"
+      - echo "  - Validate Kubernetes health"
+      - echo "  - Validate CRDs"
+      - echo "  - Validate networking"
+      - echo "  - Validate Flux"
+    vars:
+      CLUSTER: '{{.CLUSTER | default "infra"}}'

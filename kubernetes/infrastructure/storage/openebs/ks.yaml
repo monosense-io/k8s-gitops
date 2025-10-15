@@ -1,0 +1,37 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: openebs
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: openebs
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: local-storage
+    cluster: ${CLUSTER}
+spec:
+  dependsOn:
+    - name: cilium
+      namespace: flux-system
+  interval: 10m
+  timeout: 5m
+  retryInterval: 1m
+  path: ./kubernetes/infrastructure/storage/openebs
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: openebs-system
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: openebs-localpv-provisioner
+      namespace: openebs-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false

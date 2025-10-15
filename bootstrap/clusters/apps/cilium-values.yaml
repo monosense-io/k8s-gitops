@@ -1,0 +1,293 @@
+---
+# Cilium Service Mesh Configuration - Apps Cluster
+# Full service mesh features enabled from bootstrap
+
+# Cluster identification - DIFFERENT FROM INFRA
+cluster:
+  name: apps
+  id: 2
+
+# ============================================================================
+# SERVICE MESH - CRITICAL SETTINGS
+# ============================================================================
+
+# Full kube-proxy replacement required for service mesh
+kubeProxyReplacement: true
+
+# CNI Configuration
+cni:
+  exclusive: true
+  install: true
+
+# ============================================================================
+# NETWORKING
+# ============================================================================
+
+ipam:
+  mode: kubernetes
+
+# Network CIDRs for apps cluster - DIFFERENT FROM INFRA
+# Note: Adjust based on actual Talos pod CIDR configuration
+ipv4NativeRoutingCIDR: "10.246.0.0/16"  # Pod CIDR (verify with talosctl get members)
+
+ipv4:
+  enabled: true
+
+routingMode: native
+autoDirectNodeRoutes: true
+tunnelProtocol: vxlan
+
+# ============================================================================
+# ENCRYPTION & SECURITY (SERVICE MESH FEATURES)
+# ============================================================================
+
+# WireGuard transparent encryption - all pod-to-pod traffic encrypted
+encryption:
+  enabled: true
+  type: wireguard
+  nodeEncryption: false
+  wireguard:
+    persistentKeepalive: 25s
+
+# SPIRE workload identity - DISABLED for bootstrap (no storage yet)
+# Enable via Flux after deploying storage operators (Rook-Ceph/OpenEBS)
+authentication:
+  enabled: false
+  mutual:
+    spire:
+      enabled: false
+      install:
+        enabled: false
+        server:
+          dataStorage:
+            size: 1Gi
+        agent: {}
+
+# ============================================================================
+# HUBBLE OBSERVABILITY (L7 METRICS & TRACING)
+# ============================================================================
+
+hubble:
+  enabled: true
+
+  # Hubble Relay - cluster-wide flow aggregation
+  # DISABLED for bootstrap - requires CoreDNS for service discovery
+  # Enable via Flux after CoreDNS is deployed
+  relay:
+    enabled: false
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  # Hubble UI - service map visualization
+  # DISABLED for bootstrap - requires Hubble Relay
+  # Enable via Flux after CoreDNS is deployed
+  ui:
+    enabled: false
+    replicas: 1
+    ingress:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  # Prometheus metrics export
+  metrics:
+    enabled:
+    - dns:query;ignoreAAAA
+    - drop
+    - tcp
+    - flow
+    - port-distribution
+    - icmp
+    - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+
+    serviceMonitor:
+      enabled: true
+      labels:
+        prometheus: kube-prometheus
+
+    enableOpenMetrics: true
+
+  # Jaeger export (points to infra cluster via Cluster Mesh)
+  export:
+    dynamic:
+      enabled: false  # Enable after Cluster Mesh connection
+      config:
+        configMapName: hubble-export-config
+        createConfigMap: false
+
+# ============================================================================
+# CLUSTER MESH (MULTI-CLUSTER SERVICE MESH)
+# ============================================================================
+
+# DISABLED for bootstrap - requires cert-manager for TLS cert generation
+# Enable via Flux after cert-manager is deployed
+clustermesh:
+  useAPIServer: false
+
+  apiserver:
+    replicas: 2
+
+    service:
+      type: LoadBalancer
+      annotations: {}
+
+    tls:
+      auto:
+        enabled: true
+        method: cronJob
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Connected manually via CLI in Week 3
+  config:
+    enabled: false
+
+# ============================================================================
+# BGP CONTROL PLANE
+# ============================================================================
+
+bgpControlPlane:
+  enabled: true
+
+# ============================================================================
+# GATEWAY API
+# ============================================================================
+
+gatewayAPI:
+  enabled: true
+
+# ============================================================================
+# OPERATOR & AGENT RESOURCES
+# ============================================================================
+
+operator:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Cilium agent (DaemonSet on each node)
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# ============================================================================
+# MONITORING
+# ============================================================================
+
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      prometheus: kube-prometheus
+
+# ============================================================================
+# POLICY ENFORCEMENT
+# ============================================================================
+
+policyEnforcementMode: "default"
+
+# proxy.prometheus: REMOVED - deprecated in v1.14, removed in v1.16
+# Prometheus metrics are now configured via the top-level prometheus settings
+
+enableL7Proxy: true
+
+# ============================================================================
+# PERFORMANCE TUNING
+# ============================================================================
+
+bpf:
+  monitorAggregation: medium
+  monitorInterval: "5s"
+  monitorFlags: "all"
+  ctTcpMax: 524288
+  ctAnyMax: 262144
+  natMax: 524288
+  neighMax: 524288
+  policyMapMax: 16384
+
+# ============================================================================
+# HIGH AVAILABILITY
+# ============================================================================
+
+enableEndpointHealthChecking: true
+enableIPv4Masquerade: true
+
+bandwidthManager:
+  enabled: true
+  bbr: true
+
+# ============================================================================
+# SECURITY
+# ============================================================================
+
+hostFirewall:
+  enabled: false
+
+# enableCiliumEndpointSlice: REMOVED - deprecated in v1.16, removed in v1.18
+# This feature is now enabled by default and cannot be disabled
+
+# ============================================================================
+# TALOS-SPECIFIC SETTINGS
+# ============================================================================
+
+securityContext:
+  capabilities:
+    ciliumAgent:
+    - CHOWN
+    - KILL
+    - NET_ADMIN
+    - NET_RAW
+    - IPC_LOCK
+    - SYS_ADMIN
+    - SYS_RESOURCE
+    - DAC_OVERRIDE
+    - FOWNER
+    - SETGID
+    - SETUID
+    cleanCiliumState:
+    - NET_ADMIN
+    - SYS_ADMIN
+    - SYS_RESOURCE
+
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+# Kubernetes API endpoint (from Talos kubePrism)
+k8sServiceHost: "apps-k8s.monosense.io"
+k8sServicePort: 6443
+
+# ============================================================================
+# DEBUGGING (disable in production)
+# ============================================================================
+
+debug:
+  enabled: false

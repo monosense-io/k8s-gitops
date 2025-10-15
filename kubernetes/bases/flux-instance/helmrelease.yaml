@@ -1,0 +1,177 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-instance
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: flux-operator
+      namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: flux-instance
+    namespace: flux-system
+  interval: 30m
+  timeout: 10m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 2
+      strategy: rollback
+  rollback:
+    cleanupOnFail: true
+    recreate: true
+  values:
+    instance:
+      # Flux distribution artifact
+      distribution:
+        artifact: oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests
+        version: v2.4.x
+
+      # Cluster configuration
+      cluster:
+        domain: cluster.local
+        networkPolicy: false  # Using Cilium NetworkPolicy instead
+        type: kubernetes
+
+      # Sync configuration
+      sync:
+        interval: 1m
+        kind: GitRepository
+        url: https://github.com/monosense-io/k8s-gitops
+        ref: main
+        path: kubernetes/clusters/${CLUSTER}
+
+      # Enable all Flux controllers
+      components:
+        - source-controller
+        - kustomize-controller
+        - helm-controller
+        - notification-controller
+        - image-reflector-controller
+        - image-automation-controller
+
+      # Source Controller Configuration
+      sourceController:
+        create: true
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Kustomize Controller Configuration
+      kustomizeController:
+        create: true
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Helm Controller Configuration
+      helmController:
+        create: true
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Notification Controller Configuration
+      notificationController:
+        create: true
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Image Reflector Controller Configuration
+      imageReflectorController:
+        create: true
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Image Automation Controller Configuration
+      imageAutomationController:
+        create: true
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        serviceMonitor:
+          create: true
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+
+      # Additional settings
+      logLevel: info
+      securityProfile: privileged

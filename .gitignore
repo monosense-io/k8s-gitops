@@ -42,3 +42,6 @@ Thumbs.db
 .claude/
 AGENTS.md
 CLAUDE.md
+# BMAD (local only)
+.bmad-core/
+.bmad-*/

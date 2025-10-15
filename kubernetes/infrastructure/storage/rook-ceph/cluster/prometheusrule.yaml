@@ -1,0 +1,157 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rook-ceph-cluster
+  namespace: rook-ceph
+  labels:
+    app.kubernetes.io/name: rook-ceph-cluster
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: rook-ceph-cluster.rules
+      interval: 30s
+      rules:
+        - alert: CephClusterHealthWarning
+          expr: |
+            ceph_health_status == 1
+          for: 15m
+          annotations:
+            summary: Ceph cluster health is WARN
+            description: |
+              Ceph cluster health has been in WARN state for 15 minutes.
+              Check 'ceph status' for details.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: CephClusterHealthError
+          expr: |
+            ceph_health_status == 2
+          for: 5m
+          annotations:
+            summary: Ceph cluster health is ERROR
+            description: |
+              Ceph cluster health is in ERROR state.
+              Data availability may be compromised. Check 'ceph status' immediately.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: CephMgrAbsent
+          expr: |
+            absent(up{job="ceph-mgr"})
+          for: 5m
+          annotations:
+            summary: Ceph manager is absent
+            description: |
+              Ceph manager has not reported metrics for 5 minutes.
+              Cluster monitoring and management may be unavailable.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: CephMonQuorumLost
+          expr: |
+            ceph_mon_quorum_status == 0
+          for: 5m
+          annotations:
+            summary: Ceph monitor quorum lost
+            description: |
+              Ceph monitor {{ $labels.ceph_daemon }} is not in quorum.
+              Cluster operations may be blocked.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: CephOSDDown
+          expr: |
+            ceph_osd_up == 0
+          for: 5m
+          annotations:
+            summary: Ceph OSD is down
+            description: |
+              Ceph OSD {{ $labels.ceph_daemon }} has been down for 5 minutes.
+              Data availability may be degraded.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: CephOSDFull
+          expr: |
+            ceph_osd_stat_bytes_used / ceph_osd_stat_bytes > 0.85
+          for: 15m
+          annotations:
+            summary: Ceph OSD nearing full
+            description: |
+              Ceph OSD {{ $labels.ceph_daemon }} is at {{ $value | humanizePercentage }} capacity (>85%).
+              Consider adding more OSDs or cleaning up data.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: CephOSDCriticallyFull
+          expr: |
+            ceph_osd_stat_bytes_used / ceph_osd_stat_bytes > 0.95
+          for: 5m
+          annotations:
+            summary: Ceph OSD critically full
+            description: |
+              Ceph OSD {{ $labels.ceph_daemon }} is at {{ $value | humanizePercentage }} capacity (>95%).
+              OSD will be marked full and stop accepting writes.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: CephPGsDegraded
+          expr: |
+            ceph_pg_degraded > 0
+          for: 15m
+          annotations:
+            summary: Ceph placement groups degraded
+            description: |
+              {{ $value }} Ceph placement groups are degraded for 15 minutes.
+              Data redundancy is reduced.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: CephPGsDown
+          expr: |
+            ceph_pg_down > 0
+          for: 5m
+          annotations:
+            summary: Ceph placement groups are down
+            description: |
+              {{ $value }} Ceph placement groups are down.
+              Some data may be inaccessible.
+          labels:
+            severity: critical
+            component: storage
+
+        - alert: CephPoolQuotaNearFull
+          expr: |
+            ceph_pool_stored / ceph_pool_max_avail > 0.85
+          for: 15m
+          annotations:
+            summary: Ceph pool nearing quota
+            description: |
+              Ceph pool {{ $labels.name }} is at {{ $value | humanizePercentage }} of quota (>85%).
+              Consider increasing pool quota.
+          labels:
+            severity: warning
+            component: storage
+
+        - alert: CephSlowOps
+          expr: |
+            ceph_health_detail{name="SLOW_OPS"} > 0
+          for: 10m
+          annotations:
+            summary: Ceph slow operations detected
+            description: |
+              Ceph cluster is experiencing slow operations for 10 minutes.
+              Storage performance is degraded.
+          labels:
+            severity: warning
+            component: storage

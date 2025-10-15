@@ -1,0 +1,123 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: gitlab-pooler
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: shared-postgres
+
+  # Number of pooler instances
+  instances: 3
+
+  # Pool mode - transaction is best for most applications
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+
+    # Connection pool configuration
+    parameters:
+      max_client_conn: "1000"
+      default_pool_size: "50"
+      min_pool_size: "10"
+      reserve_pool_size: "10"
+      reserve_pool_timeout: "5"
+      max_db_connections: "50"
+      max_user_connections: "50"
+
+      # Timeouts
+      server_idle_timeout: "600"
+      server_lifetime: "3600"
+      server_connect_timeout: "15"
+      query_timeout: "300"
+      query_wait_timeout: "120"
+      client_idle_timeout: "0"
+      idle_transaction_timeout: "600"
+
+      # Logging
+      log_connections: "1"
+      log_disconnections: "1"
+      log_pooler_errors: "1"
+      stats_period: "60"
+
+      # Security
+      ignore_startup_parameters: "extra_float_digits,options"
+
+    # Authentication query for application users
+    authQuerySecret:
+      name: gitlab-pooler-auth
+    authQuery: "SELECT usename, passwd FROM user_search($1)"
+
+  # Deployment configuration
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  # Resource management
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "256Mi"
+    limits:
+      cpu: "2000m"
+      memory: "512Mi"
+
+  # High Availability
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                cnpg.io/poolerName: gitlab-pooler
+            topologyKey: kubernetes.io/hostname
+
+  # Pod Disruption Budget
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitlab-pooler
+        app.kubernetes.io/component: connection-pooler
+    spec:
+      containers:
+        - name: pgbouncer
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: true
+---
+# External Secret for pooler authentication
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: gitlab-pooler-auth
+  namespace: cnpg-system
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: ${EXTERNAL_SECRET_STORE}
+  target:
+    name: gitlab-pooler-auth
+    creationPolicy: Owner
+  data:
+    - secretKey: username
+      remoteRef:
+        key: kubernetes/infra/cloudnative-pg/gitlab
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: kubernetes/infra/cloudnative-pg/gitlab
+        property: password

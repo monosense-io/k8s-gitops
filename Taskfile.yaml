@@ -15,6 +15,7 @@ env:
   TALOSCONFIG: '{{.TALOS_DIR}}/talosconfig'
 
 includes:
+  cluster: .taskfiles/cluster
   bootstrap: .taskfiles/bootstrap
   kubernetes: .taskfiles/kubernetes
   talos: .taskfiles/talos

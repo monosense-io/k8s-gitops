@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cnpg-system
+
+resources:
+  - gitlab-pooler.yaml
+  - harbor-pooler.yaml
+  - mattermost-pooler.yaml
+  - keycloak-pooler.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: cloudnative-pg
+      app.kubernetes.io/managed-by: flux

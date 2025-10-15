@@ -46,6 +46,8 @@ machine:
         rsize=1048576
         wsize=1048576
   install:
+    diskSelector:
+      model: Samsung SSD 860
     image: factory.talos.dev/metal-installer/d60a9a96a6bbc418c786ee44fd5c01137d9a02497012cf080722ee79d3ee6d7e:v1.11.2
   kernel:
     modules:
@@ -121,8 +123,80 @@ cluster:
     extraArgs:
       enable-aggregator-routing: true
       feature-gates: ImageVolume=true
+      audit-log-path: /var/log/audit/kube-apiserver-audit.log
+      audit-log-maxage: "7"
+      audit-log-maxbackup: "3"
+      audit-log-maxsize: "100"
     certSANs: ["k8s.monosense.io"]
     disablePodSecurityPolicy: true
+    auditPolicy:
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      omitStages: [RequestReceived, ResponseStarted]
+      rules:
+        - level: None
+          nonResourceURLs: [/healthz*, /readyz*, /livez*, /metrics*, /version]
+          userGroups: [system:authenticated, system:unauthenticated]
+        - level: None
+          users: [system:kube-proxy, system:kube-scheduler, system:kube-controller-manager, system:serviceaccount:kube-system:cilium, system:serviceaccount:kube-system:cilium-operator]
+          verbs: [get, list, watch]
+        - level: Request
+          omitManagedFields: true
+          resources: [{group: "", resources: [secrets]}]
+          verbs: [get, list, watch, create, update, patch, delete]
+        - level: Request
+          omitManagedFields: true
+          resources:
+            - {group: "rbac.authorization.k8s.io", resources: [clusterroles, clusterrolebindings, roles, rolebindings]}
+            - {group: "", resources: [serviceaccounts]}
+          verbs: [create, update, patch, delete]
+        - level: Request
+          omitManagedFields: true
+          resources:
+            - {group: "certificates.k8s.io", resources: [certificatesigningrequests, certificatesigningrequests/approval]}
+            - {group: "cert-manager.io", resources: [certificates, issuers, clusterissuers]}
+          verbs: [create, update, patch, delete]
+        - level: Request
+          omitManagedFields: true
+          resources: [{group: "external-secrets.io", resources: [externalsecrets, secretstores, clustersecretstores]}]
+          verbs: [create, update, patch, delete]
+        - level: Request
+          omitManagedFields: true
+          resources: [{group: "", resources: [namespaces]}]
+          verbs: [create, delete]
+        - level: Request
+          omitManagedFields: true
+          resources:
+            - {group: "networking.k8s.io", resources: [networkpolicies, ingresses]}
+            - {group: "cilium.io", resources: [ciliumnetworkpolicies, ciliumclusterwidenetworkpolicies]}
+          verbs: [create, update, patch, delete]
+        - level: Request
+          omitManagedFields: true
+          resources:
+            - {group: "", resources: [persistentvolumes]}
+            - {group: "storage.k8s.io", resources: [storageclasses, volumeattachments]}
+            - {group: "ceph.rook.io", resources: [cephclusters, cephblockpools, cephfilesystems]}
+          verbs: [create, update, patch, delete]
+        - level: Metadata
+          omitManagedFields: true
+          resources:
+            - {group: apps, resources: [deployments, statefulsets, daemonsets, replicasets]}
+            - {group: batch, resources: [jobs, cronjobs]}
+            - {group: "", resources: [pods, services, configmaps]}
+          verbs: [create, update, patch, delete]
+        - level: Metadata
+          omitManagedFields: true
+          resources:
+            - {group: "kustomize.toolkit.fluxcd.io", resources: [kustomizations]}
+            - {group: "helm.toolkit.fluxcd.io", resources: [helmreleases]}
+            - {group: "source.toolkit.fluxcd.io", resources: [gitrepositories, helmrepositories, helmcharts]}
+          verbs: [create, update, patch, delete]
+        - level: Metadata
+          omitManagedFields: true
+          verbs: [get, list, watch]
+        - level: Metadata
+          omitManagedFields: false
+        - level: None
   controllerManager:
     image: registry.k8s.io/kube-controller-manager:v1.34.1
     extraArgs: { bind-address: 0.0.0.0 }

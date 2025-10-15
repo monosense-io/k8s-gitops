@@ -1,0 +1,84 @@
+---
+# Basic Prometheus Alert Rules
+# Common alerts for application health monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: placeholder  # Replaced by namespace name
+spec:
+  groups:
+    - name: application.rules
+      interval: 30s
+      rules:
+        # Pod Not Ready
+        - alert: PodNotReady
+          expr: |
+            kube_pod_status_ready{condition="false", namespace="{{ .metadata.namespace }}"} == 1
+          for: 5m
+          annotations:
+            summary: "Pod {{ $labels.pod }} not ready"
+            description: |
+              Pod {{ $labels.pod }} in namespace {{ $labels.namespace }}
+              has been in not-ready state for 5 minutes.
+          labels:
+            severity: warning
+            component: "{{ $labels.pod }}"
+
+        # High Memory Usage
+        - alert: HighMemoryUsage
+          expr: |
+            (container_memory_usage_bytes{namespace="{{ .metadata.namespace }}"} /
+             container_spec_memory_limit_bytes{namespace="{{ .metadata.namespace }}"}) * 100 > 90
+          for: 10m
+          annotations:
+            summary: "High memory usage in {{ $labels.pod }}"
+            description: |
+              Container {{ $labels.container }} in pod {{ $labels.pod }}
+              is using {{ $value | humanizePercentage }} of its memory limit.
+          labels:
+            severity: warning
+            component: "{{ $labels.pod }}"
+
+        # High CPU Usage
+        - alert: HighCPUUsage
+          expr: |
+            (rate(container_cpu_usage_seconds_total{namespace="{{ .metadata.namespace }}"}[5m]) /
+             container_spec_cpu_quota{namespace="{{ .metadata.namespace }}"}) * 100 > 90
+          for: 10m
+          annotations:
+            summary: "High CPU usage in {{ $labels.pod }}"
+            description: |
+              Container {{ $labels.container }} in pod {{ $labels.pod }}
+              is using {{ $value | humanizePercentage }} of its CPU quota.
+          labels:
+            severity: warning
+            component: "{{ $labels.pod }}"
+
+        # Container Restarting
+        - alert: ContainerRestarting
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="{{ .metadata.namespace }}"}[15m]) > 0
+          for: 5m
+          annotations:
+            summary: "Container {{ $labels.container }} restarting"
+            description: |
+              Container {{ $labels.container }} in pod {{ $labels.pod }}
+              has restarted {{ $value }} times in the last 15 minutes.
+          labels:
+            severity: warning
+            component: "{{ $labels.pod }}"
+
+        # Deployment Replicas Mismatch
+        - alert: DeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas{namespace="{{ .metadata.namespace }}"} !=
+            kube_deployment_status_replicas_available{namespace="{{ .metadata.namespace }}"}
+          for: 15m
+          annotations:
+            summary: "Deployment {{ $labels.deployment }} replicas mismatch"
+            description: |
+              Deployment {{ $labels.deployment }} has {{ $value }} replicas
+              but desired replica count is different for 15 minutes.
+          labels:
+            severity: warning
+            component: "{{ $labels.deployment }}"

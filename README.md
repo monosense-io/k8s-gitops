@@ -10,11 +10,11 @@ _... managed with Flux, Renovate, GitHub Actions, GitLab CI_ 🤖
 
 <div align="center">
 
-[![Talos](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dtalos_version&style=for-the-badge&logo=talos&logoColor=white&color=blue&label=%20)](https://www.talos.dev/)&nbsp;&nbsp;
-[![Kubernetes](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dkubernetes_version&style=for-the-badge&logo=kubernetes&logoColor=white&color=blue&label=%20)](https://www.talos.dev/)&nbsp;&nbsp;
+[![Talos](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dtalos_version&style=for-the-badge&logo=talos&logoColor=white&color=blue&label=%20)](https://www.talos.dev/)&nbsp;&nbsp;
+[![Kubernetes](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dkubernetes_version&style=for-the-badge&logo=kubernetes&logoColor=white&color=blue&label=%20)](https://www.talos.dev/)&nbsp;&nbsp;
 [![Renovate](https://img.shields.io/github/actions/workflow/status/trosvald/home-ops/renovate.yaml?branch=main&label=&logo=drone&style=for-the-badge&color=blue)](https://github.com/trosvald/home-ops/actions/workflows/renovate.yaml)&nbsp;&nbsp;
-[![Flux](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fflux_version&style=for-the-badge&logo=flux&logoColor=white&color=blue&label=%20)](https://fluxcd.io)&nbsp;&nbsp;
-[![Power](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_power_usage&label=&logo=amp&style=for-the-badge&color=blue)](https://github.com/kashalls/kromgo/)
+[![Flux](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fflux_version&style=for-the-badge&logo=flux&logoColor=white&color=blue&label=%20)](https://fluxcd.io)&nbsp;&nbsp;
+[![Power](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_power_usage&label=&logo=amp&style=for-the-badge&color=blue)](https://github.com/kashalls/kromgo/)
 
 
 
@@ -22,19 +22,19 @@ _... managed with Flux, Renovate, GitHub Actions, GitLab CI_ 🤖
 
 <div align="center">
 
-[![Home-Internet](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fdb69df2e-c93d-4e39-b9f6-6689be941116.shields?color=brightgreeen&label=WAN&style=for-the-badge&logo=battle.net&logoColor=white)](https://status.monosense.dev)&nbsp;&nbsp;
-[![Status-Page](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fdb69df2e-c93d-4e39-b9f6-6689be941116.shields?color=brightgreeen&label=Status%20Page&style=for-the-badge&logo=statuspage&logoColor=white)](https://status.monosense.dev)&nbsp;&nbsp;
-[![Alertmanager](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fec273744-4a6a-4726-a8e8-1732e489ffc6.shields&style=for-the-badge&logo=prometheus&logoColor=white&label=Alertmanager)](https://status.monosense.dev)
+[![Home-Internet](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fdb69df2e-c93d-4e39-b9f6-6689be941116.shields?color=brightgreeen&label=WAN&style=for-the-badge&logo=battle.net&logoColor=white)](https://status.monosense.io)&nbsp;&nbsp;
+[![Status-Page](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fdb69df2e-c93d-4e39-b9f6-6689be941116.shields?color=brightgreeen&label=Status%20Page&style=for-the-badge&logo=statuspage&logoColor=white)](https://status.monosense.io)&nbsp;&nbsp;
+[![Alertmanager](https://img.shields.io/endpoint?url=https%3A%2F%2Fhealthchecks.io%2Fb%2F2%2Fec273744-4a6a-4726-a8e8-1732e489ffc6.shields&style=for-the-badge&logo=prometheus&logoColor=white&label=Alertmanager)](https://status.monosense.io)
 
 </div>
 <div align="center">
 
-[![Age-Days](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_age_days&style=flat-square&label=Age)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
-[![Uptime-Days](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_uptime_days&style=flat-square&label=Uptime)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
-[![Node-Count](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_node_count&style=flat-square&label=Nodes)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
-[![Pod-Count](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_pod_count&style=flat-square&label=Pods)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
-[![CPU-Usage](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_cpu_usage&style=flat-square&label=CPU)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
-[![Memory-Usage](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.dev%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_memory_usage&style=flat-square&label=Memory)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![Age-Days](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_age_days&style=flat-square&label=Age)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![Uptime-Days](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_uptime_days&style=flat-square&label=Uptime)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![Node-Count](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_node_count&style=flat-square&label=Nodes)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![Pod-Count](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_pod_count&style=flat-square&label=Pods)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![CPU-Usage](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_cpu_usage&style=flat-square&label=CPU)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
+[![Memory-Usage](https://img.shields.io/endpoint?url=https%3A%2F%2Fkromgo.monosense.io%2Fquery%3Fformat%3Dendpoint%26metric%3Dcluster_memory_usage&style=flat-square&label=Memory)](https://github.com/kashalls/kromgo/)&nbsp;&nbsp;
 
 </div>
 
@@ -43,6 +43,21 @@ _... managed with Flux, Renovate, GitHub Actions, GitLab CI_ 🤖
 ## 📖 Overview
 
 This is a mono repository for my home infrastructure and Kubernetes cluster. I try to adhere to Infrastructure as Code (IaC) and GitOps practices using tools like [Ansible](https://www.ansible.com/), [Terraform](https://www.terraform.io/), [Kubernetes](https://kubernetes.io/), [Flux](https://github.com/fluxcd/flux2), [Renovate](https://github.com/renovatebot/renovate), and [GitHub Actions](https://github.com/features/actions).
+
+### 🚀 Multi-Cluster Architecture (In Planning)
+
+This repository is transitioning to a **multi-cluster architecture** with two separate 3-node Talos clusters:
+- **Infra Cluster** - Platform services (storage, databases, observability, security)
+- **Apps Cluster** - Application workloads (GitLab, Harbor, Mattermost)
+
+**Planning Documentation:**
+- **[Multi-Cluster Overview](./docs/MULTI-CLUSTER-OVERVIEW.md)** - Start here for complete architecture overview
+- [Talos Bootstrap Guide](./docs/talos-multi-cluster-bootstrap.md) - Step-by-step conversion instructions
+- [Architecture Decisions](./docs/architecture-decision-record.md) - All 20 ADR decisions documented
+- [Implementation Timeline](./docs/implementation-timeline.md) - 10-week rollout plan
+- [Helper Scripts](./scripts/README.md) - Automation tools for conversion
+
+**Status:** ✅ Planning Complete | 🔲 Ready to Begin Implementation
 
 ---
 
@@ -99,7 +114,7 @@ There is a template at [onedr0p/cluster-template](https://github.com/onedr0p/clu
 
 [Flux](https://github.com/fluxcd/flux2) watches my [kubernetes](./kubernetes) folder (see Directories below) and makes the changes to my clusters based on the state of my Git repository.
 
-The way Flux works for me here is it will recursively search the [kubernetes/apps](./kubernetes/apps) folder until it finds the most top level `kustomization.yaml` per directory and then apply all the resources listed in it. That aforementioned `kustomization.yaml` will generally only have a namespace resource and one or many Flux kustomizations (`ks.yaml`). Under the control of those Flux kustomizations there will be a `HelmRelease` or other resources related to the application which will be applied.
+Flux now reconciles per-cluster entrypoints under [kubernetes/clusters](./kubernetes/clusters). Each cluster composes shared stacks from `kubernetes/infrastructure` and workloads from `kubernetes/workloads` using Flux `Kustomization` objects. Shared primitives live in `kubernetes/bases`, and cluster-specific overrides are injected with `postBuild.substitute`.
 
 [Renovate](https://github.com/renovatebot/renovate) monitors my **entire** repository for dependency updates, automatically creating a PR when updates are found. When some PRs are merged Flux applies the changes to my cluster.
 

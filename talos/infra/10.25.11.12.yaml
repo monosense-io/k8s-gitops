@@ -1,0 +1,37 @@
+---
+machine:
+  network:
+    hostname: infra-02
+    interfaces:
+      - interface: bond0
+        bond:
+          deviceSelectors: [{ hardwareAddr: "3c:fd:fe:35:10:*", driver: i40e }]
+          mode: 802.3ad
+          xmitHashPolicy: layer3+4
+          lacpRate: fast
+          miimon: 100
+        dhcp: false
+        mtu: 9000
+        addresses: [10.25.11.12/24]
+        routes: [{ network: "0.0.0.0/0", gateway: "10.25.11.1" }]
+        vlans:
+          # - { vlanId: 2512, dhcp: false, mtu: 1500 }
+          - vlanId: 2512
+            mtu: 1500
+            dhcp: false
+            dhcpOptions:
+              routeMetric: 4096
+---
+apiVersion: v1alpha1
+kind: EthernetConfig
+name: enp1s0f0np0
+rings:
+  rx: 8160
+  tx: 8160
+---
+apiVersion: v1alpha1
+kind: EthernetConfig
+name: enp1s0f1np1
+rings:
+  rx: 8160
+  tx: 8160

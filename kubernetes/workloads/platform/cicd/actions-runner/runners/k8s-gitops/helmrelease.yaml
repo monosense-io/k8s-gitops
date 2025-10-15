@@ -1,0 +1,76 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: k8s-gitops-runner
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: gha-runner-scale-set
+  interval: 1h
+  timeout: 15m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    # GitHub configuration
+    # Update GITHUB_CONFIG_URL in your cluster's Flux postBuild.substitute
+    # Example: https://github.com/your-org/k8s-gitops
+    githubConfigUrl: ${GITHUB_CONFIG_URL}
+    githubConfigSecret: k8s-gitops-runner-secret
+
+    # Scaling configuration
+    # minRunners: 0 = scale from zero (cost-effective)
+    # maxRunners: 3 = cap concurrent jobs
+    minRunners: 0
+    maxRunners: 3
+
+    # Runner container mode
+    containerMode:
+      type: kubernetes
+      kubernetesModeWorkVolumeClaim:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ${OPENEBS_STORAGE_CLASS}
+        resources:
+          requests:
+            storage: 25Gi
+
+    # Controller service account reference
+    controllerServiceAccount:
+      name: actions-runner-controller
+      namespace: actions-runner-system
+
+    # Runner pod template
+    template:
+      spec:
+        serviceAccountName: k8s-gitops-runner
+
+        containers:
+          - name: runner
+            # Using stock GitHub Actions runner image
+            # For custom image with pre-installed tools, build and push to Harbor
+            # then update to: harbor.your-domain.com/actions-runner:latest
+            image: ghcr.io/actions/actions-runner:latest
+            command:
+              - /home/runner/run.sh
+            env:
+              # Allow running jobs directly in pod (not in job containers)
+              # Set to "true" if you want jobs to run in sidecar containers
+              - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+                value: "false"
+              - name: RUNNER_SCALE_SET_NAME
+                value: k8s-gitops-runner
+
+            # Resource limits per runner pod
+            # Adjust based on your workflow requirements
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi

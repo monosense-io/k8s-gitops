@@ -1,0 +1,106 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: flux-instance
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: flux-instance
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: flux-instance.rules
+      interval: 30s
+      rules:
+        - alert: FluxInstanceAbsent
+          expr: |
+            absent(flux_instance_info{exported_namespace="flux-system"})
+          for: 5m
+          annotations:
+            summary: Flux instance metric is missing
+            description: |
+              The Flux instance has not reported metrics for 5 minutes.
+              This indicates the flux-instance may be down or metrics are not being scraped.
+          labels:
+            severity: critical
+            component: flux
+
+        - alert: FluxInstanceNotReady
+          expr: |
+            flux_instance_info{exported_namespace="flux-system", ready!="True"} == 1
+          for: 5m
+          annotations:
+            summary: Flux instance {{ $labels.name }} is not ready
+            description: |
+              Flux instance {{ $labels.name }} in namespace {{ $labels.exported_namespace }}
+              has been in non-ready state for 5 minutes.
+          labels:
+            severity: critical
+            component: flux
+
+        - alert: FluxReconciliationFailure
+          expr: |
+            increase(gotk_reconcile_condition{type="Ready",status="False"}[10m]) > 0
+          for: 10m
+          annotations:
+            summary: Flux reconciliation failures detected
+            description: |
+              Kustomization {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has failed reconciliation for 10 minutes.
+              Check the Kustomization status for details.
+          labels:
+            severity: warning
+            component: flux
+
+        - alert: FluxKustomizationNotReady
+          expr: |
+            gotk_reconcile_condition{kind="Kustomization",status="False",type="Ready"} == 1
+          for: 15m
+          annotations:
+            summary: Kustomization {{ $labels.name }} not ready
+            description: |
+              Kustomization {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has not been ready for 15 minutes.
+          labels:
+            severity: warning
+            component: flux
+
+        - alert: FluxHelmReleaseNotReady
+          expr: |
+            gotk_reconcile_condition{kind="HelmRelease",status="False",type="Ready"} == 1
+          for: 15m
+          annotations:
+            summary: HelmRelease {{ $labels.name }} not ready
+            description: |
+              HelmRelease {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has not been ready for 15 minutes.
+          labels:
+            severity: warning
+            component: flux
+
+        - alert: FluxGitRepositorySyncFailure
+          expr: |
+            gotk_reconcile_condition{kind="GitRepository",status="False",type="Ready"} == 1
+          for: 10m
+          annotations:
+            summary: GitRepository {{ $labels.name }} sync failure
+            description: |
+              GitRepository {{ $labels.name }} in namespace {{ $labels.namespace }}
+              has failed to sync for 10 minutes.
+          labels:
+            severity: critical
+            component: flux
+
+        - alert: FluxReconciliationDurationHigh
+          expr: |
+            gotk_reconcile_duration_seconds{kind="Kustomization",quantile="0.99"} > 300
+          for: 15m
+          annotations:
+            summary: Flux reconciliation duration is high
+            description: |
+              Kustomization {{ $labels.name }} p99 reconciliation duration
+              has been above 5 minutes for 15 minutes.
+          labels:
+            severity: warning
+            component: flux

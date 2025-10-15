@@ -1,0 +1,18 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: flux-system
+resources:
+  - ../../../bases/flux-instance
+  - receiver
+
+patches:
+  # Inject cluster-specific variables into flux-instance sync config
+  - patch: |-
+      - op: replace
+        path: /spec/values/instance/sync/path
+        value: kubernetes/clusters/${CLUSTER}
+    target:
+      kind: HelmRelease
+      name: flux-instance

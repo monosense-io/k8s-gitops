@@ -1,0 +1,79 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: spegel
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: spegel
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: spegel.rules
+      interval: 30s
+      rules:
+        - alert: SpegelAbsent
+          expr: |
+            absent(up{job="spegel"})
+          for: 5m
+          annotations:
+            summary: Spegel metrics are absent
+            description: |
+              Spegel has not reported metrics for 5 minutes.
+              Local image caching may not be working.
+          labels:
+            severity: warning
+            component: networking
+
+        - alert: SpegelDown
+          expr: |
+            up{job="spegel"} == 0
+          for: 5m
+          annotations:
+            summary: Spegel is down
+            description: |
+              Spegel pod on {{ $labels.instance }} has been down for 5 minutes.
+              Node-local image caching is not available on this node.
+          labels:
+            severity: warning
+            component: networking
+
+        - alert: SpegelHighImagePullLatency
+          expr: |
+            histogram_quantile(0.99, rate(spegel_registry_request_duration_seconds_bucket[5m])) > 10
+          for: 15m
+          annotations:
+            summary: Spegel high image pull latency
+            description: |
+              Spegel p99 image pull latency is {{ $value | humanizeDuration }} (>10s).
+              Image pulls are slower than expected.
+          labels:
+            severity: info
+            component: networking
+
+        - alert: SpegelImagePullErrors
+          expr: |
+            rate(spegel_registry_errors_total[5m]) > 0.1
+          for: 10m
+          annotations:
+            summary: Spegel image pull errors
+            description: |
+              Spegel is encountering {{ $value | humanize }} image pull errors/sec.
+              Local image caching may be failing.
+          labels:
+            severity: warning
+            component: networking
+
+        - alert: SpegelLowCacheHitRate
+          expr: |
+            rate(spegel_registry_cache_hits_total[5m]) / (rate(spegel_registry_cache_hits_total[5m]) + rate(spegel_registry_cache_misses_total[5m])) < 0.5
+          for: 30m
+          annotations:
+            summary: Spegel low cache hit rate
+            description: |
+              Spegel cache hit rate is {{ $value | humanizePercentage }} (<50%).
+              Most images are being pulled from external registries.
+          labels:
+            severity: info
+            component: networking

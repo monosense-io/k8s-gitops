@@ -1,0 +1,51 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: spegel
+  namespace: flux-system
+spec:
+  interval: 5m
+  ref:
+    tag: 0.0.27
+  url: oci://ghcr.io/onedr0p/charts/spegel
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: spegel
+  namespace: kube-system
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: spegel
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+    crds: CreateReplace
+  upgrade:
+    remediation:
+      retries: 2
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+    persistence:
+      enabled: true
+      accessMode: ReadWriteOnce
+      size: 5Gi
+    serviceMonitor:
+      enabled: true
+    podAnnotations:
+      secret.reloader.stakater.com/reload: spegel-config

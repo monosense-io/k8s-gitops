@@ -1,0 +1,12 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Flux Kustomization resources for storage components
+  - openebs/ks.yaml
+  - rook-ceph/operator/ks.yaml
+  - rook-ceph/cluster/ks.yaml
+  # Component directories (contain actual manifests)
+  - rook-ceph
+  - openebs

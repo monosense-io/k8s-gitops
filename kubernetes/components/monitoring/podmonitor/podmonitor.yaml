@@ -1,0 +1,17 @@
+---
+# Pod Monitor for Prometheus
+# Scrapes metrics directly from pods
+# Automatically configured via Kustomize replacements
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: placeholder  # Replaced by workload name
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: placeholder  # Replaced by workload label
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http

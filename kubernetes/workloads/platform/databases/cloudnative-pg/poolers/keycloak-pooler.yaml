@@ -1,0 +1,111 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: keycloak-pooler
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: shared-postgres
+
+  instances: 3
+  type: rw
+
+  pgbouncer:
+    # Keycloak requires session mode for prepared statements
+    poolMode: session
+
+    parameters:
+      max_client_conn: "300"
+      default_pool_size: "20"
+      min_pool_size: "5"
+      reserve_pool_size: "5"
+      reserve_pool_timeout: "5"
+      max_db_connections: "20"
+      max_user_connections: "20"
+
+      server_idle_timeout: "600"
+      server_lifetime: "3600"
+      server_connect_timeout: "15"
+      query_timeout: "0"  # No timeout for session mode
+      query_wait_timeout: "120"
+      client_idle_timeout: "0"
+      idle_transaction_timeout: "600"
+
+      log_connections: "1"
+      log_disconnections: "1"
+      log_pooler_errors: "1"
+      stats_period: "60"
+
+      ignore_startup_parameters: "extra_float_digits,options"
+
+    authQuerySecret:
+      name: keycloak-pooler-auth
+    authQuery: "SELECT usename, passwd FROM user_search($1)"
+
+  deploymentStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "128Mi"
+    limits:
+      cpu: "1000m"
+      memory: "256Mi"
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                cnpg.io/poolerName: keycloak-pooler
+            topologyKey: kubernetes.io/hostname
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak-pooler
+        app.kubernetes.io/component: connection-pooler
+    spec:
+      containers:
+        - name: pgbouncer
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+  monitoring:
+    enablePodMonitor: true
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: keycloak-pooler-auth
+  namespace: cnpg-system
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: ${EXTERNAL_SECRET_STORE}
+  target:
+    name: keycloak-pooler-auth
+    creationPolicy: Owner
+  data:
+    - secretKey: username
+      remoteRef:
+        key: kubernetes/infra/cloudnative-pg/keycloak
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: kubernetes/infra/cloudnative-pg/keycloak
+        property: password

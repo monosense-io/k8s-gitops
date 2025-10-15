@@ -1,0 +1,43 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/rook/rook/master/deploy/examples/crds.yaml
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: ${ROOK_CEPH_CLUSTER_NAME}
+  namespace: ${ROOK_CEPH_NAMESPACE}
+spec:
+  cephVersion:
+    image: quay.io/ceph/ceph:${ROOK_CEPH_IMAGE_TAG}
+    allowUnsupported: false
+  dataDirHostPath: /var/lib/rook
+  mon:
+    count: ${ROOK_CEPH_MON_COUNT}
+    allowMultiplePerNode: false
+  mgr:
+    count: 2
+    modules:
+      - name: rook
+        enabled: true
+  dashboard:
+    enabled: true
+    ssl: true
+  network:
+    provider: host
+  disruptionManagement:
+    machineDisruptionBudgetNamespace: ${ROOK_CEPH_NAMESPACE}
+    osdMaintenanceTimeout: 30
+    managePodBudgets: true
+  storage:
+    useAllNodes: true
+    useAllDevices: false
+    deviceFilter: ${ROOK_CEPH_DEVICE_FILTER}
+    config:
+      osdsPerDevice: "1"
+      crushRoot: default
+      databaseSizeMB: "0"
+      walSizeMB: "0"
+      encryptedDevice: "false"
+      preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+    topologyAware: true
+  cleanupPolicy:
+    confirmation: none

@@ -1,0 +1,13 @@
+---
+# Standard Namespace with Security Defaults
+# Name will be set by the consumer's namespace field
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: placeholder
+  labels:
+    # Pod Security Standards (PSS) - Restricted by default
+    # Override in consumer if needed (e.g., privileged for kube-system)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

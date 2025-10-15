@@ -1,0 +1,26 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: rbac-base
+  annotations:
+    config.kubernetes.io/local-config: "true"
+resources:
+  - platform-admin-clusterrole.yaml
+  - monitoring-reader-clusterrole.yaml
+  - view-no-secrets-clusterrole.yaml
+
+# Note: Templates (developer-role-template.yaml, cicd-deployer-template.yaml)
+# are NOT included here. Copy them to namespace directories as needed.
+
+commonLabels:
+  app.kubernetes.io/component: rbac
+  app.kubernetes.io/part-of: security
+  rbac.monosense.io/validation: blocker-1
+
+# Add labels to all resources
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: flux
+      monosense.io/security-validated: "true"

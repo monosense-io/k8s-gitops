@@ -1,0 +1,193 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shared-postgres-alerts
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: shared-postgres
+    app.kubernetes.io/component: database
+    prometheus: victoria-metrics
+spec:
+  groups:
+    - name: cloudnative-pg-cluster
+      interval: 30s
+      rules:
+        # Critical Alerts - Page Immediately
+        - alert: CNPGClusterDown
+          expr: |
+            cnpg_pg_postmaster_start_time{cnpg_cluster="shared-postgres"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "CloudNative-PG cluster {{ $labels.cnpg_cluster }} is down"
+            description: "No primary instance available for cluster {{ $labels.cnpg_cluster }} for more than 2 minutes."
+
+        - alert: CNPGReplicationLagHigh
+          expr: |
+            cnpg_pg_replication_lag{cnpg_cluster="shared-postgres"} > 30
+          for: 5m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "High replication lag on {{ $labels.pod }}"
+            description: "Replication lag is {{ $value | humanizeDuration }} on pod {{ $labels.pod }} in cluster {{ $labels.cnpg_cluster }}."
+
+        - alert: CNPGBackupFailed
+          expr: |
+            increase(cnpg_pg_backup_failed_total{cnpg_cluster="shared-postgres"}[1h]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "Backup failed for cluster {{ $labels.cnpg_cluster }}"
+            description: "Backup has failed for cluster {{ $labels.cnpg_cluster }}. Check backup configuration and logs."
+
+        - alert: CNPGDiskSpaceHigh
+          expr: |
+            (cnpg_pg_database_size_bytes{cnpg_cluster="shared-postgres"} / on(persistentvolumeclaim) kube_persistentvolumeclaim_resource_requests_storage_bytes) > 0.85
+          for: 10m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "Disk space critically high on {{ $labels.pod }}"
+            description: "Disk usage is at {{ $value | humanizePercentage }} on pod {{ $labels.pod }}. Immediate action required."
+
+        - alert: CNPGConnectionsExhausted
+          expr: |
+            (cnpg_pg_stat_database_numbackends{cnpg_cluster="shared-postgres"} / cnpg_pg_settings_setting{cnpg_cluster="shared-postgres",name="max_connections"}) > 0.9
+          for: 5m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "Connection pool near exhaustion"
+            description: "Database {{ $labels.datname }} is using {{ $value | humanizePercentage }} of max_connections."
+
+        - alert: CNPGLongRunningTransactions
+          expr: |
+            cnpg_pg_stat_activity_max_tx_duration{cnpg_cluster="shared-postgres"} > 3600
+          for: 10m
+          labels:
+            severity: critical
+            component: shared-postgres
+          annotations:
+            summary: "Long running transaction detected"
+            description: "Transaction running for {{ $value | humanizeDuration }} on {{ $labels.pod }}. This may block VACUUM and cause bloat."
+
+        # Warning Alerts - Investigate within 24h
+        - alert: CNPGReplicationLagWarning
+          expr: |
+            cnpg_pg_replication_lag{cnpg_cluster="shared-postgres"} > 10
+          for: 10m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "Elevated replication lag on {{ $labels.pod }}"
+            description: "Replication lag is {{ $value | humanizeDuration }} on pod {{ $labels.pod }}."
+
+        - alert: CNPGDiskSpaceWarning
+          expr: |
+            (cnpg_pg_database_size_bytes{cnpg_cluster="shared-postgres"} / on(persistentvolumeclaim) kube_persistentvolumeclaim_resource_requests_storage_bytes) > 0.70
+          for: 30m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "Disk space elevated on {{ $labels.pod }}"
+            description: "Disk usage is at {{ $value | humanizePercentage }} on pod {{ $labels.pod }}. Plan for expansion."
+
+        - alert: CNPGHighQueryDuration
+          expr: |
+            histogram_quantile(0.95, rate(cnpg_pg_stat_statements_calls_total{cnpg_cluster="shared-postgres"}[5m])) > 1
+          for: 15m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "High query duration detected"
+            description: "P95 query duration is {{ $value | humanizeDuration }} on database {{ $labels.datname }}."
+
+        - alert: CNPGCacheHitRatioLow
+          expr: |
+            (rate(cnpg_pg_stat_database_blks_hit{cnpg_cluster="shared-postgres"}[5m]) / (rate(cnpg_pg_stat_database_blks_hit{cnpg_cluster="shared-postgres"}[5m]) + rate(cnpg_pg_stat_database_blks_read{cnpg_cluster="shared-postgres"}[5m]))) < 0.90
+          for: 30m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "Low cache hit ratio on database {{ $labels.datname }}"
+            description: "Cache hit ratio is {{ $value | humanizePercentage }} on database {{ $labels.datname }}. Consider increasing shared_buffers."
+
+        - alert: CNPGVacuumNotRunning
+          expr: |
+            (time() - cnpg_pg_stat_user_tables_last_autovacuum{cnpg_cluster="shared-postgres"}) > 86400
+          for: 1h
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "Autovacuum not running on table {{ $labels.relname }}"
+            description: "Table {{ $labels.schemaname }}.{{ $labels.relname }} has not been vacuumed in {{ $value | humanizeDuration }}."
+
+        - alert: CNPGDeadTuplesHigh
+          expr: |
+            cnpg_pg_stat_user_tables_n_dead_tup{cnpg_cluster="shared-postgres"} > 10000
+          for: 1h
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "High number of dead tuples on table {{ $labels.relname }}"
+            description: "Table {{ $labels.schemaname }}.{{ $labels.relname }} has {{ $value }} dead tuples. Vacuum may be needed."
+
+        - alert: CNPGWALArchivingFailing
+          expr: |
+            increase(cnpg_pg_stat_archiver_failed_count{cnpg_cluster="shared-postgres"}[1h]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "WAL archiving failures detected"
+            description: "WAL archiving has failed {{ $value }} times in the last hour on {{ $labels.pod }}."
+
+        - alert: CNPGInstanceRestart
+          expr: |
+            changes(cnpg_pg_postmaster_start_time{cnpg_cluster="shared-postgres"}[10m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "PostgreSQL instance restarted"
+            description: "PostgreSQL instance on pod {{ $labels.pod }} has restarted. Check logs for errors."
+
+        - alert: CNPGReplicationSlotInactive
+          expr: |
+            cnpg_pg_replication_slots_active{cnpg_cluster="shared-postgres"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            component: shared-postgres
+          annotations:
+            summary: "Replication slot {{ $labels.slot_name }} is inactive"
+            description: "Replication slot {{ $labels.slot_name }} on {{ $labels.pod }} has been inactive for more than 10 minutes."
+
+        # Informational
+        - alert: CNPGBackupRunning
+          expr: |
+            cnpg_pg_backup_running{cnpg_cluster="shared-postgres"} == 1
+          for: 2h
+          labels:
+            severity: info
+            component: shared-postgres
+          annotations:
+            summary: "Backup running for extended period"
+            description: "Backup for cluster {{ $labels.cnpg_cluster }} has been running for more than 2 hours. This may indicate a performance issue."

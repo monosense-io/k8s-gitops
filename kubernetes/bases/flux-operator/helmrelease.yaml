@@ -1,0 +1,53 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator
+  namespace: flux-system
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator
+    namespace: flux-system
+  interval: 30m
+  timeout: 10m
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 2
+      strategy: rollback
+  rollback:
+    cleanupOnFail: true
+    recreate: true
+  values:
+    # Enable monitoring
+    serviceMonitor:
+      create: true
+
+    # Resource management
+    resources:
+      limits:
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    # Security context
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Operator-specific settings
+    watchNamespace: ""  # Watch all namespaces

@@ -1,0 +1,27 @@
+---
+# ExternalSecret Component
+# Creates an ExternalSecret that pulls secrets from 1Password via External Secrets Operator
+#
+# Usage:
+#   apiVersion: kustomize.config.k8s.io/v1beta1
+#   kind: Kustomization
+#   components:
+#     - ../../components/externalsecret
+#   patches:
+#     - patch: |-
+#         - op: replace
+#           path: /spec/data/0/remoteRef/key
+#           value: "your/secret/path"
+#       target:
+#         kind: ExternalSecret
+#
+# Variables used:
+#   ${EXTERNAL_SECRET_STORE} - ClusterSecretStore name (usually "onepassword")
+#
+# Note: You'll need to customize the secret data mapping for your specific use case
+
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - externalsecret.yaml

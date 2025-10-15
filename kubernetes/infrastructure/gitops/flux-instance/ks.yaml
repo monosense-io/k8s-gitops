@@ -1,0 +1,37 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-instance
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: flux-instance
+    app.kubernetes.io/component: gitops
+    app.kubernetes.io/part-of: flux
+    cluster: ${CLUSTER}
+spec:
+  dependsOn:
+    - name: flux-operator
+      namespace: flux-system
+  interval: 10m
+  timeout: 5m
+  retryInterval: 1m
+  path: ./kubernetes/infrastructure/gitops/flux-instance
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: flux-system
+  healthChecks:
+    - apiVersion: fluxcd.controlplane.io/v1
+      kind: FluxInstance
+      name: flux
+      namespace: flux-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false

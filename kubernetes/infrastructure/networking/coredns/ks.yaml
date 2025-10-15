@@ -1,0 +1,37 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: coredns
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: coredns
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: dns
+    cluster: ${CLUSTER}
+spec:
+  dependsOn:
+    - name: cilium
+      namespace: flux-system
+  interval: 10m
+  timeout: 5m
+  retryInterval: 1m
+  path: ./kubernetes/infrastructure/networking/coredns
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  targetNamespace: kube-system
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: coredns
+      namespace: kube-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false

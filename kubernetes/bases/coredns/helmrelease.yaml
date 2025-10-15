@@ -1,0 +1,52 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: coredns
+  namespace: flux-system
+spec:
+  interval: 5m
+  ref:
+    tag: 1.35.0
+  url: oci://ghcr.io/coredns/charts/coredns
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coredns
+  namespace: kube-system
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: coredns
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+    crds: Create
+  upgrade:
+    remediation:
+      retries: 2
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    replicaCount: ${COREDNS_REPLICAS}
+    service:
+      clusterIP: ${COREDNS_CLUSTER_IP}
+    serviceAccount:
+      create: true
+      name: coredns
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    prometheus:
+      service:
+        enabled: true
+      servicemonitor:
+        enabled: true

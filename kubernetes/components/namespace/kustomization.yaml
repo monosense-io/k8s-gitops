@@ -1,0 +1,24 @@
+---
+# Namespace Component
+# Creates a namespace with standard labels and pod security standards
+#
+# Usage:
+#   apiVersion: kustomize.config.k8s.io/v1beta1
+#   kind: Kustomization
+#   namespace: my-namespace
+#   components:
+#     - ../../components/namespace
+#
+# The namespace field in the consumer will set the actual namespace name
+
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - namespace.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: flux
+    includeSelectors: false
+    includeTemplates: true

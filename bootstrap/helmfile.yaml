@@ -1,0 +1,46 @@
+---
+# Multi-Phase Bootstrap Orchestrator
+# This file orchestrates the phased bootstrap process
+#
+# Architecture:
+#   Phase 0 (00-crds.yaml):     Extract and install CRDs only
+#   Phase 1 (01-core.yaml):     Install core infrastructure (CRDs disabled)
+#
+# Usage:
+#   helmfile -e infra sync    # Bootstrap infra cluster (all phases)
+#   helmfile -e apps sync     # Bootstrap apps cluster (all phases)
+#
+# Manual phase control:
+#   helmfile -f helmfile.d/00-crds.yaml -e infra template | kubectl apply -f -
+#   helmfile -f helmfile.d/01-core.yaml -e infra sync
+#
+# Why phased approach?
+#   - Prevents CRD race conditions
+#   - Ensures CRDs exist before resources that depend on them
+#   - Solves PrometheusRule CRD dependency (Victoria Metrics)
+#   - Follows buroa/k8s-gitops best practice pattern
+
+helmDefaults:
+  wait: true
+  timeout: 600
+
+---
+# Cluster-specific environments
+environments:
+  infra:
+    values:
+      - clusters/infra/values.yaml
+  apps:
+    values:
+      - clusters/apps/values.yaml
+
+---
+# Import phase-specific helmfiles
+# Note: CRDs are applied via Taskfile automation (task bootstrap:infra/apps)
+# This file handles core infrastructure only
+helmfiles:
+  # Phase 1: Core Infrastructure
+  # CRDs assumed to be pre-installed via Taskfile bootstrap
+  - path: helmfile.d/01-core.yaml
+    selectors:
+      - name!=disabled
