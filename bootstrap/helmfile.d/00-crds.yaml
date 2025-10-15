@@ -77,3 +77,7 @@ releases:
     set:
       - name: crds.create
         value: true
+
+  # Note: Gateway API CRDs installed via kubectl from official Kubernetes SIGs release
+  # kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+  # Provides: GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant
