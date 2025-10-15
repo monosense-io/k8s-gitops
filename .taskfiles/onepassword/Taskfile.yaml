@@ -2,7 +2,28 @@
 version: '3'
 
 tasks:
-  todo:
-    desc: Placeholder - reimplement 1Password automation as needed
+  clustermesh:infra:
+    desc: Create/update 1Password item for infra cilium-clustermesh secret [VAULT=required]
     cmds:
-      - echo "1Password task definitions were reset during repo refactor."
+      - ./scripts/generate-clustermesh-1password-item.sh -c infra -v {{.VAULT}} -t "kubernetes/infra/cilium-clustermesh"
+    requires:
+      vars: [VAULT]
+    preconditions:
+      - which kubectl jq op
+
+  clustermesh:apps:
+    desc: Create/update 1Password item for apps cilium-clustermesh secret [VAULT=required]
+    cmds:
+      - ./scripts/generate-clustermesh-1password-item.sh -c apps -v {{.VAULT}} -t "kubernetes/apps/cilium-clustermesh"
+    requires:
+      vars: [VAULT]
+    preconditions:
+      - which kubectl jq op
+
+  clustermesh:all:
+    desc: Create/update 1Password items for both clusters [VAULT=required]
+    cmds:
+      - task op:clustermesh:infra VAULT={{.VAULT}}
+      - task op:clustermesh:apps  VAULT={{.VAULT}}
+    requires:
+      vars: [VAULT]

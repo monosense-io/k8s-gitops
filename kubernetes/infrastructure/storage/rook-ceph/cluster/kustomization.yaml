@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - ../../../../bases/rook-ceph-cluster
   - prometheusrule.yaml
+  - toolbox.yaml

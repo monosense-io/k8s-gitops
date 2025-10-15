@@ -42,6 +42,29 @@ tasks:
         done
     silent: true
 
+  reconcile-mesh:
+    desc: Reconcile Cilium mesh components (clustermesh secret, BGP policy, GatewayClass) [CLUSTER=required]
+    cmds:
+      - flux -n flux-system --context={{.CONTEXT}} reconcile ks cilium-clustermesh-secret --with-source
+      - flux -n flux-system --context={{.CONTEXT}} reconcile ks cilium-bgp-policy --with-source
+      - flux -n flux-system --context={{.CONTEXT}} reconcile ks cilium-gatewayclass --with-source
+    vars:
+      CLUSTER: '{{.CLUSTER | default ""}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+    requires:
+      vars: [CLUSTER]
+    preconditions:
+      - kubectl config get-contexts {{.CONTEXT}}
+      - which flux
+
+  reconcile-mesh-all:
+    desc: Reconcile mesh components across all clusters
+    cmds:
+      - for cluster in $(echo {{.DEFAULT_CLUSTERS}} | tr ',' ' '); do \
+          task kubernetes:reconcile-mesh CLUSTER=$cluster; \
+        done
+    silent: true
+
   validate:
     desc: Template manifests for a target scope [TARGET=infrastructure|workloads]
     cmds:

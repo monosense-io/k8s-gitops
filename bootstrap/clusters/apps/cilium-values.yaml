@@ -35,7 +35,7 @@ ipv4:
 
 routingMode: native
 autoDirectNodeRoutes: true
-tunnelProtocol: vxlan
+tunnelProtocol: ""
 
 # ============================================================================
 # ENCRYPTION & SECURITY (SERVICE MESH FEATURES)
@@ -52,12 +52,12 @@ encryption:
 # SPIRE workload identity - DISABLED for bootstrap (no storage yet)
 # Enable via Flux after deploying storage operators (Rook-Ceph/OpenEBS)
 authentication:
-  enabled: false
+  enabled: true
   mutual:
     spire:
-      enabled: false
+      enabled: true
       install:
-        enabled: false
+        enabled: true
         server:
           dataStorage:
             size: 1Gi
@@ -74,7 +74,7 @@ hubble:
   # DISABLED for bootstrap - requires CoreDNS for service discovery
   # Enable via Flux after CoreDNS is deployed
   relay:
-    enabled: false
+    enabled: true
     replicas: 1
     resources:
       requests:
@@ -88,7 +88,7 @@ hubble:
   # DISABLED for bootstrap - requires Hubble Relay
   # Enable via Flux after CoreDNS is deployed
   ui:
-    enabled: false
+    enabled: true
     replicas: 1
     ingress:
       enabled: false
@@ -133,14 +133,15 @@ hubble:
 # DISABLED for bootstrap - requires cert-manager for TLS cert generation
 # Enable via Flux after cert-manager is deployed
 clustermesh:
-  useAPIServer: false
+  useAPIServer: true
 
   apiserver:
     replicas: 2
 
     service:
       type: LoadBalancer
-      annotations: {}
+      annotations:
+        io.cilium/lb-ipam-ips: "10.25.12.100"
 
     tls:
       auto:
@@ -165,6 +166,16 @@ clustermesh:
 
 bgpControlPlane:
   enabled: true
+
+# Enable Gateway API with Envoy LB and static IP
+gatewayAPI:
+  enabled: true
+  envoy:
+    enabled: true
+    service:
+      type: LoadBalancer
+      annotations:
+        io.cilium/lb-ipam-ips: "10.25.12.120"
 
 # ============================================================================
 # GATEWAY API

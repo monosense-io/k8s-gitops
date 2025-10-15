@@ -10,3 +10,6 @@ resources:
   # - storage  # Day 2 - OpenEBS/Rook-Ceph
   # - databases  # Day 2 - CloudNativePG
   # - cilium  # Day 2 - service mesh features
+  - networking/cilium/clustermesh/ks.yaml  # Manage clustermesh secret via ExternalSecrets
+  - networking/cilium/bgp/ks.yaml          # Own BGP peering policy via Flux
+  - networking/cilium/gateway/ks.yaml      # Own Cilium GatewayClass via Flux

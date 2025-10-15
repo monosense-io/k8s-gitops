@@ -1,0 +1,44 @@
+---
+# Minimal Ceph toolbox for on-cluster ceph CLI access
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rook-ceph-tools
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rook-ceph-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rook-ceph-tools
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rook-ceph-tools
+    spec:
+      serviceAccountName: rook-ceph-system
+      containers:
+        - name: tools
+          # Use Ceph image to match cluster major version for CLI
+          image: quay.io/ceph/ceph:${ROOK_CEPH_IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh","-c"]
+          args: ["sleep infinity"]
+          env:
+            - name: CEPH_ARGS
+              value: "--cluster ${ROOK_CEPH_CLUSTER_NAME}"
+          volumeMounts:
+            - name: ceph-conf
+              mountPath: /etc/ceph
+            - name: mon-endpoints
+              mountPath: /etc/rook
+      volumes:
+        - name: ceph-conf
+          secret:
+            secretName: rook-ceph-config
+            optional: true
+        - name: mon-endpoints
+          configMap:
+            name: rook-ceph-mon-endpoints
+            optional: true
