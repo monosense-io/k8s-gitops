@@ -1,0 +1,117 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dragonfly-alerts
+  namespace: dragonfly-system
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: platform-databases
+spec:
+  groups:
+    - name: dragonfly.rules
+      interval: 30s
+      rules:
+        # Critical Alerts
+        - alert: DragonflyDown
+          expr: up{job="dragonfly"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly instance is down"
+            description: "Dragonfly instance {{ $labels.instance }} has been down for more than 1 minute"
+
+        - alert: DragonflyMasterDown
+          expr: dragonfly_redis_instance_info{role="master"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly master node is down"
+            description: "Dragonfly master node {{ $labels.instance }} is not responding"
+
+        - alert: DragonflyMemoryUsageHigh
+          expr: (dragonfly_redis_memory_used_bytes / dragonfly_redis_memory_max_bytes) > 0.9
+          for: 5m
+          labels:
+            severity: critical
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly memory usage is critically high"
+            description: "Dragonfly memory usage is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+        - alert: DragonflyDiskSpaceHigh
+          expr: (dragonfly_redis_rdb_used_disk_bytes / dragonfly_redis_rdb_max_disk_bytes) > 0.85
+          for: 5m
+          labels:
+            severity: critical
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly disk usage is critically high"
+            description: "Dragonfly disk usage is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+        # Warning Alerts
+        - alert: DragonflyMemoryUsageWarning
+          expr: (dragonfly_redis_memory_used_bytes / dragonfly_redis_memory_max_bytes) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly memory usage is high"
+            description: "Dragonfly memory usage is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}"
+
+        - alert: DragonflyConnectionCountHigh
+          expr: dragonfly_redis_connected_clients > 100
+          for: 10m
+          labels:
+            severity: warning
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly connection count is high"
+            description: "Dragonfly has {{ $value }} connected clients on instance {{ $labels.instance }}"
+
+        - alert: DragonflyReplicationLag
+          expr: dragonfly_redis_replication_offset_bytes > 1000000
+          for: 5m
+          labels:
+            severity: warning
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly replication lag is high"
+            description: "Dragonfly replication lag is {{ $value | humanizeBytes }} on instance {{ $labels.instance }}"
+
+        - alert: DragonflyCommandRateHigh
+          expr: rate(dragonfly_redis_commands_processed_total[5m]) > 10000
+          for: 10m
+          labels:
+            severity: warning
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly command rate is unusually high"
+            description: "Dragonfly is processing {{ $value }} commands per second on instance {{ $labels.instance }}"
+
+        # Info Alerts
+        - alert: DragonflyKeyEviction
+          expr: increase(dragonfly_redis_evicted_keys_total[1h]) > 0
+          for: 0m
+          labels:
+            severity: info
+            component: dragonfly
+          annotations:
+            summary: "Dragonfly keys are being evicted"
+            description: "Dragonfly evicted {{ $value }} keys in the last hour on instance {{ $labels.instance }}"
+
+        - alert: DragonflyExpiredKeys
+          expr: increase(dragonfly_redis_expired_keys_total[1h]) > 1000
+          for: 0m
+          labels:
+            severity: info
+            component: dragonfly
+          annotations:
+            summary: "High number of Dragonfly keys expired"
+            description: "Dragonfly expired {{ $value }} keys in the last hour on instance {{ $labels.instance }}"

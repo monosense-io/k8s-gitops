@@ -1,0 +1,161 @@
+---
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: dragonfly
+  namespace: dragonfly-system
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: platform-databases
+spec:
+  # Dragonfly image configuration
+  image: docker.io/dragonflydb/dragonfly:v1.17.0
+  replicas: 3
+
+  # Authentication configuration
+  auth:
+    passwordFromSecret:
+      name: dragonfly-auth
+      key: password
+
+  # Resource configuration
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Persistence configuration
+  args:
+    - --logtostderr
+    - --protected_mode=true
+    - --dir=/data
+    - --metrics-bind-address=0.0.0.0:8080
+
+  # Persistent volume configuration
+  persistentVolumeClaimSpec:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ${DRAGONFLY_STORAGE_CLASS}
+    resources:
+      requests:
+        storage: ${DRAGONFLY_DATA_SIZE}
+
+  # Service configuration
+  serviceTemplate:
+    metadata:
+      annotations:
+        service.cilium.io/global: "true"
+    spec:
+      type: ClusterIP
+      ports:
+        - name: redis
+          port: 6379
+          targetPort: 6379
+        - name: metrics
+          port: 8080
+          targetPort: 8080
+
+  # Monitoring configuration
+  monitoring:
+    # Enable Prometheus monitoring
+    enabled: true
+
+    # ServiceMonitor configuration
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      port: metrics
+
+      # Additional labels for ServiceMonitor
+      labels:
+        app.kubernetes.io/name: dragonfly
+        app.kubernetes.io/component: database
+        app.kubernetes.io/part-of: platform-databases
+
+      # Metric relabeling
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'dragonfly_(.*)'
+          targetLabel: __name__
+          replacement: 'dragonfly_${1}'
+        - sourceLabels: [instance]
+          targetLabel: dragonfly_instance
+          action: replace
+        - sourceLabels: [pod]
+          targetLabel: dragonfly_pod
+          action: replace
+
+  # Pod configuration
+  podTemplate:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: dragonfly
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          ports:
+            - containerPort: 6379
+              name: redis
+            - containerPort: 8080
+              name: metrics
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+  # High availability configuration
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: dragonfly
+
+  # Affinity rules for high availability
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: dragonfly
+            topologyKey: kubernetes.io/hostname
