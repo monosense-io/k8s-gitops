@@ -39,7 +39,7 @@ metadata:
     app.kubernetes.io/name: rook-ceph-mgr-pdb
     app.kubernetes.io/managed-by: flux
 spec:
-  minAvailable: 1
+  maxUnavailable: 1
   selector:
     matchLabels:
       app: rook-ceph-mgr

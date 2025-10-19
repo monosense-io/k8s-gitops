@@ -9,7 +9,7 @@ resources:
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
   - storage  # Rook-Ceph distributed storage (includes OpenEBS)
   # - databases  # Day 2 - CloudNativePG
-  # - cilium  # Day 2 - service mesh features
+  - networking/cilium/ks.yaml              # Cilium base kustomization (required by OpenEBS)
   - networking/cilium/clustermesh/ks.yaml  # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml          # Own BGP peering policy via Flux
   - networking/cilium/gateway/ks.yaml      # Own Cilium GatewayClass via Flux
