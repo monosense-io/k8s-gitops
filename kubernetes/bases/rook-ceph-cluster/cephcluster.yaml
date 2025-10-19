@@ -61,4 +61,4 @@ spec:
           encryptedDevice: "false"
           preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
   cleanupPolicy:
-    confirmation: none
+    confirmation: ""
