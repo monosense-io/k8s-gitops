@@ -11,15 +11,12 @@ metadata:
     app.kubernetes.io/part-of: rook-ceph
     cluster: ${CLUSTER}
 spec:
-  dependsOn:
-    - name: cilium
-      namespace: flux-system
   interval: 10m
   timeout: 5m
   retryInterval: 1m
   path: ./kubernetes/infrastructure/storage/rook-ceph/operator
   prune: true
-  wait: true
+  wait: false
   sourceRef:
     kind: GitRepository
     name: flux-system
