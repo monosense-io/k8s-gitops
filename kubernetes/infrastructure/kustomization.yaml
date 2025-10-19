@@ -7,9 +7,11 @@ resources:
   # - networking  # Day 2 - Cilium/CoreDNS/Spegel already deployed via Helmfile
   - gitops  # Flux GitOps infrastructure Kustomizations
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
-  # - storage  # Day 2 - OpenEBS/Rook-Ceph
+  - storage/openebs/ks.yaml  # OpenEBS LocalPV provisioner
+  # - storage  # Day 2 - Full storage layer (OpenEBS/Rook-Ceph)
   # - databases  # Day 2 - CloudNativePG
   # - cilium  # Day 2 - service mesh features
   - networking/cilium/clustermesh/ks.yaml  # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml          # Own BGP peering policy via Flux
   - networking/cilium/gateway/ks.yaml      # Own Cilium GatewayClass via Flux
+  - networking/envoy-gateway/ks.yaml       # Envoy Gateway (edge) via Flux
