@@ -50,7 +50,7 @@ data:
   CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
 
   # OpenEBS Configuration
-  OPENEBS_BASEPATH: "/var/openebs/local"
+  OPENEBS_BASEPATH: "/var/mnt/openebs"
   OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
 
   # Observability Configuration

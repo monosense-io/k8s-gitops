@@ -54,8 +54,8 @@ spec:
 
         - alert: OpenEBSHighDiskUsage
           expr: |
-            (node_filesystem_size_bytes{mountpoint="/var/openebs/local"} - node_filesystem_avail_bytes{mountpoint="/var/openebs/local"})
-            / node_filesystem_size_bytes{mountpoint="/var/openebs/local"} > 0.85
+            (node_filesystem_size_bytes{mountpoint="/var/mnt/openebs"} - node_filesystem_avail_bytes{mountpoint="/var/mnt/openebs"})
+            / node_filesystem_size_bytes{mountpoint="/var/mnt/openebs"} > 0.85
           for: 15m
           annotations:
             summary: OpenEBS high disk usage
@@ -68,8 +68,8 @@ spec:
 
         - alert: OpenEBSDiskFull
           expr: |
-            (node_filesystem_size_bytes{mountpoint="/var/openebs/local"} - node_filesystem_avail_bytes{mountpoint="/var/openebs/local"})
-            / node_filesystem_size_bytes{mountpoint="/var/openebs/local"} > 0.95
+            (node_filesystem_size_bytes{mountpoint="/var/mnt/openebs"} - node_filesystem_avail_bytes{mountpoint="/var/mnt/openebs"})
+            / node_filesystem_size_bytes{mountpoint="/var/mnt/openebs"} > 0.95
           for: 5m
           annotations:
             summary: OpenEBS disk almost full

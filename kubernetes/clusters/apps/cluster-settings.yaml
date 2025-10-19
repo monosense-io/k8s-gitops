@@ -65,12 +65,7 @@ data:
   OBSERVABILITY_GRAFANA_SECRET_PATH: "kubernetes/apps/grafana-admin"
 
   # CloudNative-PG Configuration
-  CNPG_STORAGE_CLASS: "openebs-local-nvme"
-  CNPG_DATA_SIZE: "200Gi"
-  CNPG_WAL_SIZE: "100Gi"
-  CNPG_BACKUP_BUCKET: "monosense-cnpg-apps"
-  CNPG_MINIO_SECRET_PATH: "kubernetes/apps/cloudnative-pg/minio"
-  CNPG_SUPERUSER_SECRET_PATH: "kubernetes/apps/cloudnative-pg/superuser"
+  # PostgreSQL is deployed only on infra cluster - not needed on apps
 
   # Dragonfly Configuration
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
