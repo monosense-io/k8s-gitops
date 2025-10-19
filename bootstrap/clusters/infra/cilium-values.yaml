@@ -132,7 +132,7 @@ hubble:
 # DISABLED for bootstrap - requires cert-manager for TLS cert generation
 # Enable via Flux after cert-manager is deployed
 clustermesh:
-  useAPIServer: true
+  useAPIServer: false
 
   apiserver:
     replicas: 2
