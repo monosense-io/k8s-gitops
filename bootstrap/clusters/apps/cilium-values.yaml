@@ -292,9 +292,12 @@ cgroup:
     enabled: false
   hostRoot: /sys/fs/cgroup
 
-# Kubernetes API endpoint (from Talos kubePrism)
-k8sServiceHost: "apps-k8s.monosense.io"
-k8sServicePort: 6443
+# ============================================================================
+# KUBERNETES API ENDPOINT (uses in-cluster config with kubePrism)
+# ============================================================================
+# Note: Not setting k8sServiceHost/Port allows Cilium to use the in-cluster
+# kubeconfig which automatically routes through Talos kubePrism (127.0.0.1:7445)
+# This is more reliable than external DNS endpoints for pod-to-API communication
 
 # ============================================================================
 # DEBUGGING (disable in production)
