@@ -27,16 +27,38 @@ spec:
     osdMaintenanceTimeout: 30
     managePodBudgets: true
   storage:
-    useAllNodes: true
+    useAllNodes: false
     useAllDevices: false
-    deviceFilter: ${ROOK_CEPH_DEVICE_FILTER}
-    config:
-      osdsPerDevice: "1"
-      crushRoot: default
-      databaseSizeMB: "0"
-      walSizeMB: "0"
-      encryptedDevice: "false"
-      preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
-    topologyAware: true
+    nodes:
+      - name: infra-01
+        devices:
+          - name: "/dev/disk/by-id/nvme-PNY_CS1031_1TB_SSD_PNY2301230103010067A"
+        config:
+          osdsPerDevice: "1"
+          crushRoot: default
+          databaseSizeMB: "0"
+          walSizeMB: "0"
+          encryptedDevice: "false"
+          preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+      - name: infra-02
+        devices:
+          - name: "/dev/disk/by-id/nvme-PNY_CS2241_1TB_SSD_PNY23242306160103994"
+        config:
+          osdsPerDevice: "1"
+          crushRoot: default
+          databaseSizeMB: "0"
+          walSizeMB: "0"
+          encryptedDevice: "false"
+          preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+      - name: infra-03
+        devices:
+          - name: "/dev/disk/by-id/nvme-PNY_CS1031_1TB_SSD_PNY23012301030100E10"
+        config:
+          osdsPerDevice: "1"
+          crushRoot: default
+          databaseSizeMB: "0"
+          walSizeMB: "0"
+          encryptedDevice: "false"
+          preferredDeviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
   cleanupPolicy:
     confirmation: none
