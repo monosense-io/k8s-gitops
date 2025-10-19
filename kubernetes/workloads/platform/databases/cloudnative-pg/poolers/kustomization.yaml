@@ -10,6 +10,7 @@ resources:
   - harbor-pooler.yaml
   - mattermost-pooler.yaml
   - keycloak-pooler.yaml
+  - synergyflow-pooler.yaml
 
 labels:
   - pairs:

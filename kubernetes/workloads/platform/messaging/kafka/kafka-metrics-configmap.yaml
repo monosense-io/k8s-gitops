@@ -1,0 +1,112 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/v1/configmap.json
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-metrics
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+data:
+  kafka-metrics-config.yml: |
+    # JMX Exporter configuration for Kafka brokers
+    # Optimized for Victoria Metrics with minimal cardinality
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+
+    rules:
+      # Broker-level metrics
+      - pattern: kafka.server<type=(.+), name=(.+)><>Value
+        name: kafka_server_$1_$2
+        type: GAUGE
+
+      # Request metrics
+      - pattern: kafka.network<type=RequestMetrics, name=RequestsPerSec, request=(.+)><>Count
+        name: kafka_network_requests_total
+        type: COUNTER
+        labels:
+          request: "$1"
+
+      - pattern: kafka.network<type=RequestMetrics, name=TotalTimeMs, request=(.+)><>Mean
+        name: kafka_network_request_time_ms
+        type: GAUGE
+        labels:
+          request: "$1"
+
+      # Topic metrics
+      - pattern: kafka.server<type=BrokerTopicMetrics, name=(.+), topic=(.+)><>Count
+        name: kafka_server_topic_$1
+        type: COUNTER
+        labels:
+          topic: "$2"
+
+      # Partition metrics
+      - pattern: kafka.log<type=Log, name=Size, topic=(.+), partition=(.+)><>Value
+        name: kafka_log_size_bytes
+        type: GAUGE
+        labels:
+          topic: "$1"
+          partition: "$2"
+
+      # Replication metrics
+      - pattern: kafka.server<type=ReplicaManager, name=(.+)><>Value
+        name: kafka_server_replica_manager_$1
+        type: GAUGE
+
+      # Controller metrics
+      - pattern: kafka.controller<type=KafkaController, name=(.+)><>Value
+        name: kafka_controller_$1
+        type: GAUGE
+
+      # Under-replicated partitions (critical)
+      - pattern: kafka.server<type=ReplicaManager, name=UnderReplicatedPartitions><>Value
+        name: kafka_server_replica_manager_under_replicated_partitions
+        type: GAUGE
+
+      # Offline partitions (critical)
+      - pattern: kafka.controller<type=KafkaController, name=OfflinePartitionsCount><>Value
+        name: kafka_controller_offline_partitions_count
+        type: GAUGE
+
+      # Consumer group metrics
+      - pattern: kafka.server<type=GroupMetadataManager, name=NumGroups><>Value
+        name: kafka_server_consumer_groups_total
+        type: GAUGE
+
+      # Network processor metrics
+      - pattern: kafka.network<type=SocketServer, name=NetworkProcessorAvgIdlePercent><>Value
+        name: kafka_network_processor_avg_idle_percent
+        type: GAUGE
+
+      # Request queue size
+      - pattern: kafka.network<type=RequestChannel, name=RequestQueueSize><>Value
+        name: kafka_network_request_queue_size
+        type: GAUGE
+
+      # Produce/Fetch request metrics
+      - pattern: kafka.server<type=BrokerTopicMetrics, name=(BytesInPerSec|BytesOutPerSec)><>Count
+        name: kafka_server_broker_$1
+        type: COUNTER
+
+      # JVM metrics
+      - pattern: java.lang<type=Memory><HeapMemoryUsage>used
+        name: jvm_memory_heap_used_bytes
+        type: GAUGE
+
+      - pattern: java.lang<type=Memory><HeapMemoryUsage>max
+        name: jvm_memory_heap_max_bytes
+        type: GAUGE
+
+      - pattern: java.lang<type=GarbageCollector, name=(.+)><CollectionCount>
+        name: jvm_gc_collection_total
+        type: COUNTER
+        labels:
+          gc: "$1"
+
+      - pattern: java.lang<type=GarbageCollector, name=(.+)><CollectionTime>
+        name: jvm_gc_collection_time_ms
+        type: COUNTER
+        labels:
+          gc: "$1"

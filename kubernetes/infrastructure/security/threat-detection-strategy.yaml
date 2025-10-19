@@ -1,0 +1,869 @@
+---
+# Comprehensive Threat Detection Strategy
+# Real-time threat detection using existing monitoring data and advanced analytics
+
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: threat-detection-rules
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: threat-detection
+    app.kubernetes.io/component: real-time-detection
+    monosense.io/security-framework: enhanced
+spec:
+  groups:
+    - name: threat.realtime_detection
+      interval: 30s
+      rules:
+        # Real-time Threat Detection Rules
+
+        # 1. Brute Force Attack Detection
+        - alert: BruteForceAttackDetected
+          expr: |
+            sum(rate(kubelet_server_authentication_errors_total[5m])) by (source_ip) > 10
+          for: 2m
+          annotations:
+            summary: Brute force attack detected
+            description: |
+              Brute force attack detected from {{ $labels.source_ip }}
+              with {{ $value | humanize }} failed authentication attempts per minute.
+            runbook_url: "https://security.monosense.io/runbooks/brute-force"
+            mitre_attack: "T1110 - Brute Force"
+          labels:
+            severity: critical
+            category: authentication_attack
+            attack_vector: credential_stuffing
+
+        # 2. Privilege Escalation Detection
+        - alert: PrivilegeEscalationDetected
+          expr: |
+            sum(rate(falco_events_total{rule="Privilege escalation attempt"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Privilege escalation attempt detected
+            description: |
+              Privilege escalation attempt detected in pod {{ $labels.namespace }}/{{ $labels.pod }}.
+              User {{ $labels.user }} attempting to escalate privileges.
+            runbook_url: "https://security.monosense.io/runbooks/privilege-escalation"
+            mitre_attack: "T1068 - Exploitation for Privilege Escalation"
+          labels:
+            severity: critical
+            category: privilege_escalation
+            attack_vector: exploitation
+
+        # 3. Container Escape Detection
+        - alert: ContainerEscapeAttempt
+          expr: |
+            sum(rate(falco_events_total{rule="Container escape attempt"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Container escape attempt detected
+            description: |
+              Container escape attempt detected in pod {{ $labels.namespace }}/{{ $labels.pod }}.
+              Attempting to break out of container isolation.
+            runbook_url: "https://security.monosense.io/runbooks/container-escape"
+            mitre_attack: "T1611 - Escape to Host"
+          labels:
+            severity: critical
+            category: container_security
+            attack_vector: container_escape
+
+        # 4. Lateral Movement Detection
+        - alert: LateralMovementDetected
+          expr: |
+            sum(rate(hubble_flows_processed_total{source_namespace!=destination_namespace, source_namespace!="kube-system"}[5m])) by (source_namespace, destination_namespace) > 5
+          for: 3m
+          annotations:
+            summary: Lateral movement detected
+            description: |
+              Unusual cross-namespace communication detected from {{ $labels.source_namespace }} to {{ $labels.destination_namespace }}.
+              This may indicate lateral movement by an attacker.
+            runbook_url: "https://security.monosense.io/runbooks/lateral-movement"
+            mitre_attack: "T1021 - Remote Services"
+          labels:
+            severity: high
+            category: lateral_movement
+            attack_vector: network_propagation
+
+        # 5. Data Exfiltration Detection
+        - alert: DataExfiltrationDetected
+          expr: |
+            sum(rate(container_network_transmit_bytes_total[5m])) by (namespace, pod) > 100000000
+          for: 5m
+          annotations:
+            summary: Potential data exfiltration detected
+            description: |
+              High data transfer volume detected from {{ $labels.namespace }}/{{ $labels.pod }}.
+              Transferring {{ $value | humanizeBytes }} per minute.
+            runbook_url: "https://security.monosense.io/runbooks/data-exfiltration"
+            mitre_attack: "T1041 - Exfiltration Over C2 Channel"
+          labels:
+            severity: high
+            category: data_exfiltration
+            attack_vector: data_theft
+
+        # 6. Cryptomining Detection
+        - alert: CryptominingDetected
+          expr: |
+            sum(rate(falco_events_total{rule="Cryptocurrency mining detected"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Cryptocurrency mining activity detected
+            description: |
+              Cryptocurrency mining activity detected in pod {{ $labels.namespace }}/{{ $labels.pod }}.
+              This indicates resource hijacking.
+            runbook_url: "https://security.monosense.io/runbooks/cryptomining"
+            mitre_attack: "T1496 - Resource Hijacking"
+          labels:
+            severity: high
+            category: resource_hijacking
+            attack_vector: crypto_mining
+
+        # 7. Port Scanning Detection
+        - alert: PortScanningDetected
+          expr: |
+            sum(rate(hubble_flows_processed_total{tcp_flags="SYN", verdict="denied"}[5m])) by (source_ip) > 20
+          for: 2m
+          annotations:
+            summary: Port scanning activity detected
+            description: |
+              Port scanning activity detected from {{ $labels.source_ip }}.
+              {{ $value | humanize }} SYN packets denied per minute.
+            runbook_url: "https://security.monosense.io/runbooks/port-scanning"
+            mitre_attack: "T1046 - Network Service Scanning"
+          labels:
+            severity: medium
+            category: reconnaissance
+            attack_vector: port_scanning
+
+        # 8. Malicious IP Communication
+        - alert: MaliciousIPCommunication
+          expr: |
+            sum(rate(hubble_flows_processed_total{destination_ip=~"${threat_ips:regex}"}[5m])) by (source_namespace, destination_ip) > 0
+          for: 0m
+          annotations:
+            summary: Communication with malicious IP detected
+            description: |
+              Pod {{ $labels.source_namespace }} communicating with known malicious IP {{ $labels.destination_ip }}.
+            runbook_url: "https://security.monosense.io/runbooks/malicious-ip"
+            mitre_attack: "T1071 - Application Layer Protocol"
+          labels:
+            severity: critical
+            category: malicious_communication
+            attack_vector: c2_communication
+
+        # 9. Suspicious Process Execution
+        - alert: SuspiciousProcessExecution
+          expr: |
+            sum(rate(falco_events_total{rule="Suspicious process execution"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Suspicious process execution detected
+            description: |
+              Suspicious process execution in pod {{ $labels.namespace }}/{{ $labels.pod }}.
+              Process may indicate compromise.
+            runbook_url: "https://security.monosense.io/runbooks/suspicious-process"
+            mitre_attack: "T1059 - Command and Scripting Interpreter"
+          labels:
+            severity: high
+            category: malicious_activity
+            attack_vector: process_injection
+
+        # 10. Unusual API Access Patterns
+        - alert: UnusualAPIAccessPatterns
+          expr: |
+            sum(rate(kubeapiserver_request_total{verb="delete", resource=~"(deployments|services|secrets)"}[5m])) by (user, namespace) > 2
+          for: 1m
+          annotations:
+            summary: Unusual API access patterns detected
+            description: |
+              User {{ $labels.user }} performing unusual delete operations on {{ $labels.resource }} in namespace {{ $labels.namespace }}.
+            runbook_url: "https://security.monosense.io/runbooks/unusual-api-access"
+            mitre_attack: "T1565 - Data Manipulation"
+          labels:
+            severity: medium
+            category: api_abuse
+            attack_vector: unauthorized_access
+
+    - name: threat.anomaly_detection
+      interval: 60s
+      rules:
+        # Anomaly Detection Rules
+
+        # 1. Network Traffic Anomalies
+        - alert: NetworkTrafficAnomaly
+          expr: |
+            abs(rate(container_network_transmit_bytes_total[5m]) - rate(container_network_transmit_bytes_total[5m] offset 24h)) / rate(container_network_transmit_bytes_total[5m] offset 24h) > 5
+          for: 10m
+          annotations:
+            summary: Network traffic anomaly detected
+            description: |
+              Network traffic for {{ $labels.pod }} is {{ $value | humanizePercentage }} higher than usual.
+              This may indicate data exfiltration or compromised workload.
+            runbook_url: "https://security.monosense.io/runbooks/network-anomaly"
+          labels:
+            severity: medium
+            category: anomaly_detection
+            attack_vector: behavioral_anomaly
+
+        # 2. CPU Usage Anomalies
+        - alert: CPUUsageAnomaly
+          expr: |
+            rate(container_cpu_usage_seconds_total[5m]) > (rate(container_cpu_usage_seconds_total[5m] offset 1h) * 3)
+          for: 15m
+          annotations:
+            summary: CPU usage anomaly detected
+            description: |
+              CPU usage for {{ $labels.pod }} is 3x higher than historical average.
+              May indicate cryptomining or malicious activity.
+            runbook_url: "https://security.monosense.io/runbooks/cpu-anomaly"
+          labels:
+            severity: medium
+            category: anomaly_detection
+            attack_vector: resource_anomaly
+
+        # 3. Authentication Pattern Anomalies
+        - alert: AuthenticationPatternAnomaly
+          expr: |
+            sum(rate(kubelet_server_authentication_errors_total[5m])) by (user) > (sum(rate(kubelet_server_authentication_errors_total[5m] offset 1h)) by (user) * 5)
+          for: 5m
+          annotations:
+            summary: Authentication pattern anomaly detected
+            description: |
+              Authentication failures for user {{ $labels.user }} are 5x higher than usual.
+              May indicate credential compromise.
+            runbook_url: "https://security.monosense.io/runbooks/auth-anomaly"
+          labels:
+            severity: high
+            category: anomaly_detection
+            attack_vector: credential_compromise
+
+    - name: threat.zero_day_detection
+      interval: 120s
+      rules:
+        # Zero-Day Vulnerability Detection
+
+        # 1. Unknown Process Execution
+        - alert: UnknownProcessExecution
+          expr: |
+            sum(rate(falco_events_total{rule="Unknown process execution"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Unknown process execution detected
+            description: |
+              Unknown process execution in {{ $labels.namespace }}/{{ $labels.pod }}.
+              May indicate zero-day exploit or novel attack.
+            runbook_url: "https://security.monosense.io/runbooks/unknown-process"
+            mitre_attack: "T1204 - User Execution"
+          labels:
+            severity: high
+            category: zero_day_detection
+            attack_vector: unknown_exploit
+
+        # 2. Unusual System Calls
+        - alert: UnusualSystemCalls
+          expr: |
+            sum(rate(falco_events_total{rule="Unusual system call"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: Unusual system calls detected
+            description: |
+              Unusual system calls detected in {{ $labels.namespace }}/{{ $labels.pod }}.
+              May indicate kernel exploitation or novel attack vector.
+            runbook_url: "https://security.monosense.io/runbooks/unusual-syscalls"
+          labels:
+            severity: high
+            category: zero_day_detection
+            attack_vector: kernel_exploit
+
+        # 3. File System Anomalies
+        - alert: FileSystemAnomaly
+          expr: |
+            sum(rate(falco_events_total{rule="Unexpected file access"}[5m])) by (namespace, pod) > 0
+          for: 0m
+          annotations:
+            summary: File system anomaly detected
+            description: |
+              Unexpected file system access in {{ $labels.namespace }}/{{ $labels.pod }}.
+              May indicate malware installation or data exfiltration.
+            runbook_url: "https://security.monosense.io/runbooks/filesystem-anomaly"
+          labels:
+            severity: medium
+            category: zero_day_detection
+            attack_vector: file_manipulation
+
+    - name: threat.insider_threat_detection
+      interval: 60s
+      rules:
+        # Insider Threat Detection
+
+        # 1. Unusual Access Hours
+        - alert: UnusualAccessHours
+          expr: |
+            sum(rate(kubeapiserver_request_total{user!="system:*", verb="get", resource="secrets"}[5m])) by (user) > 0
+            and hour() < 6 or hour() > 22
+          for: 2m
+          annotations:
+            summary: Unusual access hours detected
+            description: |
+              User {{ $labels.user }} accessing secrets during unusual hours ({{ $value }} requests/minute).
+              May indicate insider threat or compromised account.
+            runbook_url: "https://security.monosense.io/runbooks/unusual-hours"
+            mitre_attack: "T1078 - Valid Accounts"
+          labels:
+            severity: medium
+            category: insider_threat
+            attack_vector: insider_activity
+
+        # 2. Bulk Data Access
+        - alert: BulkDataAccess
+          expr: |
+            sum(rate(kubeapiserver_request_total{user!="system:*", verb="list", resource=~"(secrets|configmaps|pods)"}[5m])) by (user, namespace) > 10
+          for: 3m
+          annotations:
+            summary: Bulk data access detected
+            description: |
+              User {{ $labels.user }} performing bulk data access in namespace {{ $labels.namespace }}.
+              {{ $value }} list operations per minute may indicate data gathering.
+            runbook_url: "https://security.monosense.io/runbooks/bulk-access"
+          labels:
+            severity: medium
+            category: insider_threat
+            attack_vector: data_gathering
+
+        # 3. Privilege Abuse Detection
+        - alert: PrivilegeAbuseDetected
+          expr: |
+            sum(rate(kubeapiserver_request_total{user=~"admin|root", verb="delete", resource!~"events|events.*"}[5m])) by (user, namespace) > 2
+          for: 1m
+          annotations:
+            summary: Privilege abuse detected
+            description: |
+              Admin user {{ $labels.user }} performing excessive delete operations in {{ $labels.namespace }}.
+              May indicate privilege abuse or compromised admin account.
+            runbook_url: "https://security.monosense.io/runbooks/privilege-abuse"
+            mitre_attack: "T1485 - Data Destruction"
+          labels:
+            severity: high
+            category: insider_threat
+            attack_vector: privilege_abuse
+
+---
+# Attack Pattern Recognition and Correlation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: attack-pattern-recognition
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: attack-pattern-recognition
+    app.kubernetes.io/component: correlation
+    monosense.io/security-framework: enhanced
+data:
+  # Attack Pattern Recognition Rules
+  attack_patterns.yaml: |
+    # Attack Pattern Recognition and Correlation Rules
+
+    patterns:
+      # APT Attack Chain
+      apt_attack_chain:
+        name: "Advanced Persistent Threat Attack Chain"
+        description: "Multi-stage APT attack pattern detection"
+        stages:
+          - stage: "Initial Compromise"
+            indicators:
+              - "BruteForceAttackDetected"
+              - "MaliciousIPCommunication"
+              - "SuspiciousProcessExecution"
+            timeframe: "1h"
+          - stage: "Persistence"
+            indicators:
+              - "PrivilegeEscalationDetected"
+              - "UnusualAPIAccessPatterns"
+            timeframe: "2h"
+          - stage: "Lateral Movement"
+            indicators:
+              - "LateralMovementDetected"
+              - "UnusualAccessHours"
+            timeframe: "4h"
+          - stage: "Data Exfiltration"
+            indicators:
+              - "DataExfiltrationDetected"
+              - "BulkDataAccess"
+            timeframe: "6h"
+        confidence_threshold: 0.7
+        severity: "critical"
+
+      # Ransomware Attack Pattern
+      ransomware_attack:
+        name: "Ransomware Attack Pattern"
+        description: "Ransomware deployment and encryption pattern"
+        stages:
+          - stage: "Initial Access"
+            indicators:
+              - "BruteForceAttackDetected"
+              - "MaliciousIPCommunication"
+            timeframe: "30m"
+          - stage: "Privilege Escalation"
+            indicators:
+              - "PrivilegeEscalationDetected"
+              - "SuspiciousProcessExecution"
+            timeframe: "1h"
+          - stage: "Lateral Movement"
+            indicators:
+              - "LateralMovementDetected"
+              - "FileSystemAnomaly"
+            timeframe: "2h"
+          - stage: "Encryption"
+            indicators:
+              - "FileSystemAnomaly"
+              - "UnusualSystemCalls"
+              - "CPUUsageAnomaly"
+            timeframe: "30m"
+        confidence_threshold: 0.8
+        severity: "critical"
+
+      # Cryptojacking Attack Pattern
+      cryptojacking_attack:
+        name: "Cryptojacking Attack Pattern"
+        description: "Cryptocurrency mining hijacking pattern"
+        stages:
+          - stage: "Delivery"
+            indicators:
+              - "SuspiciousProcessExecution"
+              - "UnknownProcessExecution"
+            timeframe: "15m"
+          - stage: "Execution"
+            indicators:
+              - "CryptominingDetected"
+              - "CPUUsageAnomaly"
+            timeframe: "30m"
+          - stage: "Persistence"
+            indicators:
+              - "PrivilegeEscalationDetected"
+              - "UnusualAPIAccessPatterns"
+            timeframe: "1h"
+        confidence_threshold: 0.9
+        severity: "high"
+
+      # Data Exfiltration Attack Pattern
+      data_exfiltration_attack:
+        name: "Data Exfiltration Attack Pattern"
+        description: "Multi-stage data theft pattern"
+        stages:
+          - stage: "Reconnaissance"
+            indicators:
+              - "PortScanningDetected"
+              - "UnusualAccessHours"
+            timeframe: "2h"
+          - stage: "Initial Access"
+            indicators:
+              - "BruteForceAttackDetected"
+              - "PrivilegeEscalationDetected"
+            timeframe: "1h"
+          - stage: "Discovery"
+            indicators:
+              - "BulkDataAccess"
+              - "UnusualAPIAccessPatterns"
+            timeframe: "2h"
+          - stage: "Collection"
+            indicators:
+              - "FileSystemAnomaly"
+              - "SuspiciousProcessExecution"
+            timeframe: "3h"
+          - stage: "Exfiltration"
+            indicators:
+              - "DataExfiltrationDetected"
+              - "NetworkTrafficAnomaly"
+            timeframe: "1h"
+        confidence_threshold: 0.75
+        severity: "high"
+
+    # Correlation Rules
+    correlation_rules:
+      - name: "Multi-vector Attack"
+        description: "Detect attacks using multiple vectors"
+        condition: |
+          (
+            count(BruteForceAttackDetected{source_ip="$source_ip"}) > 0 and
+            count(PrivilegeEscalationDetected{namespace="$namespace"}) > 0
+          ) or (
+            count(MaliciousIPCommunication{source_namespace="$source_namespace"}) > 0 and
+            count(DataExfiltrationDetected{source_namespace="$source_namespace"}) > 0
+          )
+        timeframe: "6h"
+        severity: "critical"
+
+      - name: "Coordinated Attack"
+        description: "Detect coordinated attacks from multiple sources"
+        condition: |
+          count(BruteForceAttackDetected{namespace="$namespace"}) > 3 and
+          count(PrivilegeEscalationDetected{namespace="$namespace"}) > 0
+        timeframe: "2h"
+        severity: "critical"
+
+      - name: "Living off the Land"
+        description: "Detect attacks using legitimate system tools"
+        condition: |
+          (
+            SuspiciousProcessExecution{proc_name=~"(bash|sh|powershell|cmd)"} and
+            PrivilegeEscalationDetected{namespace="$namespace"}
+          ) or (
+            SuspiciousProcessExecution{proc_name=~"(wget|curl|nc|netcat)"} and
+            DataExfiltrationDetected{source_namespace="$source_namespace"}
+          )
+        timeframe: "1h"
+        severity: "high"
+
+  # Attack Pattern Matching Engine
+  pattern_matching_engine.py: |
+    import asyncio
+    import logging
+    from datetime import datetime, timedelta
+    from typing import List, Dict, Optional
+    from dataclasses import dataclass
+
+    @dataclass
+    class SecurityEvent:
+        timestamp: datetime
+        alert_name: str
+        severity: str
+        namespace: Optional[str] = None
+        pod: Optional[str] = None
+        user: Optional[str] = None
+        source_ip: Optional[str] = None
+        labels: Dict[str, str] = None
+
+    @dataclass
+    class AttackPattern:
+        name: str
+        stages: List[Dict]
+        confidence_threshold: float
+        severity: str
+
+    class AttackPatternMatcher:
+        def __init__(self):
+            self.logger = logging.getLogger(__name__)
+            self.attack_patterns = self._load_attack_patterns()
+            self.event_buffer = []
+            self.matches = []
+
+        def _load_attack_patterns(self) -> List[AttackPattern]:
+            """Load attack patterns from configuration"""
+            # Implementation to load patterns from YAML config
+            return []
+
+        async def add_event(self, event: SecurityEvent):
+            """Add security event to buffer for pattern matching"""
+            self.event_buffer.append(event)
+            await self._match_patterns()
+            await self._cleanup_old_events()
+
+        async def _match_patterns(self):
+            """Match events against attack patterns"""
+            for pattern in self.attack_patterns:
+                match = await self._match_single_pattern(pattern)
+                if match and match['confidence'] >= pattern.confidence_threshold:
+                    self.matches.append(match)
+                    await self._trigger_attack_pattern_alert(match)
+
+        async def _match_single_pattern(self, pattern: AttackPattern) -> Optional[Dict]:
+            """Match events against a single attack pattern"""
+            matched_stages = []
+            current_time = datetime.now()
+
+            for stage in pattern.stages:
+                stage_events = self._find_stage_events(stage, current_time)
+                if stage_events:
+                    matched_stages.append({
+                        'stage': stage['stage'],
+                        'events': stage_events,
+                        'timestamp': min(e.timestamp for e in stage_events)
+                    })
+                else:
+                    # If any stage doesn't match, pattern doesn't match
+                    return None
+
+            # Calculate confidence based on matched stages
+            confidence = self._calculate_confidence(matched_stages, pattern)
+
+            return {
+                'pattern_name': pattern.name,
+                'matched_stages': matched_stages,
+                'confidence': confidence,
+                'severity': pattern.severity,
+                'timestamp': current_time
+            }
+
+        def _find_stage_events(self, stage: Dict, current_time: datetime) -> List[SecurityEvent]:
+            """Find events that match a specific attack stage"""
+            indicators = stage['indicators']
+            timeframe = self._parse_timeframe(stage['timeframe'])
+            cutoff_time = current_time - timeframe
+
+            matching_events = []
+            for event in self.event_buffer:
+                if event.timestamp < cutoff_time:
+                    continue
+
+                if event.alert_name in indicators:
+                    matching_events.append(event)
+
+            return matching_events
+
+        def _parse_timeframe(self, timeframe_str: str) -> timedelta:
+            """Parse timeframe string into timedelta"""
+            # Implementation to parse "1h", "30m", etc.
+            unit = timeframe_str[-1]
+            value = int(timeframe_str[:-1])
+
+            if unit == 'h':
+                return timedelta(hours=value)
+            elif unit == 'm':
+                return timedelta(minutes=value)
+            elif unit == 'd':
+                return timedelta(days=value)
+            else:
+                raise ValueError(f"Unknown timeframe unit: {unit}")
+
+        def _calculate_confidence(self, matched_stages: List[Dict], pattern: AttackPattern) -> float:
+            """Calculate confidence score for pattern match"""
+            # Simple confidence calculation based on matched stages
+            stage_count = len(matched_stages)
+            total_stages = len(pattern.stages)
+
+            base_confidence = stage_count / total_stages
+
+            # Boost confidence if stages occurred in expected order
+            chronological_bonus = 0.1 if self._stages_in_chronological_order(matched_stages) else 0
+
+            return min(base_confidence + chronological_bonus, 1.0)
+
+        def _stages_in_chronological_order(self, stages: List[Dict]) -> bool:
+            """Check if stages occurred in chronological order"""
+            timestamps = [stage['timestamp'] for stage in stages]
+            return timestamps == sorted(timestamps)
+
+        async def _trigger_attack_pattern_alert(self, match: Dict):
+            """Trigger alert for matched attack pattern"""
+            self.logger.warning(f"Attack pattern detected: {match['pattern_name']}")
+            # Implementation to send alert to monitoring system
+
+        async def _cleanup_old_events(self):
+            """Remove old events from buffer"""
+            cutoff_time = datetime.now() - timedelta(days=7)
+            self.event_buffer = [
+                event for event in self.event_buffer
+                if event.timestamp > cutoff_time
+            ]
+
+---
+# Zero-Day Vulnerability Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zero-day-monitoring
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: zero-day-monitoring
+    app.kubernetes.io/component: vulnerability-monitoring
+    monosense.io/security-framework: enhanced
+data:
+  # Zero-Day Vulnerability Detection Configuration
+  zero_day_detection.yaml: |
+    # Zero-Day Vulnerability Monitoring Configuration
+
+    vulnerability_sources:
+      # CVE Databases
+      - name: "NVD CVE Database"
+        url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+        api_key: "${NVD_API_KEY}"
+        update_interval: "1h"
+        format: "json"
+        fields: ["cve.id", "cve.published", "cve.descriptions", "cve.metrics"]
+
+      - name: "GitHub Security Advisories"
+        url: "https://api.github.com/advisories"
+        token: "${GITHUB_TOKEN}"
+        update_interval: "2h"
+        format: "json"
+        fields: ["ghsa_id", "severity", "summary", "published_at"]
+
+      - name: "VulnDB"
+        url: "https://vulndb.cyberriskanalytics.com/api/v1/vulnerabilities"
+        api_key: "${VULNDB_API_KEY}"
+        update_interval: "4h"
+        format: "json"
+        fields: ["id", "severity", "description", "published"]
+
+    # Zero-Day Detection Rules
+    detection_rules:
+      - name: "Kubernetes Component Vulnerability"
+        description: "Detect vulnerabilities in Kubernetes components"
+        components:
+          - "kube-apiserver"
+          - "kubelet"
+          - "kube-proxy"
+          - "kube-scheduler"
+          - "kube-controller-manager"
+          - "etcd"
+          - "coredns"
+          - "cilium"
+          - "calico"
+        severity_threshold: "medium"
+        action: "immediate_alert"
+
+      - name: "Container Runtime Vulnerability"
+        description: "Detect vulnerabilities in container runtimes"
+        components:
+          - "containerd"
+          - "docker"
+          - "cri-o"
+        severity_threshold: "high"
+        action: "immediate_alert"
+
+      - name: "Application Stack Vulnerability"
+        description: "Detect vulnerabilities in application stack"
+        components:
+          - "nginx"
+          - "apache"
+          - "postgresql"
+          - "mysql"
+          - "redis"
+          - "mongodb"
+          - "java"
+          - "python"
+          - "nodejs"
+        severity_threshold: "critical"
+        action: "immediate_alert"
+
+    # Exploit Detection
+    exploit_detection:
+      # Behavioral Indicators
+      behavioral_indicators:
+        - indicator: "Unusual process execution patterns"
+          description: "Processes executing with unusual arguments or in unusual contexts"
+          weight: 0.3
+
+        - indicator: "Unexpected network connections"
+          description: "Connections to unexpected IPs or ports"
+          weight: 0.25
+
+        - indicator: "File system manipulation"
+          description: "Unauthorized file modifications or creations"
+          weight: 0.2
+
+        - indicator: "Privilege escalation attempts"
+          description: "Attempts to gain higher privileges"
+          weight: 0.25
+
+      # Signature-based Detection
+      signature_detection:
+        - name: "Known exploit patterns"
+          description: "Patterns from known exploits"
+          sources:
+            - "Exploit-DB"
+            - "Metasploit Framework"
+            - "Packet Storm"
+
+        - name: "C2 communication patterns"
+          description: "Command and control communication indicators"
+          sources:
+            - "Abuse.ch Feodo Tracker"
+            - "FireEye AXIOM"
+            - "Recorded Future"
+
+      # Anomaly-based Detection
+      anomaly_detection:
+        - name: "Process behavior anomalies"
+          description: "Unusual process behavior patterns"
+          algorithm: "isolation_forest"
+          sensitivity: 0.1
+
+        - name: "Network traffic anomalies"
+          description: "Unusual network traffic patterns"
+          algorithm: "dbscan"
+          sensitivity: 0.15
+
+        - name: "Resource usage anomalies"
+          description: "Unusual CPU, memory, or disk usage"
+          algorithm: "z_score"
+          sensitivity: 0.2
+
+  # Zero-Day Response Automation
+  zero_day_response.yaml: |
+    # Zero-Day Vulnerability Response Automation
+
+    response_playbooks:
+      - name: "Critical Vulnerability Response"
+        trigger:
+          severity: "critical"
+          component: "kubernetes"
+        actions:
+          - type: "isolation"
+            description: "Isolate affected components"
+            steps:
+              - "Network isolation"
+              - "Pod quarantine"
+              - "Service disruption"
+
+          - type: "patching"
+            description: "Apply emergency patches"
+            steps:
+              - "Rolling update"
+              - "Canary deployment"
+              - "Health verification"
+
+          - type: "monitoring"
+            description: "Enhanced monitoring"
+            steps:
+              - "Increased log collection"
+              - "Network traffic analysis"
+              - "Process monitoring"
+
+          - type: "communication"
+            description: "Stakeholder notification"
+            steps:
+              - "Security team alert"
+              - "Management notification"
+              - "Customer communication"
+
+      - name: "Container Vulnerability Response"
+        trigger:
+          severity: "high"
+          component: "container_runtime"
+        actions:
+          - type: "containment"
+            description: "Contain affected containers"
+            steps:
+              - "Pod draining"
+              - "Node isolation"
+              - "Workload migration"
+
+          - type: "remediation"
+            description: "Remediate vulnerable components"
+            steps:
+              - "Runtime upgrade"
+              - "Image rebuild"
+              - "Security scanning"
+
+      - name: "Application Vulnerability Response"
+        trigger:
+          severity: "medium"
+          component: "application"
+        actions:
+          - type: "mitigation"
+            description: "Mitigate vulnerability impact"
+            steps:
+              - "WAF rules"
+              - "Network policies"
+              - "Access controls"
+
+          - type: "remediation"
+            description: "Fix vulnerable applications"
+            steps:
+              - "Security patches"
+              - "Code updates"
+              - "Dependency updates"

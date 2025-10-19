@@ -1,0 +1,255 @@
+---
+# Multi-cluster VMagent configuration for remote write to global cluster
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  name: vmagent-multi-cluster
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vmagent-multi-cluster
+    app.kubernetes.io/component: monitoring
+spec:
+  replicaCount: 2
+  # Add cluster identification
+  externalLabels:
+    cluster: ${CLUSTER}
+    cluster_id: ${CLUSTER_ID}
+    region: ${REGION:-default}
+    datacenter: ${DATACENTER:-default}
+
+  # Remote write configuration for global cluster
+  remoteWrite:
+    - url: "http://victoria-metrics-global-vminsert.observability.svc.cluster.local:8480/insert/0/prometheus/api/v1/write"
+      queue_config:
+        max_samples_per_send: 10000
+        max_shards: 200
+        capacity: 25000
+        max_retries: 3
+        min_backoff: 30ms
+        max_backoff: 100ms
+      write_relabel_configs:
+        # Keep only essential metrics for global aggregation
+        - source_labels: [__name__]
+          regex: '(cluster_.*|node_.*|kube_node_.*|up|process_.*|go_.*|promhttp_.*|kube_pod_info|kube_deployment_.*|kube_service_.*|cilium_.*|hubble_.*|container_.*|machine_.*|kubelet_.*|kube_proxy_.*|cadvisor_.*|rest_client_.*|apiserver_.*|etcd_.*|coredns_.*|alertmanager_.*|prometheus_.*|vm_.*|victoriametrics_.*)'
+          action: keep
+        # Add cluster label to all metrics
+        - target_label: source_cluster
+          replacement: ${CLUSTER}
+        # Convert histogram counters to rates for better storage
+        - source_labels: [__name__]
+          regex: '.*_(total|count|sum|bucket)$'
+          action: keep
+        # Drop debug metrics
+        - source_labels: [__name__]
+          regex: 'go_gc_duration_seconds.*|go_goroutines|go_memstats.*|process_cpu_seconds_total|process_resident_memory_bytes'
+          action: drop
+        # Add helpful labels
+        - source_labels: [__address__]
+          target_label: instance
+          regex: '([^:]+)(:[0-9]+)?'
+          replacement: '${1}'
+        # Remove unnecessary labels
+        - regex: 'job'
+          action: labeldrop
+        - regex: 'endpoint'
+          action: labeldrop
+        - regex: 'namespace'
+          regex: 'kube-system|monitoring|observability'
+          action: labeldrop
+
+  # Scrape configuration
+  scrapeInterval: 30s
+  evaluationInterval: 30s
+
+  # Service discovery
+  serviceScrapeSelector: {}
+  serviceScrapeNamespaceSelector: {}
+  podScrapeSelector: {}
+  podScrapeNamespaceSelector: {}
+  probeScrapeSelector: {}
+  probeScrapeNamespaceSelector: {}
+
+  # Additional scrape configs for cross-cluster monitoring
+  additionalScrapeConfigs:
+    - job_name: 'kubernetes-apiservers'
+      kubernetes_sd_configs:
+        - role: endpoints
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: default;kubernetes;https
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_service_name]
+          target_label: service
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          target_label: endpoint
+
+    - job_name: 'kubernetes-nodes'
+      kubernetes_sd_configs:
+        - role: node
+      relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_node_name]
+          regex: (.+)
+          target_label: __metrics_path__
+          replacement: /api/v1/nodes/${1}/proxy/metrics
+        - source_labels: [__meta_kubernetes_node_name]
+          target_label: node
+          replacement: ${1}
+
+    - job_name: 'kubernetes-cadvisor'
+      kubernetes_sd_configs:
+        - role: node
+      metrics_path: /metrics/cadvisor
+      scheme: https
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: true
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      relabel_configs:
+        - action: labelmap
+          regex: __meta_kubernetes_node_label_(.+)
+        - target_label: __address__
+          replacement: kubernetes.default.svc:443
+        - source_labels: [__meta_kubernetes_node_name]
+          regex: (.+)
+          target_label: __metrics_path__
+          replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+        - source_labels: [__meta_kubernetes_node_name]
+          target_label: node
+          replacement: ${1}
+
+    - job_name: 'kubernetes-service-endpoints'
+      kubernetes_sd_configs:
+        - role: endpoints
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+          action: replace
+          target_label: __scheme__
+          regex: (https?)
+          replacement: ${1}
+        - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+          replacement: ${1}
+        - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+          action: replace
+          target_label: __address__
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: ${1}:${2}
+        - action: labelmap
+          regex: __meta_kubernetes_service_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_service_name]
+          action: replace
+          target_label: service
+        - source_labels: [__meta_kubernetes_pod_name]
+          action: replace
+          target_label: pod
+
+    - job_name: 'cilium-agent'
+      kubernetes_sd_configs:
+        - role: endpoints
+        namespaces:
+          names:
+            - kube-system
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          action: keep
+          regex: cilium-agent
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: metrics
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+          replacement: kube-system
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+
+    - job_name: 'hubble-relay'
+      kubernetes_sd_configs:
+        - role: endpoints
+        namespaces:
+          names:
+            - kube-system
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_service_name]
+          action: keep
+          regex: hubble-relay
+        - source_labels: [__meta_kubernetes_endpoint_port_name]
+          action: keep
+          regex: grpc
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+          replacement: kube-system
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+
+  # Resources
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Storage for cache
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ${OBSERVABILITY_BLOCK_SC}
+        resources:
+          requests:
+            storage: 50Gi
+
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  # Service account
+  serviceAccountName: vmagent
+
+  # Node selector and tolerations
+  nodeSelector:
+    kubernetes.io/os: linux
+  tolerations:
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+  # Affinity rules
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - vmagent-multi-cluster
+            topologyKey: kubernetes.io/hostname

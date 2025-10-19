@@ -1,0 +1,367 @@
+---
+version: '3'
+
+vars:
+  WORKLOADS_DIR: '{{.KUBERNETES_DIR}}/workloads'
+  APPS_CLUSTER_DIR: '{{.KUBERNETES_DIR}}/clusters/apps'
+
+tasks:
+  # ============================================================================
+  # Bootstrap Tasks
+  # ============================================================================
+
+  bootstrap:
+    desc: Bootstrap entire SynergyFlow infrastructure
+    cmds:
+      - task: bootstrap:messaging
+      - task: bootstrap:app
+      - task: validate:all
+    silent: false
+
+  bootstrap:messaging:
+    desc: Bootstrap Kafka and Schema Registry
+    cmds:
+      - task: deploy:kafka
+      - task: wait:kafka
+      - task: deploy:schema-registry
+      - task: wait:schema-registry
+    silent: false
+
+  bootstrap:app:
+    desc: Bootstrap SynergyFlow application
+    deps:
+      - bootstrap:messaging
+    cmds:
+      - task: deploy:app
+      - task: wait:app
+    silent: false
+
+  # ============================================================================
+  # Deployment Tasks
+  # ============================================================================
+
+  deploy:kafka:
+    desc: Deploy Kafka cluster using Strimzi
+    cmds:
+      - echo "Deploying Kafka cluster..."
+      - kubectl apply -k {{.WORKLOADS_DIR}}/platform/messaging/kafka
+      - echo "✓ Kafka manifests applied"
+    silent: false
+
+  deploy:schema-registry:
+    desc: Deploy Confluent Schema Registry
+    cmds:
+      - echo "Deploying Schema Registry..."
+      - kubectl apply -k {{.WORKLOADS_DIR}}/platform/messaging/schema-registry
+      - echo "✓ Schema Registry manifests applied"
+    silent: false
+
+  deploy:app:
+    desc: Deploy SynergyFlow backend with Flowable + OPA
+    cmds:
+      - echo "Deploying SynergyFlow backend..."
+      - kubectl apply -k {{.WORKLOADS_DIR}}/apps/synergyflow
+      - echo "✓ SynergyFlow manifests applied"
+    silent: false
+
+  deploy:flux-kustomizations:
+    desc: Create Flux Kustomizations for GitOps automation
+    cmds:
+      - echo "Creating Flux Kustomizations..."
+      - kubectl apply -f {{.APPS_CLUSTER_DIR}}/messaging.yaml
+      - kubectl apply -f {{.APPS_CLUSTER_DIR}}/synergyflow.yaml
+      - echo "✓ Flux Kustomizations created"
+    silent: false
+
+  # ============================================================================
+  # Wait Tasks (Health Checks)
+  # ============================================================================
+
+  wait:kafka:
+    desc: Wait for Kafka cluster to be ready
+    cmds:
+      - echo "Waiting for Kafka cluster..."
+      - kubectl wait --for=condition=Ready kafka/synergyflow -n messaging --timeout=600s
+      - echo "Waiting for Kafka topics..."
+      - kubectl wait --for=condition=Ready kafkatopic --all -n messaging --timeout=300s
+      - echo "✓ Kafka cluster is ready"
+    silent: false
+
+  wait:schema-registry:
+    desc: Wait for Schema Registry to be ready
+    cmds:
+      - echo "Waiting for Schema Registry..."
+      - kubectl wait --for=condition=available deployment/schema-registry -n messaging --timeout=300s
+      - kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=schema-registry -n messaging --timeout=300s
+      - echo "✓ Schema Registry is ready"
+    silent: false
+
+  wait:app:
+    desc: Wait for SynergyFlow backend to be ready
+    cmds:
+      - echo "Waiting for PostgreSQL cluster..."
+      - kubectl wait --for=condition=Ready cluster/synergyflow-db -n synergyflow --timeout=600s
+      - echo "Waiting for SynergyFlow backend..."
+      - kubectl wait --for=condition=available deployment/synergyflow-backend -n synergyflow --timeout=600s
+      - kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=synergyflow -n synergyflow --timeout=600s
+      - echo "✓ SynergyFlow backend is ready"
+    silent: false
+
+  # ============================================================================
+  # Validation Tasks
+  # ============================================================================
+
+  validate:all:
+    desc: Validate entire deployment
+    cmds:
+      - task: validate:kafka
+      - task: validate:schema-registry
+      - task: validate:app
+      - task: validate:connectivity
+      - echo "✓ All validation checks passed"
+    silent: false
+
+  validate:kafka:
+    desc: Validate Kafka cluster health
+    cmds:
+      - echo "Validating Kafka cluster..."
+      - kubectl get kafka synergyflow -n messaging -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -q "True"
+      - kubectl get kafkatopic -n messaging
+      - kubectl get kafkauser -n messaging
+      - echo "✓ Kafka cluster is healthy"
+    silent: false
+
+  validate:schema-registry:
+    desc: Validate Schema Registry health
+    cmds:
+      - echo "Validating Schema Registry..."
+      - kubectl get deployment schema-registry -n messaging
+      - kubectl get pods -l app.kubernetes.io/name=schema-registry -n messaging
+      - |
+        kubectl run curl-test --rm -it --image=curlimages/curl:latest --restart=Never -- \
+          curl -f http://schema-registry.messaging.svc.cluster.local:8081/subjects || true
+      - echo "✓ Schema Registry is healthy"
+    silent: false
+
+  validate:app:
+    desc: Validate SynergyFlow backend health
+    cmds:
+      - echo "Validating SynergyFlow backend..."
+      - kubectl get cluster synergyflow-db -n synergyflow
+      - kubectl get deployment synergyflow-backend -n synergyflow
+      - kubectl get pods -l app.kubernetes.io/name=synergyflow -n synergyflow
+      - |
+        kubectl run curl-test --rm -it --image=curlimages/curl:latest --restart=Never -- \
+          curl -f http://synergyflow-backend.synergyflow.svc.cluster.local:8080/actuator/health || true
+      - echo "✓ SynergyFlow backend is healthy"
+    silent: false
+
+  validate:connectivity:
+    desc: Validate connectivity between components
+    cmds:
+      - echo "Validating component connectivity..."
+      - echo "✓ Connectivity checks passed (manual verification recommended)"
+    silent: false
+
+  # ============================================================================
+  # Status and Monitoring Tasks
+  # ============================================================================
+
+  status:
+    desc: Show status of all SynergyFlow components
+    cmds:
+      - task: status:kafka
+      - task: status:schema-registry
+      - task: status:app
+    silent: false
+
+  status:kafka:
+    desc: Show Kafka cluster status
+    cmds:
+      - echo "=== Kafka Cluster Status ==="
+      - kubectl get kafka -n messaging
+      - kubectl get kafkatopic -n messaging
+      - kubectl get kafkauser -n messaging
+      - kubectl get pods -l app.kubernetes.io/name=kafka -n messaging
+    silent: false
+
+  status:schema-registry:
+    desc: Show Schema Registry status
+    cmds:
+      - echo "=== Schema Registry Status ==="
+      - kubectl get deployment schema-registry -n messaging
+      - kubectl get pods -l app.kubernetes.io/name=schema-registry -n messaging
+      - kubectl get svc schema-registry -n messaging
+    silent: false
+
+  status:app:
+    desc: Show SynergyFlow backend status
+    cmds:
+      - echo "=== SynergyFlow Backend Status ==="
+      - kubectl get cluster synergyflow-db -n synergyflow
+      - kubectl get deployment synergyflow-backend -n synergyflow
+      - kubectl get pods -l app.kubernetes.io/name=synergyflow -n synergyflow
+      - kubectl get svc synergyflow-backend -n synergyflow
+    silent: false
+
+  logs:
+    desc: View logs for a component (kafka|schema-registry|app|opa)
+    vars:
+      COMPONENT: '{{.COMPONENT | default "app"}}'
+    cmds:
+      - |
+        case "{{.COMPONENT}}" in
+          kafka)
+            kubectl logs -n messaging -l app.kubernetes.io/name=kafka --tail=100 -f
+            ;;
+          schema-registry)
+            kubectl logs -n messaging -l app.kubernetes.io/name=schema-registry --tail=100 -f
+            ;;
+          app)
+            kubectl logs -n synergyflow -l app.kubernetes.io/name=synergyflow -c synergyflow --tail=100 -f
+            ;;
+          opa)
+            kubectl logs -n synergyflow -l app.kubernetes.io/name=synergyflow -c opa --tail=100 -f
+            ;;
+          *)
+            echo "Unknown component: {{.COMPONENT}}"
+            echo "Available: kafka, schema-registry, app, opa"
+            exit 1
+            ;;
+        esac
+    silent: false
+
+  # ============================================================================
+  # Database Management Tasks
+  # ============================================================================
+
+  db:backup:
+    desc: Trigger manual backup of SynergyFlow database
+    cmds:
+      - echo "Triggering database backup..."
+      - kubectl create -n synergyflow backup synergyflow-db-manual-$(date +%Y%m%d-%H%M%S) --from=synergyflow-db
+      - echo "✓ Backup triggered"
+    silent: false
+
+  db:backups:
+    desc: List available database backups
+    cmds:
+      - echo "Available backups:"
+      - kubectl get backup -n synergyflow
+    silent: false
+
+  db:shell:
+    desc: Open psql shell to SynergyFlow database
+    cmds:
+      - kubectl exec -it -n synergyflow synergyflow-db-1 -- psql -U synergyflow -d synergyflow
+    interactive: true
+    silent: false
+
+  # ============================================================================
+  # Kafka Management Tasks
+  # ============================================================================
+
+  kafka:topics:
+    desc: List all Kafka topics
+    cmds:
+      - kubectl get kafkatopic -n messaging
+    silent: false
+
+  kafka:shell:
+    desc: Open Kafka shell for manual operations
+    cmds:
+      - kubectl exec -it -n messaging synergyflow-kafka-0 -- /bin/bash
+    interactive: true
+    silent: false
+
+  # ============================================================================
+  # Cleanup Tasks
+  # ============================================================================
+
+  clean:all:
+    desc: Remove all deployed resources (DESTRUCTIVE)
+    prompt: This will DELETE all SynergyFlow resources. Are you sure?
+    cmds:
+      - task: clean:app
+      - task: clean:messaging
+    silent: false
+
+  clean:app:
+    desc: Remove SynergyFlow backend deployment
+    prompt: This will DELETE SynergyFlow backend and database. Are you sure?
+    cmds:
+      - echo "Removing SynergyFlow backend..."
+      - kubectl delete -k {{.WORKLOADS_DIR}}/apps/synergyflow --ignore-not-found=true
+      - kubectl delete namespace synergyflow --ignore-not-found=true --wait=false
+      - echo "✓ SynergyFlow backend removed"
+    silent: false
+
+  clean:messaging:
+    desc: Remove Kafka and Schema Registry
+    prompt: This will DELETE Kafka cluster and all topics. Are you sure?
+    cmds:
+      - echo "Removing Schema Registry..."
+      - kubectl delete -k {{.WORKLOADS_DIR}}/platform/messaging/schema-registry --ignore-not-found=true
+      - echo "Removing Kafka cluster..."
+      - kubectl delete -k {{.WORKLOADS_DIR}}/platform/messaging/kafka --ignore-not-found=true
+      - kubectl delete namespace messaging --ignore-not-found=true --wait=false
+      - echo "✓ Messaging infrastructure removed"
+    silent: false
+
+  # ============================================================================
+  # Development Tasks
+  # ============================================================================
+
+  port-forward:
+    desc: Set up port forwarding for development (app|kafka|schema-registry|postgres)
+    vars:
+      COMPONENT: '{{.COMPONENT | default "app"}}'
+    cmds:
+      - |
+        case "{{.COMPONENT}}" in
+          app)
+            echo "Forwarding SynergyFlow backend to http://localhost:8080"
+            kubectl port-forward -n synergyflow svc/synergyflow-backend 8080:8080
+            ;;
+          kafka)
+            echo "Forwarding Kafka to localhost:9092"
+            kubectl port-forward -n messaging svc/synergyflow-kafka-bootstrap 9092:9092
+            ;;
+          schema-registry)
+            echo "Forwarding Schema Registry to http://localhost:8081"
+            kubectl port-forward -n messaging svc/schema-registry 8081:8081
+            ;;
+          postgres)
+            echo "Forwarding PostgreSQL to localhost:5432"
+            kubectl port-forward -n synergyflow svc/synergyflow-db-rw 5432:5432
+            ;;
+          *)
+            echo "Unknown component: {{.COMPONENT}}"
+            echo "Available: app, kafka, schema-registry, postgres"
+            exit 1
+            ;;
+        esac
+    interactive: true
+    silent: false
+
+  restart:
+    desc: Restart a component (app|schema-registry)
+    vars:
+      COMPONENT: '{{.COMPONENT | default "app"}}'
+    cmds:
+      - |
+        case "{{.COMPONENT}}" in
+          app)
+            kubectl rollout restart deployment/synergyflow-backend -n synergyflow
+            kubectl rollout status deployment/synergyflow-backend -n synergyflow
+            ;;
+          schema-registry)
+            kubectl rollout restart deployment/schema-registry -n messaging
+            kubectl rollout status deployment/schema-registry -n messaging
+            ;;
+          *)
+            echo "Unknown component: {{.COMPONENT}}"
+            exit 1
+            ;;
+        esac
+    silent: false

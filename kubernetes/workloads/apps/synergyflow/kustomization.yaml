@@ -1,0 +1,27 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization.json
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: synergyflow
+
+resources:
+  - namespace.yaml
+  # postgres-cluster.yaml removed - using shared cluster + pooler pattern
+  - externalsecrets.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+  - httproute.yaml
+  - image-automation
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: synergyflow
+      cluster: apps
+
+images:
+  - name: harbor.monosense.io/synergyflow/backend
+    newTag: v0.1.0

@@ -1,0 +1,90 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-osd-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-osd-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: rook-ceph-osd
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-mon-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-mon-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: rook-ceph-mon
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-mgr-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-mgr-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: rook-ceph-mgr
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-mds-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-mds-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: rook-ceph-mds
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-csi-rbd-provisioner-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-csi-rbd-provisioner-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: csi-rbd-provisioner
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rook-ceph-csi-rbd-node-pdb
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph
+    app.kubernetes.io/name: rook-ceph-csi-rbd-node-pdb
+    app.kubernetes.io/managed-by: flux
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: csi-rbd-node

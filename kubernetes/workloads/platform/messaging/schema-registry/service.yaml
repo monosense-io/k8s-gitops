@@ -1,0 +1,22 @@
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/v1/service.json
+apiVersion: v1
+kind: Service
+metadata:
+  name: schema-registry
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: schema-registry
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: schema-registry
+    app.kubernetes.io/component: messaging
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+      protocol: TCP
+  sessionAffinity: None

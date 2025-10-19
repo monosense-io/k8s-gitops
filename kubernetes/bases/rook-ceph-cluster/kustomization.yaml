@@ -6,3 +6,7 @@ resources:
   - cephcluster.yaml
   - cephblockpool.yaml
   - storageclass-block.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+  - volumesnapshotclass.yaml
+  - poddisruptionbudgets.yaml

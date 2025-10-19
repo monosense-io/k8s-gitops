@@ -1,0 +1,92 @@
+---
+# Grafana datasources for multi-cluster monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: datasources
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      # Global VM cluster for cross-cluster queries
+      - name: Global-VictoriaMetrics
+        type: prometheus
+        url: http://victoria-metrics-global-vmselect.observability.svc.cluster.local:8481/select/0/prometheus
+        access: proxy
+        isDefault: true
+        jsonData:
+          timeInterval: 30s
+          httpMethod: POST
+        secureJsonData:
+          basicAuthUser: global-read
+          basicAuthPassword: ${GLOBAL_READ_VMUSER_PASSWORD}
+        editable: true
+
+      # Infra cluster local metrics
+      - name: Infra-Cluster
+        type: prometheus
+        url: http://victoriametrics-vmsingle.observability.svc.cluster.local:8428
+        access: proxy
+        jsonData:
+          timeInterval: 15s
+          httpMethod: POST
+        editable: true
+
+      # Apps cluster local metrics (via ClusterMesh)
+      - name: Apps-Cluster
+        type: prometheus
+        url: http://victoriametrics-vmsingle.observability.svc.cluster.local:8428
+        access: proxy
+        jsonData:
+          timeInterval: 15s
+          httpMethod: POST
+        editable: true
+
+      # Victoria Logs for log aggregation
+      - name: Victoria-Logs
+        type: loki
+        url: http://victorialogs-vmsingle.observability.svc.cluster.local:9428
+        access: proxy
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            - datasourceUid: Global-VictoriaMetrics
+              matcherRegex: "trace_id=(\\w+)"
+              name: TraceID
+              url: "$${__value.raw}"
+        editable: true
+
+      # Business metrics
+      - name: Business-Metrics
+        type: prometheus
+        url: http://victoria-metrics-global-vmselect.observability.svc.cluster.local:8481/select/2/prometheus
+        access: proxy
+        jsonData:
+          timeInterval: 60s
+          httpMethod: POST
+        secureJsonData:
+          basicAuthUser: business
+          basicAuthPassword: ${BUSINESS_VMUSER_PASSWORD}
+        editable: true
+
+      # Hubble for network flows
+      - name: Hubble-Infra
+        type: prometheus
+        url: http://hubble-relay.kube-system.svc.cluster.local:9449/metrics
+        access: proxy
+        jsonData:
+          timeInterval: 30s
+        editable: true
+
+      # ClusterMesh metrics
+      - name: ClusterMesh
+        type: prometheus
+        url: http://cilium-agent.kube-system.svc.cluster.local:9962/metrics
+        access: proxy
+        jsonData:
+          timeInterval: 30s
+        editable: true

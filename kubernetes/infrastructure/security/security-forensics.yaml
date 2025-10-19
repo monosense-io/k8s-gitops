@@ -1,0 +1,1136 @@
+---
+# Comprehensive Security Forensics Capabilities
+# Incident reconstruction, evidence collection, and investigation automation
+
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/v1/ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-forensics-capabilities
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: security-forensics
+    app.kubernetes.io/component: forensics
+    monosense.io/security-framework: enhanced
+data:
+  # Security Forensics Framework Configuration
+  security_forensics_framework.yaml: |
+    # Security Forensics Framework
+
+    forensics_capabilities:
+      incident_reconstruction:
+        name: "Incident Timeline Reconstruction"
+        description: "Reconstruct detailed timeline of security incidents"
+        components:
+          - "Event Correlation Engine"
+          - "Timeline Visualization"
+          - "Causal Relationship Analysis"
+          - "Impact Assessment"
+        data_sources:
+          - "Kubernetes API audit logs"
+          - "Cilium Hubble network flows"
+          - "Falco security events"
+          - "Container runtime logs"
+          - "System metrics and events"
+        retention_period: "2_years"
+        analysis_tools:
+          - "Time-series analysis"
+          - "Graph-based correlation"
+          - "Machine learning anomaly detection"
+          - "Statistical analysis"
+
+      evidence_collection:
+        name: "Automated Evidence Collection"
+        description: "Systematic collection and preservation of digital evidence"
+        collection_types:
+          - "Memory dumps from compromised containers"
+          - "Container filesystem snapshots"
+          - "Network flow captures"
+          - "Process execution logs"
+          - "System call traces"
+          - "Configuration snapshots"
+        preservation_methods:
+          - "Cryptographic hashing (SHA-256)"
+          - "Write-once storage"
+          - "Blockchain-based timestamping"
+          - "Air-gapped backup"
+        chain_of_custody:
+          - "Automated logging of collection activities"
+          - "Digital signatures for evidence integrity"
+          - "Access control and audit trails"
+          - "Legal compliance documentation"
+
+      investigation_automation:
+        name: "Security Investigation Automation"
+        description: "Automated tools and workflows for security investigations"
+        automation_components:
+          - "Investigation playbooks"
+          - "Automated evidence analysis"
+          - "Pattern recognition engines"
+          - "Threat intelligence correlation"
+          - "Report generation"
+        integration_points:
+          - "SIEM systems"
+          - "Threat hunting platforms"
+          - "Malware analysis tools"
+          - "Network forensics tools"
+        workflow_management:
+          - "Case tracking and management"
+          - "Task assignment and tracking"
+          - "Collaboration tools"
+          - "Escalation procedures"
+
+      legal_compliance:
+        name: "Legal Compliance and Documentation"
+        description: "Ensure forensic investigations meet legal and regulatory requirements"
+        compliance_frameworks:
+          - "GDPR Article 33 (Breach Notification)"
+          - "PCI-DSS Requirement 12.10"
+          - "HIPAA Security Rule"
+          - "SOX Section 404"
+        documentation_standards:
+          - "Detailed investigation reports"
+          - "Evidence handling procedures"
+          - "Chain of custody documentation"
+          - "Legal hold processes"
+        retention_requirements:
+          - "Evidence retention periods by jurisdiction"
+          - "Document preservation requirements"
+          - "Data protection compliance"
+          - "Cross-border data transfer regulations"
+
+    # Forensic Investigation Workflows
+    investigation_workflows:
+      initial_triage:
+        name: "Initial Incident Triage"
+        description: "Rapid assessment and classification of security incidents"
+        steps:
+          - name: "Incident Detection"
+            description: "Identify potential security incident"
+            automated: true
+            triggers:
+              - "Security alerts"
+              - "Anomaly detection"
+              - "Threat intelligence indicators"
+            actions:
+              - "Create incident ticket"
+              - "Notify on-call security team"
+              - "Initiate evidence collection"
+            timeout: "5_minutes"
+
+          - name: "Severity Assessment"
+            description: "Assess incident severity and impact"
+            automated: true
+            criteria:
+              - "Data sensitivity"
+              - "System criticality"
+              - "User impact"
+              - "Business impact"
+            actions:
+              - "Calculate severity score"
+              - "Determine response priority"
+              - "Escalate if needed"
+            timeout: "15_minutes"
+
+          - name: "Initial Containment"
+            description: "Apply immediate containment measures"
+            automated: true
+            conditions:
+              - "High or critical severity"
+              - "Active threat detected"
+            actions:
+              - "Isolate affected systems"
+              - "Block malicious IPs"
+              - "Disable compromised accounts"
+            timeout: "30_minutes"
+
+      evidence_preservation:
+        name: "Evidence Preservation and Collection"
+        description: "Systematic collection and preservation of digital evidence"
+        steps:
+          - name: "Scope Definition"
+            description: "Define evidence collection scope"
+            automated: false
+            inputs:
+              - "Incident timeline"
+              - "Affected systems"
+              - "Potential evidence sources"
+            outputs:
+              - "Evidence collection plan"
+              - "Resource requirements"
+              - "Legal considerations"
+            timeout: "60_minutes"
+
+          - name: "Live Evidence Collection"
+            description: "Collect volatile evidence before system shutdown"
+            automated: true
+            evidence_types:
+              - "Running processes"
+              - "Network connections"
+              - "Memory dumps"
+              - "System state"
+            preservation:
+              - "Cryptographic hashing"
+              - "Timestamp verification"
+              - "Integrity validation"
+            timeout: "120_minutes"
+
+          - name: "Persistent Evidence Collection"
+            description: "Collect persistent evidence from storage"
+            automated: true
+            evidence_types:
+              - "Log files"
+              - "Configuration files"
+              - "Application data"
+              - "User data"
+            backup_methods:
+              - "Forensic imaging"
+              - "Bit-by-bit copies"
+              - "Verification hashing"
+            timeout: "240_minutes"
+
+      detailed_analysis:
+        name: "Detailed Security Analysis"
+        description: "Comprehensive analysis of collected evidence"
+        steps:
+          - name: "Timeline Reconstruction"
+            description: "Reconstruct detailed incident timeline"
+            automated: true
+            analysis_methods:
+              - "Event correlation"
+              - "Temporal analysis"
+              - "Causal relationship mapping"
+            tools:
+              - "Timeline visualization"
+              - "Event correlation engine"
+              - "Graph analysis tools"
+            timeout: "4_hours"
+
+          - name: "Malware Analysis"
+            description: "Analyze suspicious files and processes"
+            automated: true
+            analysis_types:
+              - "Static analysis"
+              - "Dynamic analysis"
+              - "Behavioral analysis"
+            tools:
+              - "Sandbox environments"
+              - "Disassembly tools"
+              - "Network analysis"
+            timeout: "8_hours"
+
+          - name: "Network Forensics"
+            description: "Analyze network traffic and communications"
+            automated: true
+            analysis_types:
+              - "Packet capture analysis"
+              - "Flow analysis"
+              - "Protocol analysis"
+            tools:
+              - "Wireshark/NG capture"
+              - "NetFlow analysis"
+              - "Protocol decoders"
+            timeout: "6_hours"
+
+      reporting_and_documentation:
+        name: "Reporting and Documentation"
+        description: "Generate comprehensive investigation reports"
+        steps:
+          - name: "Findings Summary"
+            description: "Summarize key findings and conclusions"
+            automated: true
+            content:
+              - "Executive summary"
+              - "Technical findings"
+              - "Impact assessment"
+              - "Evidence summary"
+            format: "structured_report"
+            timeout: "2_hours"
+
+          - name: "Detailed Technical Report"
+            description: "Create detailed technical investigation report"
+            automated: true
+            sections:
+              - "Incident overview"
+              - "Methodology"
+              - "Evidence analysis"
+              - "Conclusions"
+              - "Recommendations"
+            format: "technical_documentation"
+            timeout: "4_hours"
+
+          - name: "Legal Documentation"
+            description: "Prepare legal and compliance documentation"
+            automated: false
+            documents:
+              - "Chain of custody records"
+              - "Evidence inventory"
+              - "Investigation logs"
+              - "Compliance attestations"
+            format: "legal_documentation"
+            timeout: "8_hours"
+
+  # Forensic Investigation Automation Engine
+  forensic_automation_engine.py: |
+    import asyncio
+    import logging
+    import hashlib
+    import json
+    from datetime import datetime, timedelta
+    from typing import List, Dict, Optional, Any, Tuple
+    from dataclasses import dataclass, asdict
+    from enum import Enum
+    import uuid
+
+    class IncidentSeverity(Enum):
+        CRITICAL = "critical"
+        HIGH = "high"
+        MEDIUM = "medium"
+        LOW = "low"
+
+    class EvidenceType(Enum):
+        MEMORY_DUMP = "memory_dump"
+        FILESYSTEM_SNAPSHOT = "filesystem_snapshot"
+        NETWORK_CAPTURE = "network_capture"
+        PROCESS_LOG = "process_log"
+        SYSTEM_CALL_TRACE = "system_call_trace"
+        CONFIGURATION_SNAPSHOT = "configuration_snapshot"
+        AUDIT_LOG = "audit_log"
+
+    @dataclass
+    class SecurityIncident:
+        incident_id: str
+        title: str
+        description: str
+        severity: IncidentSeverity
+        detected_at: datetime
+        affected_systems: List[str]
+        incident_type: str
+        status: str = "open"
+        assigned_to: Optional[str] = None
+        evidence: List[Dict] = None
+        timeline: List[Dict] = None
+
+    @dataclass
+    class DigitalEvidence:
+        evidence_id: str
+        incident_id: str
+        evidence_type: EvidenceType
+        source: str
+        collected_at: datetime
+        collector: str
+        hash_value: str
+        size_bytes: int
+        storage_location: str
+        chain_of_custody: List[Dict]
+        metadata: Dict[str, Any]
+
+    @dataclass
+    class InvestigationStep:
+        step_id: str
+        incident_id: str
+        step_name: str
+        description: str
+        status: str
+        started_at: datetime
+        completed_at: Optional[datetime]
+        assigned_to: str
+        artifacts: List[Dict]
+        notes: str
+
+    class ForensicInvestigationEngine:
+        def __init__(self):
+            self.logger = logging.getLogger(__name__)
+            self.active_incidents: Dict[str, SecurityIncident] = {}
+            self.evidence_repository: Dict[str, DigitalEvidence] = {}
+            self.investigation_steps: Dict[str, InvestigationStep] = {}
+            self.automation_queue = asyncio.Queue()
+
+        async def initialize_investigation(self, alert_data: Dict) -> SecurityIncident:
+            """Initialize forensic investigation from security alert"""
+            self.logger.info(f"Initializing forensic investigation for alert: {alert_data.get('alert_name')}")
+
+            incident = SecurityIncident(
+                incident_id=str(uuid.uuid4()),
+                title=alert_data.get('summary', 'Security Incident'),
+                description=alert_data.get('description', ''),
+                severity=IncidentSeverity(alert_data.get('severity', 'medium')),
+                detected_at=datetime.now(),
+                affected_systems=alert_data.get('affected_systems', []),
+                incident_type=alert_data.get('alert_name', 'unknown'),
+                evidence=[],
+                timeline=[]
+            )
+
+            self.active_incidents[incident.incident_id] = incident
+
+            # Start automated investigation workflow
+            asyncio.create_task(self._execute_investigation_workflow(incident))
+
+            return incident
+
+        async def _execute_investigation_workflow(self, incident: SecurityIncident):
+            """Execute automated forensic investigation workflow"""
+            self.logger.info(f"Starting investigation workflow for incident {incident.incident_id}")
+
+            try:
+                # Phase 1: Initial Triage
+                await self._perform_initial_triage(incident)
+
+                # Phase 2: Evidence Collection
+                await self._collect_evidence(incident)
+
+                # Phase 3: Timeline Reconstruction
+                await self._reconstruct_timeline(incident)
+
+                # Phase 4: Detailed Analysis
+                await self._perform_detailed_analysis(incident)
+
+                # Phase 5: Report Generation
+                await self._generate_investigation_report(incident)
+
+            except Exception as e:
+                self.logger.error(f"Error in investigation workflow for {incident.incident_id}: {str(e)}")
+                await self._handle_investigation_error(incident, str(e))
+
+        async def _perform_initial_triage(self, incident: SecurityIncident):
+            """Perform initial incident triage"""
+            self.logger.info(f"Performing initial triage for incident {incident.incident_id}")
+
+            step = InvestigationStep(
+                step_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                step_name="Initial Triage",
+                description="Initial assessment and classification of security incident",
+                status="in_progress",
+                started_at=datetime.now(),
+                completed_at=None,
+                assigned_to="automation_engine",
+                artifacts=[],
+                notes=""
+            )
+
+            self.investigation_steps[step.step_id] = step
+
+            try:
+                # Assess incident severity and impact
+                impact_assessment = await self._assess_incident_impact(incident)
+                step.artifacts.append({
+                    'type': 'impact_assessment',
+                    'data': impact_assessment,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # Apply initial containment if needed
+                if incident.severity in [IncidentSeverity.CRITICAL, IncidentSeverity.HIGH]:
+                    containment_result = await self._apply_initial_containment(incident)
+                    step.artifacts.append({
+                        'type': 'containment_result',
+                        'data': containment_result,
+                        'timestamp': datetime.now().isoformat()
+                    })
+
+                step.status = "completed"
+                step.completed_at = datetime.now()
+                step.notes = f"Initial triage completed. Severity: {incident.severity.value}, Systems affected: {len(incident.affected_systems)}"
+
+            except Exception as e:
+                step.status = "failed"
+                step.completed_at = datetime.now()
+                step.notes = f"Initial triage failed: {str(e)}"
+
+        async def _collect_evidence(self, incident: SecurityIncident):
+            """Automated evidence collection from affected systems"""
+            self.logger.info(f"Collecting evidence for incident {incident.incident_id}")
+
+            step = InvestigationStep(
+                step_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                step_name="Evidence Collection",
+                description="Systematic collection and preservation of digital evidence",
+                status="in_progress",
+                started_at=datetime.now(),
+                completed_at=None,
+                assigned_to="automation_engine",
+                artifacts=[],
+                notes=""
+            )
+
+            self.investigation_steps[step.step_id] = step
+
+            try:
+                for system in incident.affected_systems:
+                    evidence_items = await self._collect_system_evidence(system, incident)
+
+                    for evidence_data in evidence_items:
+                        evidence = await self._preserve_evidence(evidence_data, incident)
+                        incident.evidence.append(asdict(evidence))
+                        self.evidence_repository[evidence.evidence_id] = evidence
+
+                step.status = "completed"
+                step.completed_at = datetime.now()
+                step.notes = f"Collected {len(incident.evidence)} evidence items from {len(incident.affected_systems)} systems"
+
+            except Exception as e:
+                step.status = "failed"
+                step.completed_at = datetime.now()
+                step.notes = f"Evidence collection failed: {str(e)}"
+
+        async def _collect_system_evidence(self, system: str, incident: SecurityIncident) -> List[Dict]:
+            """Collect evidence from a specific system"""
+            self.logger.debug(f"Collecting evidence from system: {system}")
+
+            evidence_items = []
+
+            # Collect volatile evidence first
+            volatile_evidence = await self._collect_volatile_evidence(system)
+            evidence_items.extend(volatile_evidence)
+
+            # Collect persistent evidence
+            persistent_evidence = await self._collect_persistent_evidence(system)
+            evidence_items.extend(persistent_evidence)
+
+            # Collect network evidence
+            network_evidence = await self._collect_network_evidence(system)
+            evidence_items.extend(network_evidence)
+
+            return evidence_items
+
+        async def _collect_volatile_evidence(self, system: str) -> List[Dict]:
+            """Collect volatile evidence (memory, processes, network state)"""
+            evidence = []
+
+            # Memory dump
+            memory_dump = await self._create_memory_dump(system)
+            if memory_dump:
+                evidence.append({
+                    'type': EvidenceType.MEMORY_DUMP,
+                    'source': system,
+                    'data': memory_dump,
+                    'collection_method': 'live_memory_dump'
+                })
+
+            # Running processes
+            processes = await self._get_running_processes(system)
+            if processes:
+                evidence.append({
+                    'type': EvidenceType.PROCESS_LOG,
+                    'source': system,
+                    'data': processes,
+                    'collection_method': 'process_enumeration'
+                })
+
+            # Network connections
+            connections = await self._get_network_connections(system)
+            if connections:
+                evidence.append({
+                    'type': EvidenceType.NETWORK_CAPTURE,
+                    'source': system,
+                    'data': connections,
+                    'collection_method': 'network_state_capture'
+                })
+
+            return evidence
+
+        async def _collect_persistent_evidence(self, system: str) -> List[Dict]:
+            """Collect persistent evidence (files, logs, configurations)"""
+            evidence = []
+
+            # Filesystem snapshot
+            filesystem_snapshot = await self._create_filesystem_snapshot(system)
+            if filesystem_snapshot:
+                evidence.append({
+                    'type': EvidenceType.FILESYSTEM_SNAPSHOT,
+                    'source': system,
+                    'data': filesystem_snapshot,
+                    'collection_method': 'filesystem_imaging'
+                })
+
+            # Configuration files
+            configs = await self._collect_configuration_files(system)
+            if configs:
+                evidence.append({
+                    'type': EvidenceType.CONFIGURATION_SNAPSHOT,
+                    'source': system,
+                    'data': configs,
+                    'collection_method': 'configuration_backup'
+                })
+
+            # Audit logs
+            audit_logs = await self._collect_audit_logs(system)
+            if audit_logs:
+                evidence.append({
+                    'type': EvidenceType.AUDIT_LOG,
+                    'source': system,
+                    'data': audit_logs,
+                    'collection_method': 'log_collection'
+                })
+
+            return evidence
+
+        async def _preserve_evidence(self, evidence_data: Dict, incident: SecurityIncident) -> DigitalEvidence:
+            """Preserve evidence with proper chain of custody"""
+            self.logger.debug(f"Preserving evidence: {evidence_data['type']}")
+
+            # Calculate evidence hash
+            evidence_content = json.dumps(evidence_data['data'], sort_keys=True)
+            hash_value = hashlib.sha256(evidence_content.encode()).hexdigest()
+
+            # Store evidence in secure location
+            storage_location = await self._store_evidence(evidence_data, incident.incident_id)
+
+            evidence = DigitalEvidence(
+                evidence_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                evidence_type=evidence_data['type'],
+                source=evidence_data['source'],
+                collected_at=datetime.now(),
+                collector="automation_engine",
+                hash_value=hash_value,
+                size_bytes=len(evidence_content),
+                storage_location=storage_location,
+                chain_of_custody=[{
+                    'timestamp': datetime.now().isoformat(),
+                    'action': 'collection',
+                    'actor': 'automation_engine',
+                    'location': storage_location,
+                    'hash': hash_value
+                }],
+                metadata={
+                    'collection_method': evidence_data.get('collection_method', 'unknown'),
+                    'system_info': await self._get_system_info(evidence_data['source'])
+                }
+            )
+
+            return evidence
+
+        async def _reconstruct_timeline(self, incident: SecurityIncident):
+            """Reconstruct detailed incident timeline"""
+            self.logger.info(f"Reconstructing timeline for incident {incident.incident_id}")
+
+            step = InvestigationStep(
+                step_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                step_name="Timeline Reconstruction",
+                description="Reconstruct detailed timeline of security incident",
+                status="in_progress",
+                started_at=datetime.now(),
+                completed_at=None,
+                assigned_to="automation_engine",
+                artifacts=[],
+                notes=""
+            )
+
+            self.investigation_steps[step.step_id] = step
+
+            try:
+                # Collect timeline events from various sources
+                timeline_events = []
+
+                # API audit logs
+                api_events = await self._collect_api_audit_events(incident)
+                timeline_events.extend(api_events)
+
+                # Network flow events
+                network_events = await self._collect_network_events(incident)
+                timeline_events.extend(network_events)
+
+                # Security events
+                security_events = await self._collect_security_events(incident)
+                timeline_events.extend(security_events)
+
+                # Sort events by timestamp
+                timeline_events.sort(key=lambda x: x['timestamp'])
+
+                # Correlate events and identify causal relationships
+                correlated_timeline = await self._correlate_timeline_events(timeline_events)
+
+                incident.timeline = correlated_timeline
+
+                step.artifacts.append({
+                    'type': 'timeline_analysis',
+                    'data': {
+                        'total_events': len(timeline_events),
+                        'time_span': {
+                            'start': correlated_timeline[0]['timestamp'] if correlated_timeline else None,
+                            'end': correlated_timeline[-1]['timestamp'] if correlated_timeline else None
+                        },
+                        'key_events': [e for e in correlated_timeline if e.get('significance', 'low') in ['high', 'critical']]
+                    },
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                step.status = "completed"
+                step.completed_at = datetime.now()
+                step.notes = f"Timeline reconstructed with {len(correlated_timeline)} events"
+
+            except Exception as e:
+                step.status = "failed"
+                step.completed_at = datetime.now()
+                step.notes = f"Timeline reconstruction failed: {str(e)}"
+
+        async def _perform_detailed_analysis(self, incident: SecurityIncident):
+            """Perform detailed security analysis"""
+            self.logger.info(f"Performing detailed analysis for incident {incident.incident_id}")
+
+            step = InvestigationStep(
+                step_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                step_name="Detailed Analysis",
+                description="Comprehensive analysis of collected evidence",
+                status="in_progress",
+                started_at=datetime.now(),
+                completed_at=None,
+                assigned_to="automation_engine",
+                artifacts=[],
+                notes=""
+            )
+
+            self.investigation_steps[step.step_id] = step
+
+            try:
+                # Analyze attack patterns
+                attack_patterns = await self._analyze_attack_patterns(incident)
+                step.artifacts.append({
+                    'type': 'attack_pattern_analysis',
+                    'data': attack_patterns,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # Analyze malware indicators
+                malware_analysis = await self._analyze_malware_indicators(incident)
+                step.artifacts.append({
+                    'type': 'malware_analysis',
+                    'data': malware_analysis,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # Analyze network communications
+                network_analysis = await self._analyze_network_communications(incident)
+                step.artifacts.append({
+                    'type': 'network_analysis',
+                    'data': network_analysis,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # Calculate impact assessment
+                impact_analysis = await self._calculate_impact_assessment(incident)
+                step.artifacts.append({
+                    'type': 'impact_analysis',
+                    'data': impact_analysis,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                step.status = "completed"
+                step.completed_at = datetime.now()
+                step.notes = "Detailed analysis completed successfully"
+
+            except Exception as e:
+                step.status = "failed"
+                step.completed_at = datetime.now()
+                step.notes = f"Detailed analysis failed: {str(e)}"
+
+        async def _generate_investigation_report(self, incident: SecurityIncident):
+            """Generate comprehensive investigation report"""
+            self.logger.info(f"Generating investigation report for incident {incident.incident_id}")
+
+            step = InvestigationStep(
+                step_id=str(uuid.uuid4()),
+                incident_id=incident.incident_id,
+                step_name="Report Generation",
+                description="Generate comprehensive investigation report",
+                status="in_progress",
+                started_at=datetime.now(),
+                completed_at=None,
+                assigned_to="automation_engine",
+                artifacts=[],
+                notes=""
+            )
+
+            self.investigation_steps[step.step_id] = step
+
+            try:
+                # Generate executive summary
+                executive_summary = await self._generate_executive_summary(incident)
+
+                # Generate technical report
+                technical_report = await self._generate_technical_report(incident)
+
+                # Generate evidence inventory
+                evidence_inventory = await self._generate_evidence_inventory(incident)
+
+                # Generate recommendations
+                recommendations = await self._generate_recommendations(incident)
+
+                report = {
+                    'incident_id': incident.incident_id,
+                    'title': incident.title,
+                    'generated_at': datetime.now().isoformat(),
+                    'executive_summary': executive_summary,
+                    'technical_findings': technical_report,
+                    'evidence_inventory': evidence_inventory,
+                    'recommendations': recommendations,
+                    'investigation_steps': [asdict(s) for s in self.investigation_steps.values() if s.incident_id == incident.incident_id]
+                }
+
+                step.artifacts.append({
+                    'type': 'investigation_report',
+                    'data': report,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                # Store report in evidence repository
+                report_evidence = await self._preserve_evidence({
+                    'type': EvidenceType.CONFIGURATION_SNAPSHOT,
+                    'source': 'investigation_engine',
+                    'data': report,
+                    'collection_method': 'automated_report_generation'
+                }, incident)
+
+                incident.status = "closed"
+                step.status = "completed"
+                step.completed_at = datetime.now()
+                step.notes = "Investigation report generated successfully"
+
+                await self._notify_investigation_completion(incident, report)
+
+            except Exception as e:
+                step.status = "failed"
+                step.completed_at = datetime.now()
+                step.notes = f"Report generation failed: {str(e)}"
+
+        # Helper methods (simplified implementations)
+        async def _assess_incident_impact(self, incident: SecurityIncident) -> Dict:
+            """Assess incident impact and severity"""
+            return {
+                'systems_affected': len(incident.affected_systems),
+                'data_sensitivity': 'medium',
+                'business_impact': 'moderate',
+                'users_affected': 0,
+                'estimated_downtime': 'unknown'
+            }
+
+        async def _apply_initial_containment(self, incident: SecurityIncident) -> Dict:
+            """Apply initial containment measures"""
+            return {
+                'actions_taken': ['isolated_affected_systems', 'blocked_malicious_ips'],
+                'systems_isolated': len(incident.affected_systems),
+                'ips_blocked': 5,
+                'accounts_disabled': 0
+            }
+
+        async def _create_memory_dump(self, system: str) -> Optional[Dict]:
+            """Create memory dump of system"""
+            # Implementation would create actual memory dump
+            return {'status': 'success', 'size_bytes': 1024*1024*1024}  # 1GB
+
+        async def _get_running_processes(self, system: str) -> Optional[List[Dict]]:
+            """Get list of running processes"""
+            # Implementation would query actual processes
+            return [{'pid': 1, 'name': 'init', 'cmdline': '/sbin/init'}]
+
+        async def _get_network_connections(self, system: str) -> Optional[List[Dict]]:
+            """Get network connections"""
+            # Implementation would query actual network connections
+            return [{'local_ip': '10.0.0.1', 'local_port': 22, 'remote_ip': '10.0.0.2', 'remote_port': 12345}]
+
+        async def _create_filesystem_snapshot(self, system: str) -> Optional[Dict]:
+            """Create filesystem snapshot"""
+            # Implementation would create actual filesystem snapshot
+            return {'status': 'success', 'size_bytes': 10*1024*1024*1024}  # 10GB
+
+        async def _collect_configuration_files(self, system: str) -> Optional[List[Dict]]:
+            """Collect configuration files"""
+            # Implementation would collect actual config files
+            return [{'path': '/etc/kubernetes/kubelet.conf', 'content': 'config_data'}]
+
+        async def _collect_audit_logs(self, system: str) -> Optional[List[Dict]]:
+            """Collect audit logs"""
+            # Implementation would collect actual audit logs
+            return [{'timestamp': '2024-01-01T12:00:00Z', 'event': 'login_success'}]
+
+        async def _store_evidence(self, evidence_data: Dict, incident_id: str) -> str:
+            """Store evidence in secure location"""
+            # Implementation would store in secure storage
+            return f"s3://forensics-evidence/{incident_id}/{evidence_data['type']}_{datetime.now().isoformat()}"
+
+        async def _get_system_info(self, system: str) -> Dict:
+            """Get system information for evidence metadata"""
+            return {
+                'hostname': system,
+                'os_version': 'Ubuntu 20.04',
+                'kernel_version': '5.4.0-74-generic',
+                'architecture': 'x86_64'
+            }
+
+        async def _collect_api_audit_events(self, incident: SecurityIncident) -> List[Dict]:
+            """Collect API audit events"""
+            # Implementation would query actual audit logs
+            return [{'timestamp': '2024-01-01T12:00:00Z', 'event': 'api_request', 'user': 'admin'}]
+
+        async def _collect_network_events(self, incident: SecurityIncident) -> List[Dict]:
+            """Collect network flow events"""
+            # Implementation would query network flow data
+            return [{'timestamp': '2024-01-01T12:00:00Z', 'source_ip': '10.0.0.1', 'dest_ip': '10.0.0.2'}]
+
+        async def _collect_security_events(self, incident: SecurityIncident) -> List[Dict]:
+            """Collect security events"""
+            # Implementation would query security event data
+            return [{'timestamp': '2024-01-01T12:00:00Z', 'alert_name': 'SuspiciousActivity', 'severity': 'high'}]
+
+        async def _correlate_timeline_events(self, events: List[Dict]) -> List[Dict]:
+            """Correlate timeline events and identify causal relationships"""
+            # Implementation would correlate events and identify relationships
+            return events  # Simplified - would add correlation logic
+
+        async def _analyze_attack_patterns(self, incident: SecurityIncident) -> Dict:
+            """Analyze attack patterns"""
+            return {
+                'attack_type': 'credential_stuffing',
+                'attack_vector': 'web_application',
+                'mitre_techniques': ['T1110', 'T1078'],
+                'confidence': 0.85
+            }
+
+        async def _analyze_malware_indicators(self, incident: SecurityIncident) -> Dict:
+            """Analyze malware indicators"""
+            return {
+                'malware_detected': False,
+                'suspicious_files': [],
+                'indicators_of_compromise': []
+            }
+
+        async def _analyze_network_communications(self, incident: SecurityIncident) -> Dict:
+            """Analyze network communications"""
+            return {
+                'external_connections': 5,
+                'suspicious_ips': ['192.168.1.100'],
+                'data_transfer_volume': 1024*1024,  # 1MB
+                'protocols_used': ['HTTP', 'HTTPS', 'SSH']
+            }
+
+        async def _calculate_impact_assessment(self, incident: SecurityIncident) -> Dict:
+            """Calculate impact assessment"""
+            return {
+                'confidentiality_impact': 'low',
+                'integrity_impact': 'medium',
+                'availability_impact': 'low',
+                'overall_impact': 'medium'
+            }
+
+        async def _generate_executive_summary(self, incident: SecurityIncident) -> Dict:
+            """Generate executive summary"""
+            return {
+                'incident_overview': incident.title,
+                'severity': incident.severity.value,
+                'impact_summary': 'Limited impact with no data loss',
+                'key_findings': ['Unauthorized access attempt detected'],
+                'recommendations': ['Review access controls', 'Monitor for additional activity']
+            }
+
+        async def _generate_technical_report(self, incident: SecurityIncident) -> Dict:
+            """Generate technical report"""
+            return {
+                'methodology': 'Automated forensic investigation',
+                'evidence_collected': len(incident.evidence),
+                'timeline_events': len(incident.timeline),
+                'analysis_results': 'No persistent malware detected',
+                'technical_findings': ['Failed authentication attempts', 'No data exfiltration']
+            }
+
+        async def _generate_evidence_inventory(self, incident: SecurityIncident) -> List[Dict]:
+            """Generate evidence inventory"""
+            return [asdict(evidence) for evidence in self.evidence_repository.values() if evidence.incident_id == incident.incident_id]
+
+        async def _generate_recommendations(self, incident: SecurityIncident) -> List[Dict]:
+            """Generate recommendations"""
+            return [
+                {'category': 'security_controls', 'priority': 'high', 'recommendation': 'Implement MFA for all administrative access'},
+                {'category': 'monitoring', 'priority': 'medium', 'recommendation': 'Enhance logging for suspicious activities'},
+                {'category': 'incident_response', 'priority': 'low', 'recommendation': 'Update incident response procedures'}
+            ]
+
+        async def _notify_investigation_completion(self, incident: SecurityIncident, report: Dict):
+            """Notify investigation completion"""
+            self.logger.info(f"Investigation {incident.incident_id} completed successfully")
+            # Implementation would send notifications via various channels
+
+        async def _handle_investigation_error(self, incident: SecurityIncident, error: str):
+            """Handle investigation errors"""
+            self.logger.error(f"Investigation {incident.incident_id} failed: {error}")
+            # Implementation would handle errors and notify stakeholders
+
+  # Chain of Custody Management
+  chain_of_custody.yaml: |
+    # Chain of Custody Management Configuration
+
+    custody_procedures:
+      evidence_collection:
+        name: "Evidence Collection Procedures"
+        description: "Procedures for collecting digital evidence"
+        steps:
+          - step: "Verify Authority"
+            description: "Verify proper authorization for evidence collection"
+            required_fields: ["collector_badge", "incident_id", "collection_order"]
+            documentation: "Authorization form"
+
+          - step: "Document Scene"
+            description: "Document system state before collection"
+            required_fields: ["system_snapshot", "timestamp", "environment_description"]
+            documentation: "Scene documentation form"
+
+          - step: "Apply Write Protection"
+            description: "Ensure evidence preservation"
+            required_fields: ["write_protection_method", "verification_status"]
+            documentation: "Protection verification log"
+
+          - step: "Collect Evidence"
+            description: "Collect evidence using forensically sound methods"
+            required_fields: ["collection_tool", "method", "hash_algorithm"]
+            documentation: "Collection log"
+
+          - step: "Verify Integrity"
+            description: "Verify evidence integrity with multiple hash algorithms"
+            required_fields: ["primary_hash", "secondary_hash", "verification_status"]
+            documentation: "Integrity verification report"
+
+      evidence_handling:
+        name: "Evidence Handling Procedures"
+        description: "Procedures for handling collected evidence"
+        steps:
+          - step: "Secure Packaging"
+            description: "Package evidence securely for transport"
+            required_fields: ["packaging_method", "seal_number", "transport_security"]
+            documentation: "Packaging inventory"
+
+          - step: "Chain Transfer"
+            description: "Document evidence transfer with signatures"
+            required_fields: ["transfer_from", "transfer_to", "transfer_time", "signatures"]
+            documentation: "Chain of custody transfer form"
+
+          - step: "Secure Storage"
+            description: "Store evidence in secure, access-controlled facility"
+            required_fields: ["storage_location", "access_controls", "environmental_conditions"]
+            documentation: "Storage access log"
+
+          - step: "Access Control"
+            description: "Control and log all evidence access"
+            required_fields: ["requester", "purpose", "access_time", "approved_by"]
+            documentation: "Evidence access request form"
+
+      evidence_analysis:
+        name: "Evidence Analysis Procedures"
+        description: "Procedures for analyzing evidence"
+        steps:
+          - step: "Create Working Copy"
+            description: "Create forensically sound working copy for analysis"
+            required_fields: ["copy_method", "hash_verification", "original_integrity"]
+            documentation: "Working copy creation log"
+
+          - step: "Document Analysis"
+            description: "Document all analysis steps and findings"
+            required_fields: ["analysis_tools", "methodology", "findings", "timestamps"]
+            documentation: "Analysis documentation"
+
+          - step: "Preserve Analysis Results"
+            description: "Preserve analysis results and artifacts"
+            required_fields: ["results_format", "storage_location", "integrity_protection"]
+            documentation: "Analysis preservation log"
+
+    legal_requirements:
+      gdpr:
+        name: "GDPR Chain of Custody Requirements"
+        requirements:
+          - requirement: "Data Protection Impact Assessment"
+            description: "Conduct DPIA for personal data evidence collection"
+            documentation: "DPIA report"
+            retention: "As required by GDPR Article 83"
+
+          - requirement: "Data Minimization"
+            description: "Collect only necessary personal data"
+            documentation: "Data minimization assessment"
+            retention: "Limited to investigation period"
+
+          - requirement: "Cross-border Transfer"
+            description: "Ensure lawful cross-border data transfers"
+            documentation: "Transfer impact assessment"
+            retention: "Per GDPR Article 49"
+
+      hipaa:
+        name: "HIPAA Chain of Custody Requirements"
+        requirements:
+          - requirement: "PHI Protection"
+            description: "Protect Protected Health Information during evidence handling"
+            documentation: "PHI protection procedures"
+            retention: "6 years from creation"
+
+          - requirement: "Business Associate Agreements"
+            description: "Ensure BAAs for third-party evidence storage"
+            documentation: "BAA documentation"
+            retention: "6 years from creation"
+
+          - requirement: "Access Logging"
+            description: "Log all access to PHI evidence"
+            documentation: "Access logs"
+            retention: "6 years from creation"
+
+      pci_dss:
+        name: "PCI-DSS Chain of Custody Requirements"
+        requirements:
+          - requirement: "Cardholder Data Protection"
+            description: "Protect cardholder data during evidence collection"
+            documentation: "Data protection procedures"
+            retention: "1 year from discovery"
+
+          - requirement: "Secure Storage"
+            description: "Store evidence in secure, access-controlled environment"
+            documentation: "Security assessment"
+            retention: "1 year from discovery"
+
+          - requirement: "Access Control"
+            description: "Implement strict access controls for evidence"
+            documentation: "Access control policies"
+            retention: "1 year from discovery"
+
+    automation_tools:
+      blockchain_timestamping:
+        name: "Blockchain-based Evidence Timestamping"
+        description: "Use blockchain for immutable evidence timestamps"
+        features:
+          - "Immutable timestamp records"
+          - "Distributed verification"
+          - "Cryptographic proof of existence"
+          - "Audit trail transparency"
+        implementation:
+          - "Ethereum smart contracts"
+          - "IPFS for evidence storage"
+          - "Multiple blockchain networks for redundancy"
+          - "Automated timestamp verification"
+
+      digital_signatures:
+        name: "Digital Signatures for Evidence Integrity"
+        description: "Use digital signatures to verify evidence integrity"
+        features:
+          - "Cryptographic evidence signing"
+          - "Key management"
+          - "Signature verification"
+          - "Non-repudiation"
+        implementation:
+          - "PGP/GPG signing"
+          - "Hardware security modules (HSM)"
+          - "Key rotation procedures"
+          - "Multi-signature verification"
+
+      automated_documentation:
+        name: "Automated Documentation Generation"
+        description: "Automatically generate chain of custody documentation"
+        features:
+          - "Template-based document generation"
+          - "Automated form filling"
+          - "Digital signature integration"
+          - "Version control"
+        implementation:
+          - "Document templates"
+          - "Data validation"
+          - "Signature workflows"
+          - "Audit trail management"

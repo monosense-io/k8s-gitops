@@ -19,3 +19,30 @@ spec:
     substitute:
       CLUSTER: apps
       SECRET_DOMAIN: "monosense.io"
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-observability
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/managed-by: flux
+    cluster: apps
+spec:
+  dependsOn:
+    - name: cluster-apps-workloads
+    - name: cluster-apps-infrastructure
+  interval: 10m
+  path: ./kubernetes/workloads/platform/observability
+  prune: true
+  wait: true
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false

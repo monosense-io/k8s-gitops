@@ -1,0 +1,251 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Multi-Cluster Overview",
+    "tags": ["multi-cluster", "overview", "global"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster Status",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "up{job=\"prometheus\"}",
+            "legendFormat": "{{cluster}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "green", "value": 1 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "CPU Utilization by Cluster",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "avg(rate(container_cpu_usage_seconds_total{id=\"/\"}[5m])) by (cluster)",
+            "legendFormat": "{{cluster}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "CPU Cores",
+            "max": 1,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Memory Utilization by Cluster",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+            "legendFormat": "{{cluster}} - {{instance}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage",
+            "max": 1,
+            "min": 0,
+            "format": "percentunit"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "ClusterMesh Connectivity",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "cilium_clustermesh_connected",
+            "legendFormat": "{{cluster}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DISCONNECTED",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "CONNECTED",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Cross-Cluster Traffic",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum(rate(hubble_flows_processed_total{traffic_direction=\"ingress\"}[5m])) by (cluster)",
+            "legendFormat": "{{cluster}} - Ingress",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(hubble_flows_processed_total{traffic_direction=\"egress\"}[5m])) by (cluster)",
+            "legendFormat": "{{cluster}} - Egress",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Flows/sec",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Pod Status by Cluster",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+        "targets": [
+          {
+            "expr": "sum(kube_pod_status_phase{phase=\"Running\"}) by (cluster)",
+            "legendFormat": "{{cluster}} - Running",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(kube_pod_status_phase{phase=\"Pending\"}) by (cluster)",
+            "legendFormat": "{{cluster}} - Pending",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(kube_pod_status_phase{phase=\"Failed\"}) by (cluster)",
+            "legendFormat": "{{cluster}} - Failed",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Service Health Across Clusters",
+        "type": "table",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+        "targets": [
+          {
+            "expr": "kube_service_status_load_balancer_ingress",
+            "legendFormat": "{{cluster}} - {{namespace}}/{{service}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {
+                "cluster": 0,
+                "namespace": 1,
+                "service": 2,
+                "Value": 3
+              },
+              "renameByName": {
+                "cluster": "Cluster",
+                "namespace": "Namespace",
+                "service": "Service",
+                "Value": "Status"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Network Error Rate",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+        "targets": [
+          {
+            "expr": "sum(rate(hubble_flows_processed_total{verdict=\"denied\"}[5m])) by (cluster) / sum(rate(hubble_flows_processed_total[5m])) by (cluster)",
+            "legendFormat": "{{cluster}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Error Rate",
+            "max": 1,
+            "min": 0,
+            "format": "percentunit"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Storage Utilization",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
+        "targets": [
+          {
+            "expr": "1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+            "legendFormat": "{{cluster}} - {{instance}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Disk Usage",
+            "max": 1,
+            "min": 0,
+            "format": "percentunit"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

@@ -1,0 +1,313 @@
+---
+name: Backup Compliance Validation
+on:
+  push:
+    paths:
+      - 'kubernetes/**/backup*.yaml'
+      - 'kubernetes/compliance/**'
+      - 'kubernetes/workloads/platform/databases/**'
+  pull_request:
+    paths:
+      - 'kubernetes/**/backup*.yaml'
+      - 'kubernetes/compliance/**'
+      - 'kubernetes/workloads/platform/databases/**'
+  schedule:
+    # Run daily compliance validation at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      compliance_framework:
+        description: 'Compliance framework to validate'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - gdpr
+          - hipaa
+          - pci-dss
+          - sox
+
+env:
+  # Compliance validation tooling
+  COMPLIANCE_VALIDATOR_VERSION: 'v1.2.0'
+  KUBECONFORM_VERSION: 'v0.6.2'
+  OPA_VERSION: 'v0.47.1'
+
+jobs:
+  compliance-validation:
+    name: Backup Compliance Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    outputs:
+      compliance-score: ${{ steps.compliance-check.outputs.score }}
+      violations-count: ${{ steps.compliance-check.outputs.violations }}
+      validation-report: ${{ steps.report-generator.outputs.report-url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup compliance validation tools
+        run: |
+          # Install OPA for policy validation
+          wget -O opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa
+          sudo mv opa /usr/local/bin/
+
+          # Install kubeconform for Kubernetes resource validation
+          wget -O kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+          # Install compliance validator
+          wget -O compliance-validator.tar.gz https://github.com/monosense/compliance-validator/releases/download/${COMPLIANCE_VALIDATOR_VERSION}/compliance-validator-linux-amd64.tar.gz
+          tar -xzf compliance-validator.tar.gz
+          sudo mv compliance-validator /usr/local/bin/
+
+      - name: Validate Kubernetes manifests
+        run: |
+          echo "🔍 Validating Kubernetes manifests against compliance requirements..."
+
+          # Validate backup manifests
+          kubeconform \
+            -strict \
+            -summary \
+            -kubernetes-version 1.29 \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/monosense/k8s-schemas/main/{{.Resource}}/{{.Kind}}.json' \
+            kubernetes/compliance/backup-compliance-*.yaml
+
+      - name: Run compliance policy validation
+        id: compliance-check
+        run: |
+          echo "🔒 Running compliance policy validation..."
+
+          # Create compliance policies
+          cat > compliance-policies.rego << 'EOF'
+          package backup.compliance
+
+          # GDPR Compliance Policy
+          validate_gdpr[decision] {
+            input.backup.compliance_frameworks[_] == "gdpr"
+            not gdpr_encryption_compliant(input.backup)
+            decision := {
+              "framework": "gdpr",
+              "status": "non-compliant",
+              "violations": ["Encryption does not meet GDPR requirements"],
+              "severity": "critical"
+            }
+          }
+
+          gdpr_encryption_compliant(backup) {
+            backup.encryption.at_rest.algorithm == "AES-256-GCM"
+            backup.encryption.in_transit.protocol == "TLSv1.3"
+            backup.encryption.key_rotation_period <= "30d"
+          }
+
+          # HIPAA Compliance Policy
+          validate_hipaa[decision] {
+            input.backup.compliance_frameworks[_] == "hipaa"
+            not hipaa_retention_compliant(input.backup)
+            decision := {
+              "framework": "hipaa",
+              "status": "non-compliant",
+              "violations": ["Retention period below HIPAA 7-year requirement"],
+              "severity": "critical"
+            }
+          }
+
+          hipaa_retention_compliant(backup) {
+            backup.retention.period >= "7y"
+            backup.audit.retention >= "7y"
+          }
+
+          # PCI-DSS Compliance Policy
+          validate_pci_dss[decision] {
+            input.backup.compliance_frameworks[_] == "pci-dss"
+            not pci_encryption_compliant(input.backup)
+            decision := {
+              "framework": "pci-dss",
+              "status": "non-compliant",
+              "violations": ["Cardholder data not properly encrypted according to PCI-DSS 4.0"],
+              "severity": "critical"
+            }
+          }
+
+          pci_encryption_compliant(backup) {
+            backup.encryption.at_rest.algorithm == "AES-256"
+            backup.encryption.at_rest.key_management == "hsm-backed"
+            backup.access.control.mfa_required == true
+          }
+
+          # SOX Compliance Policy
+          validate_sox[decision] {
+            input.backup.compliance_frameworks[_] == "sox"
+            not sox_audit_compliant(input.backup)
+            decision := {
+              "framework": "sox",
+              "status": "non-compliant",
+              "violations": ["Audit trail does not meet SOX requirements"],
+              "severity": "critical"
+            }
+          }
+
+          sox_audit_compliant(backup) {
+            backup.audit.immutable == true
+            backup.audit.integrity_protection == "cryptographic_hash"
+            backup.audit.retention >= "7y"
+          }
+          EOF
+
+          # Run compliance validation
+          COMPLIANCE_FRAMEWORK="${{ github.event.inputs.compliance_framework || 'all' }}"
+
+          compliance-validator validate \
+            --framework "${COMPLIANCE_FRAMEWORK}" \
+            --config compliance-policies.rego \
+            --input-path kubernetes/compliance/ \
+            --output-format json > compliance-results.json
+
+          # Extract results
+          VIOLATIONS=$(jq '.violations | length' compliance-results.json)
+          SCORE=$(jq '.overall_score' compliance-results.json)
+
+          echo "violations=${VIOLATIONS}" >> $GITHUB_OUTPUT
+          echo "score=${SCORE}" >> $GITHUB_OUTPUT
+
+          echo "📊 Compliance Score: ${SCORE}%"
+          echo "⚠️  Violations Found: ${VIOLATIONS}"
+
+      - name: Generate compliance report
+        id: report-generator
+        run: |
+          echo "📄 Generating compliance validation report..."
+
+          # Generate detailed compliance report
+          compliance-validator report \
+            --input compliance-results.json \
+            --template report-template.md \
+            --output compliance-report.md
+
+          # Upload report as artifact
+          echo "report-url=compliance-report.md" >> $GITHUB_OUTPUT
+
+          # Display summary
+          echo "## 📊 Compliance Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Overall Score | ${{ steps.compliance-check.outputs.score }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Violations | ${{ steps.compliance-check.outputs.violations }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Framework Validated | ${{ github.event.inputs.compliance_framework || 'All' }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Add violations details if any
+          if [ "${{ steps.compliance-check.outputs.violations }}" -gt 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚨 Compliance Violations" >> $GITHUB_STEP_SUMMARY
+            jq -r '.violations[] | "- **\(.framework)**: \(.message) (Severity: \(.severity))"' compliance-results.json >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload compliance artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compliance-validation-report
+          path: |
+            compliance-results.json
+            compliance-report.md
+          retention-days: 90
+
+      - name: Create compliance issue for violations
+        if: steps.compliance-check.outputs.violations != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('compliance-results.json', 'utf8'));
+
+            const issueTitle = `🚨 Backup Compliance Violations - ${new Date().toISOString().split('T')[0]}`;
+            const issueBody = `
+            ## Backup Compliance Validation Results
+
+            **Overall Score**: ${{ steps.compliance-check.outputs.score }}%
+            **Violations Found**: ${{ steps.compliance-check.outputs.violations }}
+
+            ### Violations Details:
+            ${results.violations.map(v =>
+              `- **${v.framework}**: ${v.message}\n  - Severity: ${v.severity}\n  - Resource: ${v.resource}`
+            ).join('\n\n')}
+
+            ### Required Actions:
+            ${results.violations.map(v =>
+              `- ${v.remediation}`
+            ).join('\n')}
+
+            ### Next Steps:
+            1. Review and address all violations
+            2. Update backup configurations
+            3. Re-run compliance validation
+            4. Update documentation
+
+            ---
+            *This issue was automatically generated by the backup compliance validation workflow.*
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: issueTitle,
+              body: issueBody,
+              labels: ['compliance', 'backup', 'security', 'automated'],
+              assignees: ['platform-admin', 'security-team']
+            });
+
+      - name: Notify compliance team
+        if: steps.compliance-check.outputs.violations != '0'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#compliance-alerts'
+          text: |
+            🚨 Backup Compliance Violations Detected
+
+            **Score**: ${{ steps.compliance-check.outputs.score }}%
+            **Violations**: ${{ steps.compliance-check.outputs.violations }}
+
+            Please review the validation results and address violations immediately.
+
+            View Report: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_COMPLIANCE_WEBHOOK }}
+
+      - name: Update compliance metrics
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # Update compliance metrics in monitoring system
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{
+              "metric": "backup_compliance_score",
+              "value": "${{ steps.compliance-check.outputs.score }}",
+              "labels": {
+                "environment": "production",
+                "framework": "${{ github.event.inputs.compliance_framework || 'all' }}"
+              }
+            }' \
+            "${{ secrets.VICTORIA_METRICS_URL }}/api/v1/import/prometheus"
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{
+              "metric": "backup_compliance_violations",
+              "value": "${{ steps.compliance-check.outputs.violations }}",
+              "labels": {
+                "environment": "production",
+                "framework": "${{ github.event.inputs.compliance_framework || 'all' }}"
+              }
+            }' \
+            "${{ secrets.VICTORIA_METRICS_URL }}/api/v1/import/prometheus"

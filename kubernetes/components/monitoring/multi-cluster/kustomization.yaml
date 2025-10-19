@@ -1,0 +1,35 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: multi-cluster-monitoring
+  namespace: observability
+resources:
+  - vmagent-remote-write.yaml
+  - global-alert-rules.yaml
+  - grafana-datasources.yaml
+configMapGenerator:
+  - name: global-overview-dashboard
+    files:
+      - global-dashboards.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana-dashboard
+        app.kubernetes.io/component: global-overview
+  - name: cluster-comparison-dashboard
+    files:
+      - cluster-comparison-dashboard.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana-dashboard
+        app.kubernetes.io/component: cluster-comparison
+  - name: business-impact-dashboard
+    files:
+      - business-impact-dashboard.json
+    options:
+      labels:
+        app.kubernetes.io/name: grafana-dashboard
+        app.kubernetes.io/component: business-impact
+commonLabels:
+  app.kubernetes.io/component: multi-cluster-monitoring
+  app.kubernetes.io/managed-by: flux

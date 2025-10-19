@@ -1,0 +1,973 @@
+---
+# Enhanced Security Alerting System
+# Security-specific alerting rules, threat intelligence integration, and automated response
+
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/monitoring.coreos.com/prometheusrule_v1.json
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: enhanced-security-alerting
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: security-alerting
+    app.kubernetes.io/component: enhanced-alerting
+    monosense.io/security-framework: enhanced
+spec:
+  groups:
+    - name: security.critical_alerts
+      interval: 15s
+      rules:
+        # Critical Security Alerts - Immediate Response Required
+
+        # 1. Active Breach Detection
+        - alert: ActiveSecurityBreach
+          expr: |
+            (
+              sum(rate(falco_events_total{rule=~"(Privilege escalation|Container escape|Malicious activity)"}[1m])) by (cluster) > 0
+            ) or (
+              sum(rate(hubble_flows_processed_total{destination_ip=~"${threat_ips:regex}"}[1m])) by (cluster) > 0
+            ) or (
+              sum(rate(kubelet_server_authentication_errors_total[1m])) by (cluster) > 50
+            )
+          for: 0m
+          annotations:
+            summary: "🚨 ACTIVE SECURITY BREACH DETECTED 🚨"
+            description: |
+              ACTIVE SECURITY BREACH IN CLUSTER {{ $labels.cluster }}!
+
+              Immediate investigation required:
+              - Check running pods for suspicious activity
+              - Review recent authentication logs
+              - Verify network traffic patterns
+              - Check for data exfiltration indicators
+
+              RUN INCIDENT RESPONSE PLAYBOOK IMMEDIATELY
+            runbook_url: "https://security.monosense.io/runbooks/active-breach"
+            incident_response: "https://security.monosense.io/incident-response/breach"
+            mitre_attack: "Multiple - Active Attack"
+          labels:
+            severity: critical
+            category: active_threat
+            response_time: "immediate"
+            escalation: "executive"
+
+        # 2. Critical System Compromise
+        - alert: CriticalSystemCompromise
+          expr: |
+            (
+              sum(rate(falco_events_total{rule="Critical system compromise"}[1m])) by (cluster) > 0
+            ) or (
+              sum(rate(kubeapiserver_request_total{user="system:anonymous", verb!="list", resource!="events"}[1m])) by (cluster) > 0
+            ) or (
+              sum(rate(container_network_transmit_bytes_total[1m])) by (cluster) > 1000000000
+            )
+          for: 0m
+          annotations:
+            summary: "🔥 CRITICAL SYSTEM COMPROMISE 🔥"
+            description: |
+              CRITICAL SYSTEM COMPROMISE DETECTED IN {{ $labels.cluster }}!
+
+              System integrity may be compromised. Immediate actions:
+              1. ISOLATE AFFECTED SYSTEMS
+              2. PRESERVE EVIDENCE
+              3. NOTIFY SECURITY TEAM
+              4. INITIATE INCIDENT RESPONSE
+
+              EXPECT DATA LOSS AND SERVICE DISRUPTION
+            runbook_url: "https://security.monosense.io/runbooks/critical-compromise"
+            incident_response: "https://security.monosense.io/incident-response/critical"
+          labels:
+            severity: critical
+            category: system_compromise
+            response_time: "immediate"
+            escalation: "executive"
+
+        # 3. Widespread Malware Detection
+        - alert: WidespreadMalwareInfection
+          expr: |
+            sum(rate(falco_events_total{rule=~"(Cryptomining|Malicious process|Trojan detected)"}[2m])) by (cluster) > 5
+          for: 30s
+          annotations:
+            summary: "🦠 WIDESPREAD MALWARE INFECTION 🦠"
+            description: |
+              Widespread malware infection detected in {{ $labels.cluster }}!
+              {{ $value | humanize }} malicious processes detected across multiple pods.
+
+              IMMEDIATE ACTIONS REQUIRED:
+              - Isolate infected workloads
+              - Scan all container images
+              - Check for persistence mechanisms
+              - Review deployment pipelines
+            runbook_url: "https://security.monosense.io/runbooks/malware-outbreak"
+            incident_response: "https://security.monosense.io/incident-response/malware"
+          labels:
+            severity: critical
+            category: malware_outbreak
+            response_time: "immediate"
+            escalation: "security_team"
+
+    - name: security.high_priority_alerts
+      interval: 30s
+      rules:
+        # High Priority Security Alerts - Response within 15 minutes
+
+        # 1. Advanced Persistent Threat (APT) Detection
+        - alert: APTActivityDetected
+          expr: |
+            (
+              sum(rate(falco_events_total{rule="APT activity pattern"}[5m])) by (cluster, namespace) > 0
+            ) or (
+              sum(rate(hubble_flows_processed_total{source_namespace!=destination_namespace, traffic_encryption="disabled"}[5m])) by (cluster, source_namespace) > 10
+            ) or (
+              sum(rate(kubeapiserver_request_total{user=~"(admin|root)", verb="delete", resource!~"events|pods"}[5m])) by (cluster) > 2
+            )
+          for: 2m
+          annotations:
+            summary: "🎯 ADVANCED PERSISTENT THREAT DETECTED 🎯"
+            description: |
+              APT activity detected in {{ $labels.cluster }}{{ if $labels.namespace }}/{{ $labels.namespace }}{{ end }}.
+
+              Indicators of sophisticated attack:
+              - Multi-stage attack patterns
+              - Lateral movement attempts
+              - Privilege escalation activities
+              - Data gathering operations
+
+              INVESTIGATE IMMEDIATELY - LIKELY TARGETED ATTACK
+            runbook_url: "https://security.monosense.io/runbooks/apt-activity"
+            incident_response: "https://security.monosense.io/incident-response/apt"
+            mitre_attack: "TA0043 - Advanced Persistent Threat"
+          labels:
+            severity: high
+            category: apt_activity
+            response_time: "15_minutes"
+            escalation: "security_lead"
+
+        # 2. Large Scale Data Exfiltration
+        - alert: LargeScaleDataExfiltration
+          expr: |
+            sum(rate(container_network_transmit_bytes_total[5m])) by (cluster, namespace) > 1000000000
+          for: 2m
+          annotations:
+            summary: "📤 LARGE SCALE DATA EXFILTRATION 📤"
+            description: |
+              Large scale data exfiltration detected from {{ $labels.namespace }} in {{ $labels.cluster }}.
+              Transferring {{ $value | humanizeBytes }} per second.
+
+              CRITICAL BUSINESS IMPACT:
+              - Customer data may be compromised
+              - Intellectual property at risk
+              - Regulatory compliance violations possible
+
+              IMMEDIATE INVESTIGATION AND CONTAINMENT REQUIRED
+            runbook_url: "https://security.monosense.io/runbooks/data-exfiltration"
+            incident_response: "https://security.monosense.io/incident-response/exfiltration"
+            mitre_attack: "T1041 - Exfiltration Over C2 Channel"
+          labels:
+            severity: high
+            category: data_exfiltration
+            response_time: "15_minutes"
+            escalation: "security_lead"
+
+        # 3. Insider Threat Indicators
+        - alert: InsiderThreatDetected
+          expr: |
+            (
+              sum(rate(kubeapiserver_request_total{user!="system:*", verb="get", resource="secrets"}[5m])) by (cluster, user) > 10
+              and hour() < 6 or hour() > 22
+            ) or (
+              sum(rate(kubeapiserver_request_total{user!="system:*", verb="delete", resource=~"(deployments|services|secrets)"}[5m])) by (cluster, user) > 5
+            ) or (
+              sum(rate(falco_events_total{rule="Unauthorized administrative access"}[5m])) by (cluster, user) > 0
+            )
+          for: 3m
+          annotations:
+            summary: "👤 INSIDER THREAT ACTIVITY DETECTED 👤"
+            description: |
+              Insider threat activity detected for user {{ $labels.user }} in {{ $labels.cluster }}.
+
+              Suspicious activities:
+              - Access to sensitive resources during unusual hours
+              - Excessive delete operations
+              - Unauthorized administrative access
+
+              IMMEDIATE HR AND SECURITY NOTIFICATION REQUIRED
+            runbook_url: "https://security.monosense.io/runbooks/insider-threat"
+            incident_response: "https://security.monosense.io/incident-response/insider"
+            mitre_attack: "T1207 - Rogue System Administrator"
+          labels:
+            severity: high
+            category: insider_threat
+            response_time: "15_minutes"
+            escalation: "security_lead"
+
+    - name: security.medium_priority_alerts
+      interval: 60s
+      rules:
+        # Medium Priority Security Alerts - Response within 1 hour
+
+        # 1. Suspicious Network Activity
+        - alert: SuspiciousNetworkActivity
+          expr: |
+            (
+              sum(rate(hubble_flows_processed_total{tcp_flags="SYN", verdict="denied"}[5m])) by (cluster, source_ip) > 50
+            ) or (
+              sum(rate(hubble_dns_queries_total{query_name=~"${suspicious_domains:regex}"}[5m])) by (cluster, source_namespace) > 0
+            ) or (
+              sum(rate(hubble_flows_processed_total{destination_port!~"(80|443|53|22|6443)"}[5m])) by (cluster, source_namespace) > 20
+            )
+          for: 5m
+          annotations:
+            summary: "🌐 Suspicious Network Activity Detected"
+            description: |
+              Suspicious network activity detected in {{ $labels.cluster }}.
+
+              {{ if $labels.source_ip }}Source IP: {{ $labels.source_ip }}{{ end }}
+              {{ if $labels.source_namespace }}Source Namespace: {{ $labels.source_namespace }}{{ end }}
+
+              Activity types:
+              - Port scanning attempts
+              - Access to suspicious domains
+              - Unusual port usage
+
+              INVESTIGATE WITHIN 1 HOUR
+            runbook_url: "https://security.monosense.io/runbooks/suspicious-network"
+            mitre_attack: "T1018 - Remote System Discovery"
+          labels:
+            severity: medium
+            category: network_anomaly
+            response_time: "1_hour"
+            escalation: "security_analyst"
+
+        # 2. Security Configuration Drift
+        - alert: SecurityConfigurationDrift
+          expr: |
+            (
+              sum(kubernetes_pod_info{privileged="true"}) by (cluster, namespace) > 0
+            ) or (
+              sum(kubernetes_pod_info{host_network="true"}) by (cluster, namespace) > 0
+            ) or (
+              sum(kubernetes_serviceaccount_count) by (cluster, namespace) / sum(kubernetes_pod_count) by (cluster, namespace) < 0.8
+            )
+          for: 10m
+          annotations:
+            summary: "⚙️ Security Configuration Drift Detected"
+            description: |
+              Security configuration drift detected in {{ $labels.namespace }}/{{ $labels.cluster }}.
+
+              Configuration issues:
+              - Pods running with elevated privileges
+              - Pods using host network
+              - Insufficient service account coverage
+
+              REMEDIATE WITHIN 4 HOURS
+            runbook_url: "https://security.monosense.io/runbooks/config-drift"
+          labels:
+            severity: medium
+            category: configuration_drift
+            response_time: "4_hours"
+            escalation: "devops_team"
+
+        # 3. Emerging Threat Indicators
+        - alert: EmergingThreatIndicators
+          expr: |
+            (
+              sum(rate(hubble_flows_processed_total{anomaly_score>0.7}[10m])) by (cluster, source_namespace) > 0
+            ) or (
+              sum(rate(falco_events_total{rule="Emerging threat pattern"}[10m])) by (cluster, namespace) > 0
+            ) or (
+              sum(rate(kubeapiserver_request_total{user=~"unknown|anonymous", verb!="list"}[10m])) by (cluster) > 0
+            )
+          for: 15m
+          annotations:
+            summary: "🔍 Emerging Threat Indicators Detected"
+            description: |
+              Emerging threat indicators detected in {{ $labels.cluster }}.
+
+              Potential indicators:
+              - Anomalous network behavior
+              - Unusual process patterns
+              - Unknown user activities
+
+              MONITOR CLOSELY AND INVESTIGATE
+            runbook_url: "https://security.monosense.io/runbooks/emerging-threats"
+          labels:
+            severity: medium
+            category: emerging_threat
+            response_time: "4_hours"
+            escalation: "security_analyst"
+
+    - name: security.trend_analysis_alerts
+      interval: 300s
+      rules:
+        # Trend Analysis Alerts - Proactive Security Monitoring
+
+        # 1. Security Posture Degradation
+        - alert: SecurityPostureDegradation
+          expr: |
+            business:security:security_posture_trend < 70
+          for: 30m
+          annotations:
+            summary: "📉 Security Posture Degradation Trend"
+            description: |
+              Security posture for {{ $labels.cluster }} has degraded to {{ $value | humanize }}%.
+
+              Contributing factors:
+              - Increased threat activity
+              - Decreased compliance scores
+              - Growing policy violations
+
+              REVIEW SECURITY MEASURES AND IMPLEMENT IMPROVEMENTS
+            runbook_url: "https://security.monosense.io/runbooks/posture-degradation"
+          labels:
+            severity: warning
+            category: security_posture
+            response_time: "24_hours"
+            escalation: "security_manager"
+
+        # 2. Increasing Attack Surface
+        - alert: IncreasingAttackSurface
+          expr: |
+            sum(kubernetes_pod_count) by (cluster) - sum(kubernetes_networkpolicy_count) by (cluster) > 50
+          for: 1h
+          annotations:
+            summary: "🎯 Increasing Attack Surface Detected"
+            description: |
+              Attack surface in {{ $labels.cluster }} is increasing.
+              {{ $value | humanize }} pods without network policies.
+
+              Recommendations:
+              - Implement network policies for all workloads
+              - Review and minimize exposed services
+              - Apply principle of least privilege
+            runbook_url: "https://security.monosense.io/runbooks/attack-surface"
+          labels:
+            severity: warning
+            category: attack_surface
+            response_time: "1_week"
+            escalation: "security_architect"
+
+        # 3. Security Metrics Anomalies
+        - alert: SecurityMetricsAnomaly
+          expr: |
+            abs(security:auth:failed_login_rate - security:auth:failed_login_rate offset 24h) / security:auth:failed_login_rate offset 24h > 2
+          for: 2h
+          annotations:
+            summary: "📊 Security Metrics Anomaly Detected"
+            description: |
+              Security metrics showing unusual patterns in {{ $labels.cluster }}.
+
+              Current failed login rate is {{ $value | humanizePercentage }} different from 24h average.
+
+              INVESTIGATE POTENTIAL SECURITY ISSUES
+            runbook_url: "https://security.monosense.io/runbooks/metrics-anomaly"
+          labels:
+            severity: warning
+            category: metrics_anomaly
+            response_time: "8_hours"
+            escalation: "security_analyst"
+
+---
+# Threat Intelligence Integration and Correlation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: threat-intelligence-integration
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: threat-intelligence
+    app.kubernetes.io/component: intelligence
+    monosense.io/security-framework: enhanced
+data:
+  # Threat Intelligence Feed Configuration
+  threat_intelligence_feeds.yaml: |
+    # Threat Intelligence Feed Configuration
+
+    feeds:
+      # Malicious IP Feeds
+      - name: "Abuse.ch Feodo Tracker"
+        type: "ip"
+        url: "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.txt"
+        format: "text"
+        update_interval: "1h"
+        confidence: "high"
+        tags: ["c2", "botnet", "malware"]
+
+      - name: "Blocklist.de Malicious IPs"
+        type: "ip"
+        url: "https://lists.blocklist.de/lists/all.txt"
+        format: "text"
+        update_interval: "2h"
+        confidence: "medium"
+        tags: ["attack", "scan", "malware"]
+
+      # Malicious Domain Feeds
+      - name: "PhishTank"
+        type: "domain"
+        url: "https://data.phishtank.com/data/online-valid.csv"
+        format: "csv"
+        update_interval: "6h"
+        confidence: "high"
+        tags: ["phishing", "credential_theft"]
+
+      - name: "URLhaus Malicious URLs"
+        type: "url"
+        url: "https://urlhaus.abuse.ch/downloads/csv_recent/"
+        format: "csv"
+        update_interval: "1h"
+        confidence: "high"
+        tags: ["malware", "payload_delivery"]
+
+      # File Hash Feeds
+      - name: "VirusTotal Malicious Hashes"
+        type: "hash"
+        url: "https://www.virustotal.com/vtapi/v2/file/report"
+        api_key: "${VIRUSTOTAL_API_KEY}"
+        format: "json"
+        update_interval: "4h"
+        confidence: "high"
+        tags: ["malware", "trojan", "backdoor"]
+
+      # CVE and Vulnerability Feeds
+      - name: "NVD CVE Database"
+        type: "cve"
+        url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+        api_key: "${NVD_API_KEY}"
+        format: "json"
+        update_interval: "1h"
+        confidence: "high"
+        tags: ["vulnerability", "exploit"]
+
+    # Threat Intelligence Processing
+    processing:
+      normalization:
+        - standardize_ip_formats
+        - normalize_domains
+        - extract_file_hashes
+        - parse_cve_data
+
+      enrichment:
+        - add_geolocation
+        - add_asn_information
+        - add_reputation_scores
+        - add_attack_patterns
+
+      deduplication:
+        - remove_duplicate_indicators
+        - merge_similar_threats
+        - consolidate_tags
+
+      scoring:
+        algorithm: "weighted_average"
+        factors:
+          confidence: 0.4
+          source_reliability: 0.3
+          recency: 0.2
+          threat_severity: 0.1
+
+  # Threat Correlation Engine
+  threat_correlation_engine.py: |
+    import asyncio
+    import logging
+    from datetime import datetime, timedelta
+    from typing import List, Dict, Optional, Set
+    from dataclasses import dataclass
+    from collections import defaultdict
+
+    @dataclass
+    class ThreatIndicator:
+        indicator_type: str  # ip, domain, hash, url
+        value: str
+        confidence: float
+        source: str
+        tags: List[str]
+        first_seen: datetime
+        last_seen: datetime
+        severity: str
+
+    @dataclass
+    class SecurityEvent:
+        timestamp: datetime
+        event_type: str
+        source_ip: Optional[str] = None
+        destination_ip: Optional[str] = None
+        domain: Optional[str] = None
+        user: Optional[str] = None
+        process: Optional[str] = None
+        severity: str = "medium"
+
+    class ThreatCorrelationEngine:
+        def __init__(self):
+            self.logger = logging.getLogger(__name__)
+            self.threat_indicators: Dict[str, ThreatIndicator] = {}
+            self.security_events: List[SecurityEvent] = []
+            self.correlated_threats: List[Dict] = []
+
+        async def add_threat_indicator(self, indicator: ThreatIndicator):
+            """Add new threat indicator to the database"""
+            key = f"{indicator.indicator_type}:{indicator.value}"
+            self.threat_indicators[key] = indicator
+            await self._correlate_with_events(indicator)
+
+        async def add_security_event(self, event: SecurityEvent):
+            """Add new security event and correlate with threats"""
+            self.security_events.append(event)
+            await self._correlate_event_with_threats(event)
+
+        async def _correlate_with_events(self, indicator: ThreatIndicator):
+            """Correlate threat indicator with existing events"""
+            recent_events = [
+                e for e in self.security_events
+                if e.timestamp >= indicator.first_seen - timedelta(hours=24)
+            ]
+
+            for event in recent_events:
+                if await self._event_matches_indicator(event, indicator):
+                    await self._create_correlated_threat(event, indicator)
+
+        async def _correlate_event_with_threats(self, event: SecurityEvent):
+            """Correlate security event with existing threat indicators"""
+            for indicator in self.threat_indicators.values():
+                if await self._event_matches_indicator(event, indicator):
+                    await self._create_correlated_threat(event, indicator)
+
+        async def _event_matches_indicator(self, event: SecurityEvent, indicator: ThreatIndicator) -> bool:
+            """Check if security event matches threat indicator"""
+            if indicator.indicator_type == "ip":
+                return event.source_ip == indicator.value or event.destination_ip == indicator.value
+            elif indicator.indicator_type == "domain":
+                return event.domain == indicator.value
+            elif indicator.indicator_type == "hash":
+                return event.process and indicator.value in event.process
+            return False
+
+        async def _create_correlated_threat(self, event: SecurityEvent, indicator: ThreatIndicator):
+            """Create correlated threat alert"""
+            correlation_score = self._calculate_correlation_score(event, indicator)
+
+            correlated_threat = {
+                'timestamp': datetime.now(),
+                'event': event,
+                'indicator': indicator,
+                'correlation_score': correlation_score,
+                'threat_type': self._determine_threat_type(event, indicator),
+                'recommended_actions': self._get_recommended_actions(event, indicator)
+            }
+
+            self.correlated_threats.append(correlated_threat)
+            await self._trigger_correlation_alert(correlated_threat)
+
+        def _calculate_correlation_score(self, event: SecurityEvent, indicator: ThreatIndicator) -> float:
+            """Calculate correlation confidence score"""
+            base_score = indicator.confidence
+
+            # Boost score for recent events
+            recency_bonus = 0.2 if (datetime.now() - event.timestamp).total_seconds() < 3600 else 0
+
+            # Boost score for high severity events
+            severity_bonus = {"critical": 0.3, "high": 0.2, "medium": 0.1, "low": 0.0}.get(event.severity, 0)
+
+            return min(base_score + recency_bonus + severity_bonus, 1.0)
+
+        def _determine_threat_type(self, event: SecurityEvent, indicator: ThreatIndicator) -> str:
+            """Determine the type of threat based on correlation"""
+            if "c2" in indicator.tags or "botnet" in indicator.tags:
+                return "command_and_control"
+            elif "malware" in indicator.tags:
+                return "malware_infection"
+            elif "phishing" in indicator.tags:
+                return "credential_theft"
+            elif "attack" in indicator.tags:
+                return "active_attack"
+            else:
+                return "suspicious_activity"
+
+        def _get_recommended_actions(self, event: SecurityEvent, indicator: ThreatIndicator) -> List[str]:
+            """Get recommended actions for correlated threat"""
+            actions = []
+
+            if indicator.severity == "critical":
+                actions.extend([
+                    "Isolate affected systems immediately",
+                    "Preserve digital evidence",
+                    "Notify incident response team"
+                ])
+            elif indicator.severity == "high":
+                actions.extend([
+                    "Block malicious indicators",
+                    "Enhance monitoring",
+                    "Review access logs"
+                ])
+            else:
+                actions.extend([
+                    "Monitor for additional activity",
+                    "Update security controls",
+                    "Review threat intelligence"
+                ])
+
+            return actions
+
+        async def _trigger_correlation_alert(self, correlated_threat: Dict):
+            """Trigger alert for correlated threat"""
+            self.logger.warning(
+                f"Threat correlation detected: {correlated_threat['threat_type']} "
+                f"with score {correlated_threat['correlation_score']:.2f}"
+            )
+            # Implementation to send alert to monitoring system
+
+---
+# Automated Security Response Playbooks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: automated-security-response
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: automated-response
+    app.kubernetes.io/component: response-automation
+    monosense.io/security-framework: enhanced
+data:
+  # Automated Response Playbooks
+  response_playbooks.yaml: |
+    # Automated Security Response Playbooks
+
+    playbooks:
+      # Critical Threat Response
+      - name: "Critical Threat Containment"
+        trigger:
+          alert_severity: "critical"
+          threat_types: ["active_threat", "system_compromise", "malware_outbreak"]
+        automation_level: "full"
+        actions:
+          - type: "isolation"
+            name: "Network Isolation"
+            description: "Isolate affected workloads from network"
+            steps:
+              - "Create deny-all network policy for affected namespace"
+              - "Add quarantine annotations to affected pods"
+              - "Update load balancer configurations"
+              - "Notify incident response team"
+            timeout: "5_minutes"
+            rollback: true
+
+          - type: "containment"
+            name: "Workload Containment"
+            description: "Contain affected workloads"
+            steps:
+              - "Scale down deployments to 0 replicas"
+              - "Drain affected nodes"
+              - "Stop non-critical services"
+              - "Preserve container state for forensics"
+            timeout: "10_minutes"
+            rollback: true
+
+          - type: "preservation"
+            name: "Evidence Preservation"
+            description: "Preserve forensic evidence"
+            steps:
+              "Take memory dumps of affected containers"
+              "Export network flow logs"
+              "Capture container filesystem snapshots"
+              "Preserve audit logs and metrics"
+            timeout: "15_minutes"
+            rollback: false
+
+      # High Priority Threat Response
+      - name: "High Priority Threat Response"
+        trigger:
+          alert_severity: "high"
+          threat_types: ["apt_activity", "data_exfiltration", "insider_threat"]
+        automation_level: "partial"
+        actions:
+          - type: "investigation"
+            name: "Automated Investigation"
+            description: "Automated initial investigation"
+            steps:
+              - "Analyze process execution patterns"
+              - "Review network connection history"
+              - "Check file system modifications"
+              - "Correlate with threat intelligence"
+            timeout: "20_minutes"
+            rollback: false
+
+          - type: "blocking"
+            name: "Threat Blocking"
+            description: "Block identified threats"
+            steps:
+              - "Update network policies to block malicious IPs"
+              - "Add malicious domains to DNS blocklist"
+              - "Terminate suspicious processes"
+              - "Revoke compromised credentials"
+            timeout: "10_minutes"
+            rollback: true
+
+          - type: "notification"
+            name: "Stakeholder Notification"
+            description: "Notify relevant stakeholders"
+            steps:
+              - "Alert security team via Slack/PagerDuty"
+              - "Send email notification to security leadership"
+              - "Update incident tracking system"
+              - "Generate preliminary incident report"
+            timeout: "5_minutes"
+            rollback: false
+
+      # Medium Priority Threat Response
+      - name: "Medium Priority Threat Response"
+        trigger:
+          alert_severity: "medium"
+          threat_types: ["network_anomaly", "configuration_drift", "emerging_threat"]
+        automation_level: "minimal"
+        actions:
+          - type: "analysis"
+            name: "Threat Analysis"
+            description: "Analyze potential threats"
+            steps:
+              - "Correlate events with historical data"
+              - "Check against threat intelligence feeds"
+              - "Analyze behavior patterns"
+              - "Generate risk assessment"
+            timeout: "30_minutes"
+            rollback: false
+
+          - type: "enhancement"
+            name: "Security Enhancement"
+            description: "Enhance security monitoring"
+            steps:
+              - "Add new alerting rules"
+              - "Update monitoring dashboards"
+              - "Configure additional log collection"
+              - "Schedule security review"
+            timeout: "45_minutes"
+            rollback: false
+
+          - type: "documentation"
+            name: "Threat Documentation"
+            description: "Document threat patterns"
+            steps:
+              - "Create threat intelligence report"
+              - "Update security knowledge base"
+              - "Document lessons learned"
+              - "Schedule team briefing"
+            timeout: "60_minutes"
+            rollback: false
+
+  # Response Automation Engine
+  response_automation_engine.py: |
+    import asyncio
+    import logging
+    from datetime import datetime
+    from typing import List, Dict, Optional
+    from dataclasses import dataclass
+    from enum import Enum
+
+    class AutomationLevel(Enum):
+        FULL = "full"
+        PARTIAL = "partial"
+        MINIMAL = "minimal"
+        MANUAL = "manual"
+
+    @dataclass
+    class SecurityAlert:
+        alert_name: str
+        severity: str
+        threat_type: str
+        cluster: str
+        namespace: Optional[str] = None
+        labels: Dict[str, str] = None
+        annotations: Dict[str, str] = None
+
+    @dataclass
+    class ResponseAction:
+        action_type: str
+        name: str
+        description: str
+        steps: List[str]
+        timeout: str
+        rollback: bool
+        status: str = "pending"
+
+    class ResponseAutomationEngine:
+        def __init__(self):
+            self.logger = logging.getLogger(__name__)
+            self.playbooks = self._load_playbooks()
+            self.active_responses: Dict[str, List[ResponseAction]] = {}
+
+        def _load_playbooks(self) -> List[Dict]:
+            """Load response playbooks from configuration"""
+            # Implementation to load playbooks from YAML
+            return []
+
+        async def handle_alert(self, alert: SecurityAlert) -> bool:
+            """Handle security alert with automated response"""
+            self.logger.info(f"Processing alert: {alert.alert_name}")
+
+            playbook = self._find_matching_playbook(alert)
+            if not playbook:
+                self.logger.warning(f"No playbook found for alert: {alert.alert_name}")
+                return False
+
+            return await self._execute_playbook(playbook, alert)
+
+        def _find_matching_playbook(self, alert: SecurityAlert) -> Optional[Dict]:
+            """Find playbook that matches the alert"""
+            for playbook in self.playbooks:
+                if self._alert_matches_playbook(alert, playbook):
+                    return playbook
+            return None
+
+        def _alert_matches_playbook(self, alert: SecurityAlert, playbook: Dict) -> bool:
+            """Check if alert matches playbook trigger conditions"""
+            trigger = playbook.get('trigger', {})
+
+            # Check severity match
+            if trigger.get('alert_severity'):
+                if alert.severity != trigger['alert_severity']:
+                    return False
+
+            # Check threat type match
+            if trigger.get('threat_types'):
+                if alert.threat_type not in trigger['threat_types']:
+                    return False
+
+            return True
+
+        async def _execute_playbook(self, playbook: Dict, alert: SecurityAlert) -> bool:
+            """Execute response playbook"""
+            self.logger.info(f"Executing playbook: {playbook['name']}")
+
+            automation_level = AutomationLevel(playbook.get('automation_level', 'manual'))
+
+            if automation_level == AutomationLevel.MANUAL:
+                await self._notify_manual_response(playbook, alert)
+                return True
+
+            response_id = f"{alert.alert_name}_{datetime.now().isoformat()}"
+            self.active_responses[response_id] = []
+
+            success = True
+            for action_config in playbook.get('actions', []):
+                action = ResponseAction(
+                    action_type=action_config['type'],
+                    name=action_config['name'],
+                    description=action_config['description'],
+                    steps=action_config['steps'],
+                    timeout=action_config['timeout'],
+                    rollback=action_config.get('rollback', False)
+                )
+
+                self.active_responses[response_id].append(action)
+
+                if not await self._execute_action(action, alert):
+                    success = False
+                    if action.rollback:
+                        await self._rollback_action(action, alert)
+                    break
+
+            await self._notify_playbook_completion(playbook, alert, success)
+            return success
+
+        async def _execute_action(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute individual response action"""
+            self.logger.info(f"Executing action: {action.name}")
+            action.status = "running"
+
+            try:
+                if action.action_type == "isolation":
+                    return await self._execute_isolation(action, alert)
+                elif action.action_type == "containment":
+                    return await self._execute_containment(action, alert)
+                elif action.action_type == "investigation":
+                    return await self._execute_investigation(action, alert)
+                elif action.action_type == "blocking":
+                    return await self._execute_blocking(action, alert)
+                elif action.action_type == "notification":
+                    return await self._execute_notification(action, alert)
+                else:
+                    self.logger.warning(f"Unknown action type: {action.action_type}")
+                    return False
+
+            except Exception as e:
+                self.logger.error(f"Error executing action {action.name}: {str(e)}")
+                action.status = "failed"
+                return False
+
+        async def _execute_isolation(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute network isolation action"""
+            # Implementation to create network policies for isolation
+            self.logger.info(f"Isolating {alert.namespace} from network")
+
+            # Example: Create deny-all network policy
+            # This would use Kubernetes API to create network policies
+
+            action.status = "completed"
+            return True
+
+        async def _execute_containment(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute workload containment action"""
+            # Implementation to contain affected workloads
+            self.logger.info(f"Containing workloads in {alert.namespace}")
+
+            # Example: Scale down deployments
+            # This would use Kubernetes API to scale deployments
+
+            action.status = "completed"
+            return True
+
+        async def _execute_investigation(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute automated investigation action"""
+            # Implementation to perform automated investigation
+            self.logger.info(f"Performing automated investigation for {alert.alert_name}")
+
+            # Example: Analyze logs, check processes, review network flows
+            # This would integrate with logging and monitoring systems
+
+            action.status = "completed"
+            return True
+
+        async def _execute_blocking(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute threat blocking action"""
+            # Implementation to block identified threats
+            self.logger.info(f"Blocking threats for {alert.alert_name}")
+
+            # Example: Update firewall rules, block IPs, revoke credentials
+            # This would integrate with network and security systems
+
+            action.status = "completed"
+            return True
+
+        async def _execute_notification(self, action: ResponseAction, alert: SecurityAlert) -> bool:
+            """Execute notification action"""
+            # Implementation to send notifications
+            self.logger.info(f"Sending notifications for {alert.alert_name}")
+
+            # Example: Send Slack messages, emails, PagerDuty alerts
+            # This would integrate with notification systems
+
+            action.status = "completed"
+            return True
+
+        async def _rollback_action(self, action: ResponseAction, alert: SecurityAlert):
+            """Rollback failed action"""
+            self.logger.warning(f"Rolling back action: {action.name}")
+            action.status = "rolling_back"
+
+            # Implementation to rollback changes
+            # This would reverse the changes made by the action
+
+            action.status = "rolled_back"
+
+        async def _notify_manual_response(self, playbook: Dict, alert: SecurityAlert):
+            """Notify that manual response is required"""
+            self.logger.info(f"Manual response required for alert: {alert.alert_name}")
+
+            # Implementation to send manual response notification
+            # This would notify the security team that manual intervention is needed
+
+        async def _notify_playbook_completion(self, playbook: Dict, alert: SecurityAlert, success: bool):
+            """Notify playbook completion"""
+            status = "successful" if success else "failed"
+            self.logger.info(f"Playbook {playbook['name']} {status} for alert {alert.alert_name}")
+
+            # Implementation to send completion notification
+            # This would update incident tracking systems and notify stakeholders

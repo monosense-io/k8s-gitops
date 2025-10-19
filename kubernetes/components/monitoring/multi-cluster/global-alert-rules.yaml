@@ -1,0 +1,258 @@
+---
+# Global multi-cluster alerting rules
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: multi-cluster-alerts
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vmalert
+    app.kubernetes.io/component: multi-cluster-alerts
+spec:
+  groups:
+    - name: multi-cluster-health
+      rules:
+        # Cluster availability
+        - alert: ClusterDown
+          expr: up{job="prometheus"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            scope: global
+            category: availability
+          annotations:
+            summary: "Cluster {{ $labels.cluster }} is down"
+            description: "Prometheus target {{ $labels.instance }} in cluster {{ $labels.cluster }} has been down for more than 2 minutes"
+            runbook_url: "https://runbooks.monosense.io/cluster-down"
+
+        - alert: ClusterHighLatency
+          expr: histogram_quantile(0.95, rate(scrape_duration_seconds_bucket[5m])) > 1
+          for: 5m
+          labels:
+            severity: warning
+            scope: global
+            category: performance
+          annotations:
+            summary: "High scrape latency in cluster {{ $labels.cluster }}"
+            description: "95th percentile scrape latency is {{ $value }}s in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/high-scrape-latency"
+
+        # Cross-cluster connectivity
+        - alert: ClusterMeshDisconnected
+          expr: cilium_clustermesh_connected == 0
+          for: 1m
+          labels:
+            severity: critical
+            scope: global
+            category: connectivity
+          annotations:
+            summary: "ClusterMesh disconnected in cluster {{ $labels.cluster }}"
+            description: "ClusterMesh is not connected in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/clustermesh-disconnected"
+
+        - alert: CrossClusterServiceUnavailable
+          expr: up{service=~".*-global"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            scope: global
+            category: connectivity
+          annotations:
+            summary: "Cross-cluster service {{ $labels.service }} unavailable"
+            description: "Service {{ $labels.service }} is not reachable across clusters"
+            runbook_url: "https://runbooks.monosense.io/cross-cluster-service-unavailable"
+
+        # Resource utilization across clusters
+        - alert: MultiClusterHighCPUUtilization
+          expr: avg(rate(container_cpu_usage_seconds_total{id="/"}[5m])) by (cluster) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            scope: global
+            category: resources
+          annotations:
+            summary: "High CPU utilization in cluster {{ $labels.cluster }}"
+            description: "Average CPU utilization is {{ $value | humanizePercentage }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/high-cpu-utilization"
+
+        - alert: MultiClusterHighMemoryUtilization
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            scope: global
+            category: resources
+          annotations:
+            summary: "High memory utilization in cluster {{ $labels.cluster }}"
+            description: "Memory utilization is {{ $value | humanizePercentage }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/high-memory-utilization"
+
+        - alert: MultiClusterDiskSpaceCritical
+          expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 0.9
+          for: 5m
+          labels:
+            severity: critical
+            scope: global
+            category: resources
+          annotations:
+            summary: "Critical disk space in cluster {{ $labels.cluster }}"
+            description: "Disk utilization is {{ $value | humanizePercentage }} on node {{ $labels.instance }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/disk-space-critical"
+
+        # Application health across clusters
+        - alert: MultiClusterPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            scope: global
+            category: application
+          annotations:
+            summary: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is crash looping in cluster {{ $labels.cluster }}"
+            description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/pod-crash-looping"
+
+        - alert: MultiClusterDeploymentNotReady
+          expr: kube_deployment_status_replicas_unavailable > 0
+          for: 10m
+          labels:
+            severity: warning
+            scope: global
+            category: application
+          annotations:
+            summary: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} not ready in cluster {{ $labels.cluster }}"
+            description: "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} has {{ $value }} unavailable replicas in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/deployment-not-ready"
+
+        # Service mesh health
+        - alert: MultiClusterHighErrorRate
+          expr: sum(rate(hubble_flows_processed_total{verdict="denied"}[5m])) by (cluster) / sum(rate(hubble_flows_processed_total[5m])) by (cluster) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            scope: global
+            category: security
+          annotations:
+            summary: "High network error rate in cluster {{ $labels.cluster }}"
+            description: "Network error rate is {{ $value | humanizePercentage }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/high-network-error-rate"
+
+        - alert: MultiClusterUnusualTrafficPattern
+          expr: rate(hubble_flows_processed_total[5m]) > 10000
+          for: 10m
+          labels:
+            severity: warning
+            scope: global
+            category: security
+          annotations:
+            summary: "Unusual traffic pattern in cluster {{ $labels.cluster }}"
+            description: "High traffic rate detected: {{ $value }} flows/second in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/unusual-traffic-pattern"
+
+    - name: multi-cluster-business-metrics
+      rules:
+        # Business impact metrics
+        - alert: MultiClusterServiceDegradation
+          expr: avg(rate(http_requests_total{status=~"5.."}[5m])) by (service, cluster) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+            scope: global
+            category: business
+            business_impact: high
+          annotations:
+            summary: "Service {{ $labels.service }} degraded in cluster {{ $labels.cluster }}"
+            description: "5xx error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/service-degradation"
+
+        - alert: MultiClusterResponseTimeHigh
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+          for: 10m
+          labels:
+            severity: warning
+            scope: global
+            category: business
+            business_impact: medium
+          annotations:
+            summary: "High response time for service {{ $labels.service }} in cluster {{ $labels.cluster }}"
+            description: "95th percentile response time is {{ $value }}s for service {{ $labels.service }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/high-response-time"
+
+        - alert: MultiClusterThroughputLow
+          expr: rate(http_requests_total[5m]) < 10
+          for: 15m
+          labels:
+            severity: warning
+            scope: global
+            category: business
+            business_impact: medium
+          annotations:
+            summary: "Low throughput for service {{ $labels.service }} in cluster {{ $labels.cluster }}"
+            description: "Request rate is {{ $value }} req/s for service {{ $labels.service }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/low-throughput"
+
+    - name: multi-cluster-security
+      rules:
+        # Security monitoring
+        - alert: MultiClusterUnauthorizedAccess
+          expr: sum(rate(hubble_flows_processed_total{verdict="denied", traffic_direction="ingress"}[5m])) by (cluster) > 100
+          for: 2m
+          labels:
+            severity: warning
+            scope: global
+            category: security
+          annotations:
+            summary: "High rate of unauthorized access attempts in cluster {{ $labels.cluster }}"
+            description: "{{ $value }} unauthorized access attempts per minute in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/unauthorized-access"
+
+        - alert: MultiClusterPortScanDetected
+          expr: sum(rate(hubble_flows_processed_total{verdict="denied", traffic_direction="ingress"}[1m])) by (source_ip, cluster) > 50
+          for: 1m
+          labels:
+            severity: critical
+            scope: global
+            category: security
+          annotations:
+            summary: "Port scan detected from {{ $labels.source_ip }} in cluster {{ $labels.cluster }}"
+            description: "High rate of denied connections from {{ $labels.source_ip }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/port-scan"
+
+        - alert: MultiClusterCertificateExpiring
+          expr: cert_manager_certificate_expiration_timestamp_seconds - time() < 86400 * 7
+          for: 1h
+          labels:
+            severity: warning
+            scope: global
+            category: security
+          annotations:
+            summary: "Certificate {{ $labels.name }} expiring in cluster {{ $labels.cluster }}"
+            description: "Certificate {{ $labels.name }} expires in {{ $value | humanizeDuration }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/certificate-expiring"
+
+    - name: multi-cluster-cost-optimization
+      rules:
+        # Cost optimization alerts
+        - alert: MultiClusterUnderutilizedNodes
+          expr: avg(rate(container_cpu_usage_seconds_total{id="/"}[5m])) by (cluster, instance) < 0.1
+          for: 1h
+          labels:
+            severity: info
+            scope: global
+            category: cost
+          annotations:
+            summary: "Underutilized node {{ $labels.instance }} in cluster {{ $labels.cluster }}"
+            description: "Node {{ $labels.instance }} has average CPU utilization of {{ $value | humanizePercentage }} in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/underutilized-nodes"
+
+        - alert: MultiClusterStorageWaste
+          expr: kube_persistentvolumeclaim_status_capacity_bytes - kube_persistentvolumeclaim_resource_requests_storage_bytes > 0
+          for: 1h
+          labels:
+            severity: info
+            scope: global
+            category: cost
+          annotations:
+            summary: "Storage waste detected in cluster {{ $labels.cluster }}"
+            description: "PVC {{ $labels.persistentvolumeclaim }} has {{ $value | humanizeBytes }} of unused capacity in cluster {{ $labels.cluster }}"
+            runbook_url: "https://runbooks.monosense.io/storage-waste"

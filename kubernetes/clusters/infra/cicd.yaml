@@ -1,0 +1,29 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/kustomize.toolkit.fluxcd.io/kustomization_v1.json
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-infra-cicd
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/managed-by: flux
+    cluster: infra
+spec:
+  dependsOn:
+    - name: cluster-infra-infrastructure
+      namespace: flux-system
+  interval: 10m
+  path: ./kubernetes/workloads/platform/cicd/actions-runner
+  prune: true
+  wait: true
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+        optional: false
+    substitute:
+      GITHUB_CONFIG_URL: "https://github.com/monosense-io/k8s-gitops"

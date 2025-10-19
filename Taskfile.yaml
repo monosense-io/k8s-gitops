@@ -22,6 +22,7 @@ includes:
   volsync: .taskfiles/volsync
   workstation: .taskfiles/workstation
   op: .taskfiles/onepassword
+  synergyflow: .taskfiles/synergyflow
 
 tasks:
 

@@ -6,5 +6,7 @@ resources:
   - cloudnative-pg.yaml
   - fluent.yaml
   - gitlab.yaml
+  - harbor.yaml
   - openebs.yaml
   - rook-ceph.yaml
+  - strimzi.yaml

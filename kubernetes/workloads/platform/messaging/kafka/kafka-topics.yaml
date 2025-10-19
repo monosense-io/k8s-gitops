@@ -1,0 +1,245 @@
+---
+# yaml-language-server: $schema=https://strimzi.io/install/latest/kafka.strimzi.io-v1beta2-kafkatopic.json
+# SynergyFlow Event Topics
+# Schema-first approach: all topics require Avro schema registration in Schema Registry
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: user-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: user
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 604800000  # 7 days
+    segment.ms: 86400000     # 1 day segments
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: incident-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: incident
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days (audit requirement)
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: change-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: change
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 7776000000  # 90 days (compliance requirement)
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: problem-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: problem
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: workflow-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: workflow
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: notification-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: notification
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 604800000  # 7 days (ephemeral)
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: cmdb-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: cmdb
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 7776000000  # 90 days (compliance)
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: team-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: team
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: knowledge-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: knowledge
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: integration-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+    synergyflow.io/module: integration
+spec:
+  partitions: 6
+  replicas: 3
+  config:
+    retention.ms: 604800000  # 7 days
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
+
+---
+# Dead Letter Queue for failed event processing
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: dlq-events
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: synergyflow
+    app.kubernetes.io/name: kafka-topic
+    app.kubernetes.io/component: messaging
+    app.kubernetes.io/part-of: synergyflow
+spec:
+  partitions: 3
+  replicas: 3
+  config:
+    retention.ms: 2592000000  # 30 days for investigation
+    segment.ms: 86400000
+    compression.type: snappy
+    min.insync.replicas: 2
+    cleanup.policy: delete
