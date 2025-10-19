@@ -7,6 +7,3 @@ resources:
   - openebs/ks.yaml
   - rook-ceph/operator/ks.yaml
   - rook-ceph/cluster/ks.yaml
-  # Component directories (contain actual manifests)
-  - rook-ceph
-  - openebs
