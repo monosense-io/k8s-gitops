@@ -8,4 +8,4 @@ resources:
   - cluster-settings.yaml
   - infrastructure.yaml
   - cicd.yaml
-  # - workloads.yaml  # Day 2 - platform workloads
+  - workloads.yaml  # Platform workloads (enabled for variable substitution fix)
