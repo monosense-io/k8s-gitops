@@ -9,8 +9,9 @@ resources:
   - ../../../../components/monitoring/multi-cluster
   - secrets.yaml
   - backup-cronjob.yaml
-components:
-  - ../../../../components/monitoring/business-metrics
+# Temporarily disable business metrics component
+# components:
+#   - ../../../../components/monitoring/business-metrics
 patchesStrategicMerge:
   - |-
     apiVersion: helm.toolkit.fluxcd.io/v2
