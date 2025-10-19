@@ -15,4 +15,4 @@ spec:
           connectRetryTimeSeconds: 5
           holdTimeSeconds: 9
           keepAliveTimeSeconds: 3
-          eBGPMultihop: 1
+          eBGPMultihopTTL: 1

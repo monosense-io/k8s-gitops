@@ -16,7 +16,8 @@ spec:
           rules:
             http:
               - {}
-  # Require authenticated (SPIFFE/SPIRE) connections to the selected endpoints
-  authentication:
-    mode: "required"
+  # NOTE: authentication field requires Cilium Mutual Authentication feature
+  # Commented out until feature is enabled in cluster configuration
+  # authentication:
+  #   mode: "required"
 
