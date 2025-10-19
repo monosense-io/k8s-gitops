@@ -15,8 +15,8 @@ spec:
   primaryUpdateStrategy: unsupervised
   primaryUpdateMethod: switchover
 
-  # High Availability
-  minSyncReplicas: 0
+  # High Availability - ENABLING SYNCHRONOUS REPLICATION
+  minSyncReplicas: 1    # CHANGED: Enable synchronous replication
   maxSyncReplicas: 2
 
   # Superuser Access
@@ -38,8 +38,20 @@ spec:
       secret:
         name: cnpg-superuser
       postInitSQL:
+        # Core monitoring extensions
         - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
         - CREATE EXTENSION IF NOT EXISTS pgaudit;
+
+        # GitLab required extensions
+        - CREATE EXTENSION IF NOT EXISTS pg_trgm;           # Text similarity and trigram indexing
+        - CREATE EXTENSION IF NOT EXISTS btree_gist;        # GiST indexing for common datatypes
+        - CREATE EXTENSION IF NOT EXISTS plpgsql;           # Procedural language (usually pre-installed)
+        - CREATE EXTENSION IF NOT EXISTS amcheck;           # Relation integrity verification
+
+        # Harbor compatibility extensions
+        - CREATE EXTENSION IF NOT EXISTS uuid-ossp;         # UUID generation (Harbor may need)
+
+        # Configuration
         - ALTER SYSTEM SET pg_stat_statements.track = 'all';
 
   # Storage Configuration
@@ -67,23 +79,23 @@ spec:
           storage: ${CNPG_WAL_SIZE}
       volumeMode: Filesystem
 
-  # Resource Management
+  # Resource Management (Optimized for Guaranteed QoS)
   resources:
     requests:
-      cpu: "2000m"
-      memory: "8Gi"
+      cpu: "1000m"
+      memory: "4Gi"
     limits:
-      cpu: "4000m"
-      memory: "16Gi"
+      cpu: "1000m"
+      memory: "4Gi"
 
   # PostgreSQL Configuration
   postgresql:
     parameters:
-      # Memory Configuration
-      shared_buffers: "4GB"
-      effective_cache_size: "12GB"
-      maintenance_work_mem: "1GB"
-      work_mem: "64MB"
+      # Memory Configuration (Optimized for 4GB container)
+      shared_buffers: "1GB"          # 25% of container memory
+      effective_cache_size: "3GB"     # 75% of container memory
+      maintenance_work_mem: "512MB"   # 12.5% of container memory
+      work_mem: "16MB"                # Reduced for lower memory footprint
 
       # WAL Configuration
       wal_level: replica
@@ -120,10 +132,10 @@ spec:
       log_lock_waits: "on"
       log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h "
 
-      # Autovacuum Configuration
+      # Autovacuum Configuration - ENHANCED FOR MULTI-TENANT
       autovacuum: "on"
-      autovacuum_max_workers: "4"
-      autovacuum_naptime: "15s"
+      autovacuum_max_workers: "6"     # INCREASED: Better for multi-tenant
+      autovacuum_naptime: "10s"       # REDUCED: More responsive
       autovacuum_vacuum_threshold: "50"
       autovacuum_vacuum_scale_factor: "0.1"
       autovacuum_analyze_threshold: "50"
@@ -158,16 +170,32 @@ spec:
       - name: shared-postgres-monitoring
         key: custom-queries.yaml
 
-  # Pod Scheduling
+  # Pod Scheduling (Optimized for Cluster Mesh)
   affinity:
     enablePodAntiAffinity: true
     topologyKey: kubernetes.io/hostname
     podAntiAffinityType: preferred
+    # Add node affinity for cross-cluster optimization
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: topology.kubernetes.io/region
+                operator: In
+                values:
+                  - infra
 
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: topology.kubernetes.io/zone
       whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: shared-postgres
+    # Add additional spread constraint for cluster mesh optimization
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: PreferAvoid
       labelSelector:
         matchLabels:
           cnpg.io/cluster: shared-postgres
@@ -184,7 +212,7 @@ spec:
     retentionPolicy: "30d"
     barmanObjectStore:
       destinationPath: "s3://${CNPG_BACKUP_BUCKET}/shared-postgres"
-      endpointURL: "http://172.16.11.3:9000"
+      endpointURL: "${CNPG_MINIO_ENDPOINT_URL}"
       s3Credentials:
         accessKeyId:
           name: cnpg-minio-credentials
@@ -210,7 +238,7 @@ spec:
   # Managed Database Roles
   managed:
     roles:
-      # GitLab Application User
+      # GitLab Application User (scaled for 10 users)
       - name: gitlab_app
         ensure: present
         login: true
@@ -219,11 +247,11 @@ spec:
         createrole: false
         inherit: true
         replication: false
-        connectionLimit: 50
+        connectionLimit: 25    # Reduced from 50, appropriate for 10 users
         passwordSecret:
           name: gitlab-db-credentials
 
-      # Harbor Application User
+      # Harbor Application User - UPDATED WITH HIGHER LIMITS
       - name: harbor_app
         ensure: present
         login: true
@@ -232,7 +260,7 @@ spec:
         createrole: false
         inherit: true
         replication: false
-        connectionLimit: 30
+        connectionLimit: 50    # INCREASED from 30
         passwordSecret:
           name: harbor-db-credentials
 

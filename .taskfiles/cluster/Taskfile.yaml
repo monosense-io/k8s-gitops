@@ -396,10 +396,27 @@ tasks:
 
   health:
     desc: 🏥 Quick health check across all layers
+    silent: true
     cmds:
       - 'echo "🏥 Health Check: {{.CLUSTER}}"'
       - echo ""
-      - 'talosctl --nodes {{.ALL_NODES}} health --wait-timeout 10s && echo "✅ Talos: Healthy" || echo "❌ Talos: Unhealthy"'
+      - |
+        HEALTHY=true
+        for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
+          if [ -n "$node" ]; then
+            if talosctl --nodes $node health --wait-timeout 5s &> /dev/null; then
+              echo "  ✅ Talos node $node: Healthy"
+            else
+              echo "  ❌ Talos node $node: Unhealthy"
+              HEALTHY=false
+            fi
+          fi
+        done
+        if [ "$HEALTHY" = "true" ]; then
+          echo "✅ Talos: All nodes healthy"
+        else
+          echo "❌ Talos: Some nodes unhealthy"
+        fi
       - 'kubectl --context={{.CONTEXT}} get nodes &> /dev/null && echo "✅ Kubernetes: Healthy" || echo "❌ Kubernetes: Unhealthy"'
       - 'kubectl --context={{.CONTEXT}} get crd prometheusrules.monitoring.coreos.com &> /dev/null && echo "✅ CRDs: Installed" || echo "❌ CRDs: Not installed"'
       - 'flux --context={{.CONTEXT}} check --pre &> /dev/null && echo "✅ Flux: Healthy" || echo "❌ Flux: Not installed"'

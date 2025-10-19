@@ -7,7 +7,6 @@ namespace: harbor
 
 resources:
   - namespace.yaml
-  - postgres-cluster.yaml
   - externalsecrets.yaml
   - helmrelease.yaml
   - servicemonitor.yaml

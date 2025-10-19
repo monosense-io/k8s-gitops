@@ -1,0 +1,296 @@
+---
+# NetworkPolicy for Victoria Metrics cluster components
+# Restricts traffic to only necessary ports and namespaces
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-metrics-cluster-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoriametrics
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow vmselect to access vmstorage
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmselect
+    ports:
+    - protocol: TCP
+      port: 8400
+  # Allow vminsert to access vmstorage
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vminsert
+    ports:
+    - protocol: TCP
+      port: 8400
+  # Allow vmagent to scrape metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmagent
+    ports:
+    - protocol: TCP
+      port: 8429
+  # Allow Grafana to query metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: grafana
+    ports:
+    - protocol: TCP
+      port: 8429
+  # Allow external access for monitoring APIs (if ingress is configured)
+  - ports:
+    - protocol: TCP
+      port: 8429  # HTTP select
+    - protocol: TCP
+      port: 8481  # HTTP insert
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Kubernetes API for service discovery
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow access to etcd (if needed for backup)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 2379
+    - protocol: TCP
+      port: 2380
+
+---
+# NetworkPolicy for Victoria Logs cluster
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs-cluster-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victorialogs
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow vminsert to access vmstorage
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vminsert
+    ports:
+    - protocol: TCP
+      port: 8400
+  # Allow vmselect to access vmstorage
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmselect
+    ports:
+    - protocol: TCP
+      port: 8400
+  # Allow vmauth to access vmselect
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmauth
+    ports:
+    - protocol: TCP
+      port: 8481
+  # Allow log shippers to send logs
+  - ports:
+    - protocol: TCP
+      port: 9428  # Logs insert endpoint
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Kubernetes API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# NetworkPolicy for Grafana
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow web UI access (if ingress is configured)
+  - ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Victoria Metrics for data sources
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: victoriametrics
+    ports:
+    - protocol: TCP
+      port: 8429
+    - protocol: TCP
+      port: 8481
+  # Allow access to Victoria Logs
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: victorialogs
+    ports:
+    - protocol: TCP
+      port: 9428
+  # Allow access to Kubernetes API for data source auto-discovery
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+
+---
+# NetworkPolicy for Alertmanager
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertmanager-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow vmalert to send alerts
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmalert
+    ports:
+    - protocol: TCP
+      port: 9093
+  # Allow web UI access (if ingress is configured)
+  - ports:
+    - protocol: TCP
+      port: 9093
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow outbound webhook notifications
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+
+---
+# NetworkPolicy for Node Exporter
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: node-exporter-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: node-exporter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow vmagent to scrape node metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmagent
+    ports:
+    - protocol: TCP
+      port: 9100
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+
+---
+# NetworkPolicy for kube-state-metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kube-state-metrics-netpol
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kube-state-metrics
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow vmagent to scrape k8s metrics
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: vmagent
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow access to Kubernetes API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443

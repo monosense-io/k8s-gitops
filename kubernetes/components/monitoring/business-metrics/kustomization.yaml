@@ -7,8 +7,12 @@ metadata:
 resources:
   - servicemonitor.yaml
   - prometheusrule.yaml
-  - grafana-dashboard.json
   - business-metrics-configmap.yaml
+configMapGenerator:
+  - name: business-metrics-dashboard
+    namespace: observability
+    files:
+      - grafana-dashboard.json
 commonLabels:
   app.kubernetes.io/name: business-metrics
   app.kubernetes.io/component: monitoring

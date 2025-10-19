@@ -78,17 +78,18 @@ spec:
           size: 10Gi
           accessMode: ReadWriteOnce
 
-    # Use external PostgreSQL (CloudNative-PG)
+    # Use external PostgreSQL (Shared CloudNative-PG Cluster) - UPDATED
     database:
       type: external
       external:
-        host: harbor-db-rw.harbor.svc.cluster.local
+        # CHANGED: Now using shared pooler instead of separate cluster
+        host: harbor-pooler-rw.cnpg-system.svc.cluster.local
         port: "5432"
-        username: harbor
+        username: harbor_app    # CHANGED: Match shared cluster user
         coreDatabase: registry
         notaryServerDatabase: notary_server
         notarySignerDatabase: notary_signer
-        sslmode: require
+        sslmode: require      # Harbor requires SSL
       # Password provided via valuesFrom above
 
     # Use external Redis (DragonflyDB)

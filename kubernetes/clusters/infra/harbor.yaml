@@ -30,8 +30,8 @@ spec:
   healthChecks:
     - apiVersion: postgresql.cnpg.io/v1
       kind: Cluster
-      name: harbor-db
-      namespace: harbor
+      name: shared-postgres
+      namespace: cnpg-system
 
     - apiVersion: helm.toolkit.fluxcd.io/v2
       kind: HelmRelease

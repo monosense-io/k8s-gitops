@@ -15,7 +15,7 @@ data:
       # Global VM cluster for cross-cluster queries
       - name: Global-VictoriaMetrics
         type: prometheus
-        url: http://victoria-metrics-global-vmselect.observability.svc.cluster.local:8481/select/0/prometheus
+        url: http://${GLOBAL_VM_SELECT_ENDPOINT}/select/0/prometheus
         access: proxy
         isDefault: true
         jsonData:
@@ -63,7 +63,7 @@ data:
       # Business metrics
       - name: Business-Metrics
         type: prometheus
-        url: http://victoria-metrics-global-vmselect.observability.svc.cluster.local:8481/select/2/prometheus
+        url: http://${GLOBAL_VM_SELECT_ENDPOINT}/select/2/prometheus
         access: proxy
         jsonData:
           timeInterval: 60s

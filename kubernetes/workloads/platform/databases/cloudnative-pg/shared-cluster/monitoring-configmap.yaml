@@ -193,3 +193,63 @@ data:
         - n_live_tup:
             usage: "GAUGE"
             description: "Number of live tuples"
+
+    # Extension availability monitoring
+    extension_status:
+      query: |
+        SELECT
+          extname as extension_name,
+          CASE WHEN extversion IS NOT NULL THEN 1 ELSE 0 END as available
+        FROM pg_extension
+        WHERE extname IN ('pg_trgm', 'btree_gist', 'amcheck', 'pgaudit', 'uuid-ossp')
+      metrics:
+        - extension_name:
+            usage: "LABEL"
+            description: "Extension name"
+        - available:
+            usage: "GAUGE"
+            description: "Extension availability (1=available)"
+
+    # Synchronous replication monitoring
+    sync_replication_status:
+      query: |
+        SELECT
+          count(*) FILTER (WHERE state = 'streaming' AND sync_state = 'sync') AS sync_replicas,
+          count(*) FILTER (WHERE state = 'streaming' AND sync_state = 'async') AS async_replicas
+        FROM pg_stat_replication
+      metrics:
+        - sync_replicas:
+            usage: "GAUGE"
+            description: "Number of synchronous replicas"
+        - async_replicas:
+            usage: "GAUGE"
+            description: "Number of asynchronous replicas"
+
+    # Pooler connection monitoring
+    pooler_connections:
+      query: |
+        SELECT
+          datname,
+          usename,
+          application_name,
+          COUNT(*) AS active_connections,
+          SUM(CASE WHEN state = 'active' THEN 1 ELSE 0 END) AS active_queries
+        FROM pg_stat_activity
+        WHERE application_name LIKE '%bouncer%' OR datname IN ('gitlab', 'registry', 'notary_server', 'notary_signer')
+        GROUP BY datname, usename, application_name
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Database name"
+        - usename:
+            usage: "LABEL"
+            description: "User name"
+        - application_name:
+            usage: "LABEL"
+            description: "Application name"
+        - active_connections:
+            usage: "GAUGE"
+            description: "Active connections"
+        - active_queries:
+            usage: "GAUGE"
+            description: "Active queries"

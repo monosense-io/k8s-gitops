@@ -44,8 +44,8 @@ data:
   ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
   ROOK_CEPH_BLOCKPOOL_NAME: "rook-ceph-block"
   ROOK_CEPH_IMAGE_TAG: v19.2.3
-  # Device Filter: Match ONLY PNY devices by name, exclude OpenEBS TEAM devices and any other NVMe
-  ROOK_CEPH_DEVICE_FILTER: "^nvme-PNY_.*$"
+  # Device Configuration: Using node-specific by-id paths in cephcluster.yaml
+  # No longer using device filter since node-specific config explicitly lists devices per node
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
   CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
@@ -65,16 +65,22 @@ data:
   OBSERVABILITY_LOG_TENANT: "infra"
   OBSERVABILITY_GRAFANA_SECRET_PATH: "kubernetes/infra/grafana-admin"
 
+  # Global Monitoring Configuration (for cross-cluster federation)
+  GLOBAL_VM_INSERT_ENDPOINT: "victoria-metrics-global-vminsert.observability.svc.cluster.local:8480"
+  GLOBAL_VM_SELECT_ENDPOINT: "victoria-metrics-global-vmselect.observability.svc.cluster.local:8481"
+  GLOBAL_ALERTMANAGER_ENDPOINT: "victoria-metrics-global-alertmanager.observability.svc.cluster.local:9093"
+
   # CloudNative-PG Configuration
   CNPG_OPERATOR_VERSION: "1.25.1"
   CNPG_POSTGRES_VERSION: "16.8"
   CNPG_STORAGE_CLASS: "openebs-local-nvme"
-  CNPG_DATA_SIZE: "500Gi"
-  CNPG_WAL_SIZE: "200Gi"
+  CNPG_DATA_SIZE: "80Gi"
+  CNPG_WAL_SIZE: "20Gi"
   CNPG_INSTANCES: "3"
   CNPG_SHARED_CLUSTER_NAME: "shared-postgres"
   CNPG_BACKUP_BUCKET: "monosense-cnpg"
   CNPG_BACKUP_SCHEDULE: "0 2 * * *"
+  CNPG_MINIO_ENDPOINT_URL: "http://10.25.11.3:9000"
   CNPG_MINIO_SECRET_PATH: "kubernetes/infra/cloudnative-pg/minio"
   CNPG_SUPERUSER_SECRET_PATH: "kubernetes/infra/cloudnative-pg/superuser"
 

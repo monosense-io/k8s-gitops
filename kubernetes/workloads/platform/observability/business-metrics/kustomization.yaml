@@ -7,25 +7,15 @@ metadata:
   name: business-metrics
   namespace: observability
 resources:
-  - ../../../../components/monitoring/business-metrics
+  - ../../../../components/monitoring/business-metrics/servicemonitor.yaml
+  - ../../../../components/monitoring/business-metrics/prometheusrule.yaml
+  - ../../../../components/monitoring/business-metrics/business-metrics-configmap.yaml
 configMapGenerator:
-  - name: vmalert-business-rules
+  - name: business-metrics-dashboard
+    namespace: observability
     files:
-      - business-metrics-rules.yaml=../../../../components/monitoring/business-metrics/business-metrics-configmap.yaml
-patches:
-  # Patch Victoria Metrics to include business metrics recording rules
-  - target:
-      kind: HelmRelease
-      name: victoria-metrics
-    patch: |-
-      - op: add
-        path: /spec/values/vmalert/spec/additionalScrapeConfigs
-        value:
-          - name: business-metrics-rules
-            configMap:
-              name: vmalert-business-rules
-              key: business-metrics-rules.yaml
-      - op: add
-        path: /spec/values/vmalert/spec/extraArgs
-        value:
-          rule.file: "/etc/vmalert/rules/*.yaml"
+      - ../../../../components/monitoring/business-metrics/grafana-dashboard.json
+commonLabels:
+  app.kubernetes.io/name: business-metrics
+  app.kubernetes.io/component: monitoring
+  app.kubernetes.io/part-of: victoria-metrics

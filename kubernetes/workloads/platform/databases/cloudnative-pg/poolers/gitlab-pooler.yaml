@@ -16,24 +16,25 @@ spec:
   pgbouncer:
     poolMode: transaction
 
-    # Connection pool configuration
+    # Connection pool configuration (Optimized for 10 GitLab users)
     parameters:
-      max_client_conn: "1000"
-      default_pool_size: "50"
-      min_pool_size: "10"
-      reserve_pool_size: "10"
-      reserve_pool_timeout: "5"
-      max_db_connections: "50"
-      max_user_connections: "50"
+      # APPROPRIATE: Scaled for 10 users, not over-provisioned
+      max_client_conn: "200"            # Sufficient for 10 users with connections
+      default_pool_size: "15"           # Reasonable for small user base
+      min_pool_size: "3"                # Lower minimum for efficiency
+      reserve_pool_size: "5"            # Small reserve for bursts
+      reserve_pool_timeout: "3"         # Faster timeout for cross-cluster
+      max_db_connections: "15"          # Matches pool size
+      max_user_connections: "15"        # Matches pool size
 
-      # Timeouts
-      server_idle_timeout: "600"
-      server_lifetime: "3600"
-      server_connect_timeout: "15"
-      query_timeout: "300"
-      query_wait_timeout: "120"
-      client_idle_timeout: "0"
-      idle_transaction_timeout: "600"
+      # Timeouts (Optimized for cross-cluster latency)
+      server_idle_timeout: "300"        # Shorter idle timeout
+      server_lifetime: "1800"          # Shorter lifetime
+      server_connect_timeout: "10"     # Faster connection timeout
+      query_timeout: "180"             # Shorter query timeout
+      query_wait_timeout: "60"         # Faster wait timeout
+      client_idle_timeout: "60"        # Add client idle timeout
+      idle_transaction_timeout: "300"  # Shorter transaction timeout
 
       # Logging
       log_connections: "1"
@@ -55,14 +56,14 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
 
-  # Resource management
+  # Resource management (APPROPRIATE for 10 GitLab users)
   resources:
     requests:
-      cpu: "500m"
-      memory: "256Mi"
+      cpu: "150m"                     # Modest increase from 200m to 150m
+      memory: "96Mi"                  # Modest increase from 128Mi to 96Mi
     limits:
-      cpu: "2000m"
-      memory: "512Mi"
+      cpu: "300m"                     # Reasonable limit from 500m to 300m
+      memory: "192Mi"                  # Reasonable limit from 256Mi to 192Mi
 
   # High Availability
   affinity:

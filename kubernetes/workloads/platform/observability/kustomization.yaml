@@ -8,21 +8,26 @@ resources:
   - victoria-metrics
   - victoria-logs
   - fluent-bit
-  - business-metrics
+  # - business-metrics  # TODO: Fix business metrics integration
 # Only deploy global VM cluster in infra cluster
 # Deploy multi-cluster monitoring components based on cluster
-patchesStrategicMerge:
-  - |-
-    $patch: delete
-    apiVersion: kustomize.toolkit.fluxcd.io/v1
-    kind: Kustomization
-    metadata:
-      name: multi-cluster
-    $patch: delete
-    apiVersion: kustomize.toolkit.fluxcd.io/v1
-    kind: Kustomization
-    metadata:
-      name: victoria-metrics-global
-components:
-  # Include multi-cluster monitoring components
-  - ../../../../components/monitoring/multi-cluster
+# Temporarily remove patches - these are trying to delete non-existent resources
+# patches:
+#   - patch: |
+#       $patch: delete
+#       apiVersion: kustomize.toolkit.fluxcd.io/v1
+#       kind: Kustomization
+#       metadata:
+#         name: multi-cluster
+#   - patch: |
+#       $patch: delete
+#       apiVersion: kustomize.toolkit.fluxcd.io/v1
+#       kind: Kustomization
+#       metadata:
+#         name: victoria-metrics-global
+# Temporarily disable components to fix core deployment first
+# components:
+#   # Include multi-cluster monitoring components
+#   - ../../../../components/monitoring/multi-cluster
+#   # Include monitoring network policies for security
+#   - ../../../../components/networkpolicy/monitoring

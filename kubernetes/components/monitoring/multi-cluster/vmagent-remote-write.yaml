@@ -19,7 +19,7 @@ spec:
 
   # Remote write configuration for global cluster
   remoteWrite:
-    - url: "http://victoria-metrics-global-vminsert.observability.svc.cluster.local:8480/insert/0/prometheus/api/v1/write"
+    - url: "http://${GLOBAL_VM_INSERT_ENDPOINT}/insert/0/prometheus/api/v1/write"
       queue_config:
         max_samples_per_send: 10000
         max_shards: 200

@@ -73,23 +73,57 @@ spec:
       enabled: true
     nodeExporter:
       enabled: true
-    vmsingle:
+    vmcluster:
       enabled: true
       spec:
         retentionPeriod: ${OBSERVABILITY_METRICS_RETENTION}
-        replicaCount: 1
-        storage:
-          volumeClaimTemplate:
-            metadata:
-              labels:
-                app.kubernetes.io/name: victoriametrics-vmsingle
-            spec:
-              storageClassName: ${OBSERVABILITY_BLOCK_SC}
-              resources:
-                requests:
-                  storage: 750Gi
-              accessModes:
-                - ReadWriteOnce
+        replicationFactor: 2
+        vmstorage:
+          replicaCount: 3
+          storage:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: ${OBSERVABILITY_BLOCK_SC}
+                resources:
+                  requests:
+                    storage: 300Gi
+                accessModes:
+                  - ReadWriteOnce
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+        vmselect:
+          replicaCount: 2
+          cacheMountPath: /cache
+          storage:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: ${OBSERVABILITY_BLOCK_SC}
+                resources:
+                  requests:
+                    storage: 20Gi
+                accessModes:
+                  - ReadWriteOnce
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+        vminsert:
+          replicaCount: 2
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1500m
+              memory: 2Gi
     vmagent:
       enabled: true
       spec:
@@ -103,8 +137,22 @@ spec:
               storageClassName: ${OBSERVABILITY_BLOCK_SC}
               resources:
                 requests:
-                  storage: 50Gi
+                  storage: 20Gi
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
     vmalert:
       enabled: true
       spec:
-        replicaCount: 1
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi

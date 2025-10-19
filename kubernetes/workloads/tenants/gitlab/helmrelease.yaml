@@ -55,7 +55,7 @@ spec:
             aws_access_key_id: <%= File.read("/etc/gitlab/objectstorage/AWS_ACCESS_KEY_ID") %>
             aws_secret_access_key: <%= File.read("/etc/gitlab/objectstorage/AWS_SECRET_ACCESS_KEY") %>
             endpoint: http://10.25.11.3:9000
-            region: us-east-1
+            region: syno
             path_style: true
           credentials:
             secret: gitlab-s3-credentials
