@@ -8,5 +8,5 @@ resources:
   - storageclass-block.yaml
   - servicemonitor.yaml
   - networkpolicy.yaml
-  - volumesnapshotclass.yaml
+  # - volumesnapshotclass.yaml  # Disabled: CSI snapshot CRD not installed
   - poddisruptionbudgets.yaml
