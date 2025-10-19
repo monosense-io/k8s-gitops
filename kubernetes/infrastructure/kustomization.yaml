@@ -8,7 +8,7 @@ resources:
   - gitops  # Flux GitOps infrastructure Kustomizations
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
   - storage/openebs/ks.yaml  # OpenEBS LocalPV provisioner
-  # - storage  # Day 2 - Full storage layer (OpenEBS/Rook-Ceph)
+  - storage  # Rook-Ceph distributed storage
   # - databases  # Day 2 - CloudNativePG
   # - cilium  # Day 2 - service mesh features
   - networking/cilium/clustermesh/ks.yaml  # Manage clustermesh secret via ExternalSecrets
