@@ -81,11 +81,15 @@ spec:
         - protocol: TCP
           port: 8081
 
-    # Allow Redis access
+    # Allow Redis/DragonflyDB access (infra cluster)
     - to:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: dragonfly-system
+          podSelector:
+            matchLabels:
               app.kubernetes.io/name: dragonfly
+              app.kubernetes.io/component: database
       ports:
         - protocol: TCP
           port: 6379

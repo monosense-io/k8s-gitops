@@ -96,7 +96,7 @@ spec:
     redis:
       type: external
       external:
-        addr: dragonfly.dragonfly.svc.cluster.local:6379
+        addr: dragonfly.dragonfly-system.svc.cluster.local:6379
         # Separate databases for different components
         coreDatabaseIndex: "1"
         jobserviceDatabaseIndex: "2"
