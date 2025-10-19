@@ -44,7 +44,8 @@ data:
   ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
   ROOK_CEPH_BLOCKPOOL_NAME: "rook-ceph-block"
   ROOK_CEPH_IMAGE_TAG: v19.2.3
-  ROOK_CEPH_DEVICE_FILTER: "^nvme[0-9]+n1$"
+  # Device Filter: Match ONLY PNY devices by name, exclude OpenEBS TEAM devices and any other NVMe
+  ROOK_CEPH_DEVICE_FILTER: "^nvme-PNY_.*$"
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
   CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
