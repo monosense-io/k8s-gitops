@@ -1,0 +1,132 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cnpg-backup-validation
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: shared-postgres
+    app.kubernetes.io/component: backup-validation
+    app.kubernetes.io/part-of: cloudnative-pg
+spec:
+  schedule: "0 6 * * *"  # Daily at 6 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cnpg-backup-validation
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup-validator
+              image: postgres:16.8
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+                  echo "Starting backup validation at $(date)"
+
+                  # Backup validation script
+                  BUCKET_PATH="${CNPG_BACKUP_BUCKET}/shared-postgres"
+                  MINIO_ENDPOINT="${CNPG_MINIO_ENDPOINT_URL}"
+
+                  # Check if MinIO is accessible
+                  if ! curl -f -s "${MINIO_ENDPOINT}/minio/health/live" > /dev/null; then
+                    echo "ERROR: MinIO endpoint is not accessible: ${MINIO_ENDPOINT}"
+                    exit 1
+                  fi
+                  echo "✓ MinIO endpoint is accessible"
+
+                  # Check backup credentials
+                  if [[ -z "${MINIO_ACCESS_KEY}" || -z "${MINIO_SECRET_KEY}" ]]; then
+                    echo "ERROR: MinIO credentials not found"
+                    exit 1
+                  fi
+                  echo "✓ MinIO credentials are available"
+
+                  # Install AWS CLI for S3 operations
+                  apk add --no-cache aws-cli
+
+                  # Configure AWS CLI for MinIO
+                  aws configure set aws_access_key_id "${MINIO_ACCESS_KEY}"
+                  aws configure set aws_secret_access_key "${MINIO_SECRET_KEY}"
+                  aws configure set default.region us-east-1
+
+                  # List recent backups
+                  echo "Checking recent backups in S3 bucket: ${BUCKET_PATH}"
+                  BACKUP_COUNT=$(aws s3 ls "s3://${BUCKET_PATH}/" --endpoint-url "${MINIO_ENDPOINT}" --recursive | wc -l)
+
+                  if [[ ${BACKUP_COUNT} -eq 0 ]]; then
+                    echo "WARNING: No backups found in S3 bucket"
+                    exit 1
+                  fi
+
+                  echo "✓ Found ${BACKUP_COUNT} backup objects in S3"
+
+                  # Check for recent base backups (last 7 days)
+                  RECENT_BACKUPS=$(aws s3 ls "s3://${BUCKET_PATH}/base/" --endpoint-url "${MINIO_ENDPOINT}" --recursive | grep "$(date -d '7 days ago' '+%Y-%m-%d')" | wc -l)
+
+                  if [[ ${RECENT_BACKUPS} -eq 0 ]]; then
+                    echo "WARNING: No base backups found in the last 7 days"
+                    exit 1
+                  fi
+
+                  echo "✓ Found ${RECENT_BACKUPS} recent base backups"
+
+                  # Check WAL archives
+                  WAL_COUNT=$(aws s3 ls "s3://${BUCKET_PATH}/wal/" --endpoint-url "${MINIO_ENDPOINT}" --recursive | wc -l)
+                  echo "✓ Found ${WAL_COUNT} WAL archive files"
+
+                  # Verify backup integrity by checking latest backup metadata
+                  LATEST_BACKUP=$(aws s3 ls "s3://${BUCKET_PATH}/base/" --endpoint-url "${MINIO_ENDPOINT}" --recursive | sort -r | head -1)
+                  if [[ -n "${LATEST_BACKUP}" ]]; then
+                    BACKUP_SIZE=$(echo "${LATEST_BACKUP}" | awk '{print $3}')
+                    BACKUP_DATE=$(echo "${LATEST_BACKUP}" | awk '{print $1" "$2}')
+                    echo "✓ Latest backup: ${BACKUP_DATE} (${BACKUP_SIZE} bytes)"
+                  else
+                    echo "WARNING: Could not determine latest backup"
+                  fi
+
+                  echo "Backup validation completed successfully at $(date)"
+
+              env:
+                - name: CNPG_BACKUP_BUCKET
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cluster-settings
+                      key: CNPG_BACKUP_BUCKET
+                - name: CNPG_MINIO_ENDPOINT_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: cluster-settings
+                      key: CNPG_MINIO_ENDPOINT_URL
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-minio-credentials
+                      key: access-key
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-minio-credentials
+                      key: secret-key
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 999
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL

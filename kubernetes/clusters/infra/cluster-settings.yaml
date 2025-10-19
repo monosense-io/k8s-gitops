@@ -86,5 +86,5 @@ data:
 
   # Dragonfly Configuration
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
-  DRAGONFLY_DATA_SIZE: "50Gi"
+  DRAGONFLY_DATA_SIZE: "30Gi"
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"

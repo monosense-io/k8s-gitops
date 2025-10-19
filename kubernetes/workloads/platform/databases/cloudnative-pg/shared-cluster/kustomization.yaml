@@ -12,6 +12,7 @@ resources:
   - services.yaml
   - scheduledbackup.yaml
   - prometheusrule.yaml
+  - backup-validation.yaml
 
 labels:
   - pairs:

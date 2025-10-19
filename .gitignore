@@ -40,8 +40,10 @@ Thumbs.db
 .bmad-core/
 .bmad-infrastructure-devops/
 .claude/
+.clinerules/
 AGENTS.md
 CLAUDE.md
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
+notes.txt
