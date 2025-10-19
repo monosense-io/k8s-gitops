@@ -7,5 +7,6 @@ kind: Kustomization
 resources:
   # Component directories (contain actual manifests)
   # - rbac  # Day 2 - RoleBindings reference monitoring, databases, rook-ceph namespaces
-  - external-secrets  # Required for ClusterSecretStore
+  - external-secrets/ks.yaml              # Flux Kustomization for External Secrets
+  - external-secrets                      # Underlying manifests (HelmRelease, CRDs, rules)
   # - cert-manager  # Day 2 - cert-manager already deployed via Helmfile

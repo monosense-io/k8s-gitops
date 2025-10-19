@@ -11,5 +11,5 @@ spec:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy
   ref:
-    semver: ">=1.18.0 <1.19.0"
+    tag: 1.18.2
   url: oci://ghcr.io/cilium/charts/cilium

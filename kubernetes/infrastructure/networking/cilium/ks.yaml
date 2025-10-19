@@ -12,7 +12,7 @@ metadata:
     cluster: ${CLUSTER}
 spec:
   interval: 10m
-  timeout: 5m
+  timeout: 15m
   retryInterval: 1m
   path: ./kubernetes/infrastructure/networking/cilium
   prune: true
