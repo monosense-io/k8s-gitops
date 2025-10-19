@@ -51,12 +51,12 @@ encryption:
 # SPIRE workload identity - DISABLED for bootstrap (no storage yet)
 # Enable via Flux after deploying storage operators (Rook-Ceph/OpenEBS)
 authentication:
-  enabled: true
+  enabled: false
   mutual:
     spire:
-      enabled: true
+      enabled: false
       install:
-        enabled: true
+        enabled: false
         server:
           dataStorage:
             size: 1Gi
