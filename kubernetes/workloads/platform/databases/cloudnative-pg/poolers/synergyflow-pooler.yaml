@@ -108,7 +108,7 @@ spec:
     enablePodMonitor: true
 ---
 # External Secret for pooler authentication
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: synergyflow-pooler-auth
@@ -121,7 +121,7 @@ spec:
   refreshInterval: 1h
   secretStoreRef:
     kind: ClusterSecretStore
-    name: vault-backend
+    name: ${EXTERNAL_SECRET_STORE}
   target:
     name: synergyflow-pooler-auth
     creationPolicy: Owner
