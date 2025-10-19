@@ -6,6 +6,7 @@ resources:
   - cert-manager.yaml
   - cilium.yaml
   - coredns.yaml
+  - dragonfly-operator.yaml
   - external-secrets.yaml
   - spegel.yaml
   - victoria-metrics.yaml
