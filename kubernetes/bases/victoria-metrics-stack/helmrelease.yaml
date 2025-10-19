@@ -156,3 +156,5 @@ spec:
           limits:
             cpu: 500m
             memory: 1Gi
+        extraArgs:
+          notifier.blackhole: "true"
