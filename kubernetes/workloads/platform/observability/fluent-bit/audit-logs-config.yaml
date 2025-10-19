@@ -6,7 +6,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: fluent-bit-audit-config
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: fluent-bit
     app.kubernetes.io/component: audit-logging
@@ -53,7 +53,7 @@ data:
     [OUTPUT]
         Name                 http
         Match                audit.kube-apiserver
-        Host                 victoria-logs.monitoring.svc.cluster.local
+        Host                 victorialogs-vmauth.observability.svc.cluster.local
         Port                 9428
         URI                  /insert/jsonline?_stream_fields=stream,cluster,namespace
         Format               json_lines
@@ -79,7 +79,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: fluent-bit-audit-volumes
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: fluent-bit
     app.kubernetes.io/component: audit-logging
