@@ -9,6 +9,8 @@ resources:
   - victoria-logs
   - fluent-bit
   # - business-metrics  # TODO: Fix business metrics integration
+# Temporarily disable multi-cluster to fix GitOps reconciliation
+# - multi-cluster
 # Only deploy global VM cluster in infra cluster
 # Deploy multi-cluster monitoring components based on cluster
 # Temporarily remove patches - these are trying to delete non-existent resources
