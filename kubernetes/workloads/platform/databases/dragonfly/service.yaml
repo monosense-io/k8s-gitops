@@ -1,16 +1,24 @@
 ---
+# Additional service for global access (complements operator service)
 apiVersion: v1
 kind: Service
 metadata:
-  name: dragonfly
+  name: dragonfly-global
   namespace: dragonfly-system
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: platform-databases
   annotations:
     service.cilium.io/global: "true"
+    service.cilium.io/shared: "true"
 spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly
   ports:
     - name: redis
       port: 6379
       targetPort: 6379
+      protocol: TCP

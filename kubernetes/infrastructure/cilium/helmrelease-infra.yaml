@@ -181,9 +181,15 @@ spec:
             cpu: 500m
             memory: 512Mi
 
-      # Cluster mesh will be connected via CLI in Week 3
+      # Cluster mesh configuration (connects to remote clusters)
       config:
-        enabled: false
+        enabled: true
+        clusters:
+          - name: apps
+            address: apps-cilium-apiserver.monosense.io
+            port: 443
+            tls:
+              certValidationMode: skip  # Can be set to 'strict' after validating certs
 
     # ==============================================================================
     # BGP CONTROL PLANE
