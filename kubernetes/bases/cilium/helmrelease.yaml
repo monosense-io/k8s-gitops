@@ -105,14 +105,15 @@ spec:
         enabled: true
         rollOutPods: true
 
-    # Cilium Service Mesh (POC): enable SPIRE-based mutual authentication
+    # Cilium Service Mesh (POC): SPIRE disabled to resolve HelmRelease adoption issues
+    # Re-enable after Flux successfully adopts the Helm release
     authentication:
-      enabled: true
+      enabled: false
       mutual:
         spire:
-          enabled: true
+          enabled: false
           install:
-            enabled: true
+            enabled: false
             # Install SPIRE into the "cilium" namespace managed by the chart
             namespace: cilium
             existingNamespace: false
