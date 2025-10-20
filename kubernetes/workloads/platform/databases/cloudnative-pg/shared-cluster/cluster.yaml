@@ -24,12 +24,6 @@ spec:
   superuserSecret:
     name: cnpg-superuser
 
-  # Certificate Management
-  certificates:
-    serverTLSSecret: shared-postgres-server-cert
-    serverCASecret: shared-postgres-ca-cert
-    clientCASecret: shared-postgres-ca-cert
-
   # Bootstrap Configuration
   bootstrap:
     initdb:
