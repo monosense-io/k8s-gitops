@@ -120,7 +120,8 @@ releases:
     version: 0.20.3
     needs: ['cert-manager/cert-manager']
     values:
-      # IMPORTANT: CRDs already installed
+      # IMPORTANT: Disable inline CRD installation - CRDs pre-installed via 00-crds.yaml
+      - installCRDs: false
       - crds:
           createClusterSecretStore: false
       - webhook:
