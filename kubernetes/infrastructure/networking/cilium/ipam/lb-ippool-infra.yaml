@@ -10,12 +10,7 @@ spec:
   blocks:
     - start: "10.25.11.100"
       stop: "10.25.11.119"
-  serviceSelector:
-    matchExpressions:
-      - key: io.cilium/lb-ipam-cluster
-        operator: In
-        values:
-          - infra
+  serviceSelector: {}
 ---
 # Patch for infra cluster services to use this pool
 # Apply this label to services that should get IPs from infra pool:
