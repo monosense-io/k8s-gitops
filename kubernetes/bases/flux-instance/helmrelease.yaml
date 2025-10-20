@@ -46,7 +46,7 @@ spec:
         interval: 1m
         kind: GitRepository
         url: https://github.com/monosense-io/k8s-gitops
-        ref: main
+        ref: refs/heads/main
         path: kubernetes/clusters/${CLUSTER}
 
       # Enable all Flux controllers
