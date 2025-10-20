@@ -15,5 +15,5 @@ resources:
   - networking/cilium/clustermesh/ks.yaml   # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml           # Own BGP peering policy via Flux
   - networking/cilium/gateway/ks.yaml       # Cilium Gateway API (using Cilium's native implementation)
-  # Flux GitOps (depends on cilium for Gateway API CRDs):
-  - gitops/ks.yaml                          # Flux operator + instance (HTTPRoute requires Gateway API CRDs)
+  # Flux GitOps: Deployed via bootstrap helmfile, NOT managed through GitOps
+  # - gitops/ks.yaml                        # DISABLED: Flux should not manage itself
