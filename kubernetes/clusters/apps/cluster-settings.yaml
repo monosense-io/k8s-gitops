@@ -44,13 +44,14 @@ data:
   ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
   ROOK_CEPH_BLOCKPOOL_NAME: "rook-ceph-block"
   ROOK_CEPH_IMAGE_TAG: v19.2.3
-  ROOK_CEPH_DEVICE_FILTER: "^nvme[0-9]+n1$"
+  # Device Configuration: Using node-specific by-id paths in cephcluster.yaml
+  # No longer using device filter since node-specific config explicitly lists devices per node
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
   CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
 
   # OpenEBS Configuration
-  OPENEBS_BASEPATH: "/var/openebs/local"
+  OPENEBS_BASEPATH: "/var/mnt/openebs"
   OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
 
   # Observability Configuration
