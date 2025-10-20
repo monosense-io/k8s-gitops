@@ -31,6 +31,11 @@ spec:
                   set -e
                   echo "Starting backup validation at $(date)"
 
+                  # Debug: Print all environment variables
+                  echo "=== All Environment Variables ==="
+                  env | grep -E "CNPG|MINIO" | sort
+                  echo "=== End Environment Variables ==="
+
                   # Backup validation script
                   BUCKET_PATH="${CNPG_BACKUP_BUCKET}/shared-postgres"
                   MINIO_ENDPOINT="${CNPG_MINIO_ENDPOINT_URL}"
