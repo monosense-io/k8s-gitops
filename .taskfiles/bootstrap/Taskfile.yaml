@@ -26,25 +26,26 @@ tasks:
     prompt: Bootstrap {{.CLUSTER}} cluster? This will apply CRDs and infrastructure.
     cmds:
       - task: preflight
-        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
-      - echo "🎯 Bootstrapping {{.CLUSTER}} cluster..."
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}", DRY_RUN: "{{.DRY_RUN}}"}
+      - echo "🎯 Bootstrapping {{.CLUSTER}} cluster{{if eq .DRY_RUN "true"}} (DRY-RUN MODE){{end}}..."
       - echo ""
       - task: phase:0
-        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}", DRY_RUN: "{{.DRY_RUN}}"}
       - task: phase:1
-        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}", DRY_RUN: "{{.DRY_RUN}}"}
       - task: phase:2
-        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}", DRY_RUN: "{{.DRY_RUN}}"}
       - task: phase:3
-        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}", DRY_RUN: "{{.DRY_RUN}}"}
       - echo ""
-      - echo "✅ Bootstrap complete for {{.CLUSTER}} cluster!"
+      - echo "✅ Bootstrap {{if eq .DRY_RUN "true"}}dry-run {{end}}complete for {{.CLUSTER}} cluster!"
       - echo ""
       - task: status
         vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
     vars:
       CLUSTER: '{{.CLUSTER | default ""}}'
       CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
     requires:
       vars: [CLUSTER]
 
@@ -104,6 +105,11 @@ tasks:
     internal: true
     cmds:
       - |
+        {{if eq .DRY_RUN "true"}}
+        echo "  → [DRY-RUN] Would apply prerequisites:"
+        cat {{.BOOTSTRAP_DIR}}/prerequisites/resources.yaml
+        echo "  → [DRY-RUN] Would wait for namespaces to be Active"
+        {{else}}
         # Only use op inject if file contains op:// references
         if grep -q "op://" {{.BOOTSTRAP_DIR}}/prerequisites/resources.yaml 2>/dev/null && \
            command -v op &> /dev/null && op account list &> /dev/null 2>&1; then
@@ -114,38 +120,58 @@ tasks:
           echo "  → Applying prerequisites (without secret injection)..."
           kubectl --context={{.CONTEXT}} apply -f {{.BOOTSTRAP_DIR}}/prerequisites/resources.yaml
         fi
-      - echo "  → Waiting for namespaces..."
-      - kubectl --context={{.CONTEXT}} wait --for=jsonpath='{.status.phase}'=Active namespace/external-secrets namespace/flux-system --timeout=60s
+        echo "  → Waiting for namespaces..."
+        kubectl --context={{.CONTEXT}} wait --for=jsonpath='{.status.phase}'=Active namespace/external-secrets namespace/flux-system --timeout=60s
+        {{end}}
     vars:
       CONTEXT: '{{.CONTEXT}}'
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
 
   crds:
     internal: true
     cmds:
-      - echo "  → Extracting and applying CRDs..."
       - |
+        {{if eq .DRY_RUN "true"}}
+        echo "  → [DRY-RUN] Would extract and apply CRDs:"
+        helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/00-crds.yaml -e {{.CLUSTER}} template 2>/dev/null | \
+          yq ea 'select(.kind == "CustomResourceDefinition")' | grep "^  name:" | head -10
+        echo "  ... (truncated)"
+        echo "  → [DRY-RUN] Would install Gateway API CRDs v1.4.0"
+        echo "  → [DRY-RUN] Would wait for CRDs to be established"
+        {{else}}
+        echo "  → Extracting and applying CRDs..."
         helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/00-crds.yaml -e {{.CLUSTER}} template | \
           yq ea 'select(.kind == "CustomResourceDefinition")' | \
           kubectl --context={{.CONTEXT}} apply --server-side -f -
-      - echo "  → Installing Gateway API CRDs..."
-      - kubectl --context={{.CONTEXT}} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
-      - echo "  → Waiting for CRDs to be established..."
-      - kubectl --context={{.CONTEXT}} wait --for condition=established crd/prometheusrules.monitoring.coreos.com crd/servicemonitors.monitoring.coreos.com --timeout=120s
-      - kubectl --context={{.CONTEXT}} wait --for condition=established crd/gatewayclasses.gateway.networking.k8s.io crd/gateways.gateway.networking.k8s.io --timeout=120s
+        echo "  → Installing Gateway API CRDs..."
+        kubectl --context={{.CONTEXT}} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+        echo "  → Waiting for CRDs to be established..."
+        kubectl --context={{.CONTEXT}} wait --for condition=established crd/prometheusrules.monitoring.coreos.com crd/servicemonitors.monitoring.coreos.com --timeout=120s
+        kubectl --context={{.CONTEXT}} wait --for condition=established crd/gatewayclasses.gateway.networking.k8s.io crd/gateways.gateway.networking.k8s.io --timeout=120s
+        {{end}}
     vars:
       CLUSTER: '{{.CLUSTER}}'
       CONTEXT: '{{.CONTEXT}}'
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
 
   core:
     internal: true
     cmds:
-      - echo "  → Syncing core infrastructure via helmfile..."
-      - helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/01-core.yaml.gotmpl -e {{.CLUSTER}} sync
-      - echo "  → Waiting for Flux to be ready..."
-      - kubectl --context={{.CONTEXT}} wait --for=condition=Ready pod -l app.kubernetes.io/name=flux-instance -n flux-system --timeout=300s
+      - |
+        {{if eq .DRY_RUN "true"}}
+        echo "  → [DRY-RUN] Would sync core infrastructure via helmfile:"
+        helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/01-core.yaml.gotmpl -e {{.CLUSTER}} list 2>/dev/null || echo "    (helm releases)"
+        echo "  → [DRY-RUN] Would wait for Flux to be ready"
+        {{else}}
+        echo "  → Syncing core infrastructure via helmfile..."
+        helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/01-core.yaml.gotmpl -e {{.CLUSTER}} sync
+        echo "  → Waiting for Flux to be ready..."
+        kubectl --context={{.CONTEXT}} wait --for=condition=Ready pod -l app.kubernetes.io/name=flux-instance -n flux-system --timeout=300s
+        {{end}}
     vars:
       CLUSTER: '{{.CLUSTER}}'
       CONTEXT: '{{.CONTEXT}}'
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
 
   validate:
     internal: true
