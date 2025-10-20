@@ -51,10 +51,9 @@ spec:
 
         containers:
           - name: runner
-            # Using stock GitHub Actions runner image
-            # For custom image with pre-installed tools, build and push to Harbor
-            # then update to: harbor.your-domain.com/actions-runner:latest
-            image: ghcr.io/actions/actions-runner:latest
+            # Using home-operations actions-runner image
+            # Pre-built with common tools for CI/CD workflows
+            image: ghcr.io/home-operations/actions-runner:2.329.0@sha256:1d26dc36431014527e0d920e7b84878dcf8fd69fb9639598de1af5ccf9210131
             command:
               - /home/runner/run.sh
             env:
