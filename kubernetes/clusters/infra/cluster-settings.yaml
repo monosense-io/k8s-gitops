@@ -39,6 +39,9 @@ data:
   # Domain Configuration
   SECRET_DOMAIN: "monosense.io"
 
+  # GitHub Actions Configuration
+  GITHUB_CONFIG_URL: "https://github.com/monosense-io/k8s-gitops"
+
   # Rook-Ceph Configuration
   ROOK_CEPH_NAMESPACE: "rook-ceph"
   ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
