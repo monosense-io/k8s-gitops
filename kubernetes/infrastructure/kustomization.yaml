@@ -3,10 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
+# Note: storage is cluster-specific (deployed by infra only, via cluster infrastructure.yaml)
 resources:
   # - networking  # Day 2 - Cilium/CoreDNS/Spegel already deployed via Helmfile
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
-  - storage  # Rook-Ceph distributed storage (includes OpenEBS)
+  # - storage  # Cluster-specific via infrastructure/storage/ks.yaml (infra cluster only)
   # - databases  # Day 2 - CloudNativePG
   # Cilium deployment sequence (must be in order):
   - cilium/ks.yaml                          # Deploy cilium HelmRelease (prerequisite for Gateway API CRDs)
