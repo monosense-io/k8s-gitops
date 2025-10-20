@@ -6,9 +6,6 @@ resources:
   # CloudNative-PG Operator (REQUIRED - manages all CNPG resources)
   - ../../../../bases/cloudnative-pg/operator
 
-  # Namespace
-  - namespace.yaml
-
   # Shared multi-tenant PostgreSQL cluster
   - shared-cluster
 
