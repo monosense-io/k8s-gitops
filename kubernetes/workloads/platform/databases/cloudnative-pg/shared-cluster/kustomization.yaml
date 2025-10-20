@@ -9,7 +9,6 @@ resources:
   - externalsecrets.yaml
   - monitoring-configmap.yaml
   - cluster.yaml
-  - services.yaml
   - scheduledbackup.yaml
   - prometheusrule.yaml
   - backup-validation.yaml
