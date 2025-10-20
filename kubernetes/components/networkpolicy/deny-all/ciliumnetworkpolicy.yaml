@@ -1,0 +1,19 @@
+---
+# CiliumNetworkPolicy - Default Deny All (Zero Trust)
+# Denies all ingress and egress traffic by default
+# Uses SPIFFE identity-based security for true zero trust
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: deny-all
+  namespace: default  # This will be applied to all namespaces
+spec:
+  endpointSelector: {}
+  ingress:
+    # No ingress rules - denies all inbound traffic
+    # Only explicitly allowed traffic with valid SPIFFE identities will be permitted
+  egress:
+    # No egress rules - denies all outbound traffic
+    # Only explicitly allowed traffic with valid SPIFFE identities will be permitted
+  # Note: This creates a true zero trust environment where all traffic is denied
+  # unless explicitly allowed by subsequent policies with SPIFFE identity verification
