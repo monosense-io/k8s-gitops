@@ -18,14 +18,8 @@ spec:
   # Retention policy (overrides cluster setting for scheduled backups)
   backupOwnerReference: self
 
-  # Method
+  # Method (barmanObjectStore backups are always online)
   method: barmanObjectStore
-
-  # Online backup (no downtime)
-  online: true
-  onlineConfiguration:
-    immediateCheckpoint: true
-    waitForArchive: true
 
   # Suspend if needed (for maintenance)
   suspend: false
