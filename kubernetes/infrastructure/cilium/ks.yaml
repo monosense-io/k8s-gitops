@@ -17,6 +17,7 @@ spec:
   interval: 10m
   timeout: 15m
   retryInterval: 1m
+  # Deploy from a temporary directory that includes helmrelease after substitution
   path: ./kubernetes/infrastructure/cilium
   prune: true
   wait: true

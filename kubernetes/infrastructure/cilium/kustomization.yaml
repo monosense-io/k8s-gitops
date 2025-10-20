@@ -4,5 +4,5 @@ kind: Kustomization
 
 resources:
   - ocirepository.yaml
-  # Cluster-specific Cilium HelmRelease (referenced conditionally via kustomization patches)
-  - helmrelease-${CLUSTER}.yaml
+  - helmrelease-infra.yaml
+  - helmrelease-apps.yaml
