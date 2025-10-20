@@ -40,3 +40,13 @@ spec:
       - kind: ConfigMap
         name: cluster-settings
         optional: false
+  # Dynamically include cluster-specific helmrelease file via patchesJson6902
+  patchesJson6902:
+    - target:
+        group: kustomize.config.k8s.io
+        version: v1beta1
+        kind: Kustomization
+      patch: |-
+        - op: add
+          path: /resources/-
+          value: helmrelease-${CLUSTER}.yaml

@@ -4,5 +4,4 @@ kind: Kustomization
 
 resources:
   - ocirepository.yaml
-  - helmrelease-infra.yaml
-  - helmrelease-apps.yaml
+  # Note: Cilium HelmRelease included via cilium/ks.yaml patchesJson6902
