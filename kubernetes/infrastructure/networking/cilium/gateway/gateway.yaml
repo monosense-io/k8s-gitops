@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/gateway.networking.k8s.io/gateway_v1.json
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cilium-gateway
+  namespace: kube-system
+  annotations:
+    # Cilium-specific annotations for LoadBalancer configuration
+    io.cilium/lb-ipam-ips: ${CILIUM_GATEWAY_LB_IP}
+  labels:
+    app.kubernetes.io/name: cilium-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/managed-by: flux
+spec:
+  gatewayClassName: cilium
+
+  listeners:
+    # HTTPS listener for secure traffic
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.${SECRET_DOMAIN}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: wildcard-tls
+            namespace: kube-system
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    # HTTP listener for redirects to HTTPS
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.${SECRET_DOMAIN}"
+      allowedRoutes:
+        namespaces:
+          from: All
