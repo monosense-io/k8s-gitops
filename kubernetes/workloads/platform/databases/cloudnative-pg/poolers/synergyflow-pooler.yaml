@@ -63,26 +63,6 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
 
-  # Resource allocation
-  resources:
-    requests:
-      cpu: "500m"
-      memory: "256Mi"
-    limits:
-      cpu: "2000m"
-      memory: "512Mi"
-
-  # High Availability - spread across nodes
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                cnpg.io/poolerName: synergyflow-pooler
-            topologyKey: kubernetes.io/hostname
-
   # Pod template for security hardening
   template:
     metadata:
@@ -91,8 +71,27 @@ spec:
         app.kubernetes.io/component: connection-pooler
         app.kubernetes.io/part-of: synergyflow
     spec:
+      # High Availability - spread across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    cnpg.io/poolerName: synergyflow-pooler
+                topologyKey: kubernetes.io/hostname
+
       containers:
         - name: pgbouncer
+          # Resource allocation
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "2000m"
+              memory: "512Mi"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

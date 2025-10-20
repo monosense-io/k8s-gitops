@@ -47,32 +47,31 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
 
-  resources:
-    requests:
-      cpu: "500m"
-      memory: "256Mi"
-    limits:
-      cpu: "1500m"
-      memory: "512Mi"
-
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                cnpg.io/poolerName: mattermost-pooler
-            topologyKey: kubernetes.io/hostname
-
   template:
     metadata:
       labels:
         app.kubernetes.io/name: mattermost-pooler
         app.kubernetes.io/component: connection-pooler
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    cnpg.io/poolerName: mattermost-pooler
+                topologyKey: kubernetes.io/hostname
+
       containers:
         - name: pgbouncer
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "1500m"
+              memory: "512Mi"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

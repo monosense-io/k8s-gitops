@@ -48,32 +48,31 @@ spec:
     rollingUpdate:
       maxUnavailable: 1
 
-  resources:
-    requests:
-      cpu: "250m"
-      memory: "128Mi"
-    limits:
-      cpu: "1000m"
-      memory: "256Mi"
-
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                cnpg.io/poolerName: keycloak-pooler
-            topologyKey: kubernetes.io/hostname
-
   template:
     metadata:
       labels:
         app.kubernetes.io/name: keycloak-pooler
         app.kubernetes.io/component: connection-pooler
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    cnpg.io/poolerName: keycloak-pooler
+                topologyKey: kubernetes.io/hostname
+
       containers:
         - name: pgbouncer
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "256Mi"
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
