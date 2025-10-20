@@ -303,6 +303,19 @@ spec:
         passwordSecret:
           name: postgres-readonly-credentials
 
+      # SynergyFlow Application User (Flowable workflow engine)
+      - name: synergyflow_app
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        inherit: true
+        replication: false
+        connectionLimit: 50
+        passwordSecret:
+          name: synergyflow-db-credentials
+
   # Service Template
   serviceAccountTemplate:
     metadata:

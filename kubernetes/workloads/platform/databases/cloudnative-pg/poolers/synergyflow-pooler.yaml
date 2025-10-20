@@ -127,9 +127,9 @@ spec:
   data:
     - secretKey: username
       remoteRef:
-        key: postgresql/synergyflow
+        key: kubernetes/infra/cloudnative-pg/synergyflow
         property: username
     - secretKey: password
       remoteRef:
-        key: postgresql/synergyflow
+        key: kubernetes/infra/cloudnative-pg/synergyflow
         property: password
