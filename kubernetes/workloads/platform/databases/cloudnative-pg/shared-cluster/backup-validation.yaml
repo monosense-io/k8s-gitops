@@ -96,15 +96,9 @@ spec:
 
               env:
                 - name: CNPG_BACKUP_BUCKET
-                  valueFrom:
-                    configMapKeyRef:
-                      name: cluster-settings
-                      key: CNPG_BACKUP_BUCKET
+                  value: "${CNPG_BACKUP_BUCKET}"
                 - name: CNPG_MINIO_ENDPOINT_URL
-                  valueFrom:
-                    configMapKeyRef:
-                      name: cluster-settings
-                      key: CNPG_MINIO_ENDPOINT_URL
+                  value: "${CNPG_MINIO_ENDPOINT_URL}"
                 - name: MINIO_ACCESS_KEY
                   valueFrom:
                     secretKeyRef:
