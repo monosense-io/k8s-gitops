@@ -70,6 +70,7 @@ spec:
   prune: true
   wait: false
   timeout: 5m
+  validate: false
   sourceRef:
     kind: GitRepository
     name: flux-system
