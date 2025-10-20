@@ -45,9 +45,11 @@ releases:
       # Load cluster-specific service mesh configuration
       - ../clusters/{{ .Environment.Name }}/cilium-values.yaml
     set:
-      # Override with environment-specific k8sServiceHost
+      # Override with environment-specific k8sServiceHost and k8sServicePort
       - name: k8sServiceHost
         value: {{ .Values.k8sServiceHost }}
+      - name: k8sServicePort
+        value: {{ .Values.k8sServicePort }}
     hooks:
       - events: ['postsync']
         showlogs: true

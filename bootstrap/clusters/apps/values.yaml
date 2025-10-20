@@ -4,6 +4,7 @@
 
 # Kubernetes API
 k8sServiceHost: "apps-k8s.monosense.io"
+k8sServicePort: "6443"
 
 # CoreDNS
 corednsClusterIP: "10.246.0.10"
