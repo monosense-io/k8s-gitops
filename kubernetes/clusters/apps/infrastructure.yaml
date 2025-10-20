@@ -78,6 +78,15 @@ spec:
       - kind: ConfigMap
         name: cluster-settings
         optional: false
+  # Remove storage deployments for apps cluster (pending review)
+  patchesJson6902:
+    - target:
+        group: kustomize.config.k8s.io
+        version: v1beta1
+        kind: Kustomization
+      patch: |-
+        - op: remove
+          path: /resources/1
   patches:
     # Apply default HelmRelease settings to all nested Kustomizations
     - patch: |-
