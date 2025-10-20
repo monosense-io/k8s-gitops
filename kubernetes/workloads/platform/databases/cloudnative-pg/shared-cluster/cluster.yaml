@@ -42,7 +42,7 @@ spec:
         - CREATE EXTENSION IF NOT EXISTS amcheck;           # Relation integrity verification
 
         # Harbor compatibility extensions
-        - CREATE EXTENSION IF NOT EXISTS "uuid-ossp";         # UUID generation (Harbor may need)
+        - 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'         # UUID generation (Harbor may need)
 
         # Configuration
         - ALTER SYSTEM SET pg_stat_statements.track = 'all';
