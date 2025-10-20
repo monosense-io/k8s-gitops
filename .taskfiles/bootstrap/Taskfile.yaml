@@ -142,7 +142,7 @@ tasks:
         echo "  → Extracting and applying CRDs..."
         helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/00-crds.yaml -e {{.CLUSTER}} template | \
           yq ea 'select(.kind == "CustomResourceDefinition")' | \
-          kubectl --context={{.CONTEXT}} apply --server-side -f -
+          kubectl --context={{.CONTEXT}} apply --server-side --force-conflicts -f -
         echo "  → Installing Gateway API CRDs..."
         kubectl --context={{.CONTEXT}} apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
         echo "  → Waiting for CRDs to be established..."
