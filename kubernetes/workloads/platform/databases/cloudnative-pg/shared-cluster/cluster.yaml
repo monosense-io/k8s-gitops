@@ -186,7 +186,7 @@ spec:
     # Add additional spread constraint for cluster mesh optimization
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: PreferAvoid
+      whenUnsatisfiable: ScheduleAnyway
       labelSelector:
         matchLabels:
           cnpg.io/cluster: shared-postgres
