@@ -141,13 +141,10 @@ spec:
       track_io_timing: "on"
       track_functions: "all"
 
-      # Extensions
-      shared_preload_libraries: "pg_stat_statements,pgaudit"
+      # Extensions (shared_preload_libraries is auto-managed by operator)
 
-      # TLS Configuration
-      ssl: "on"
+      # TLS Configuration (ssl and ssl_prefer_server_ciphers are auto-managed)
       ssl_min_protocol_version: "TLSv1.3"
-      ssl_prefer_server_ciphers: "on"
 
     pg_hba:
       - host all all all scram-sha-256
