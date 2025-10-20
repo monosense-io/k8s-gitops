@@ -34,7 +34,6 @@ spec:
       postInitSQL:
         # Core monitoring extensions
         - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-        - CREATE EXTENSION IF NOT EXISTS pgaudit;
 
         # GitLab required extensions
         - CREATE EXTENSION IF NOT EXISTS pg_trgm;           # Text similarity and trigram indexing
