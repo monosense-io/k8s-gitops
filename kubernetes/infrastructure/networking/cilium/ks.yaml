@@ -24,15 +24,15 @@ spec:
   targetNamespace: kube-system
   # Note: Cilium DaemonSet and Operator are managed by bootstrap/helmfile.d/01-core.yaml
   # This Kustomization manages ONLY day-2 features that depend on Cilium being ready
-  # healthChecks:
-  #   - apiVersion: apps/v1
-  #     kind: DaemonSet
-  #     name: cilium
-  #     namespace: kube-system
-  #   - apiVersion: apps/v1
-  #     kind: Deployment
-  #     name: cilium-operator
-  #     namespace: kube-system
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: cilium
+      namespace: kube-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cilium-operator
+      namespace: kube-system
   postBuild:
     substituteFrom:
       - kind: ConfigMap
