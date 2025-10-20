@@ -27,6 +27,14 @@ spec:
     cleanupOnFail: true
   values:
     installCRDs: true
+
+    # DNS-01 Challenge Configuration
+    # Use external DNS servers to verify DNS propagation instead of cluster DNS
+    # This resolves issues where CoreDNS caching prevents proper ACME challenge validation
+    extraArgs:
+      - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
+      - --dns01-recursive-nameservers-only=true
+
     prometheus:
       enabled: true
       servicemonitor:
