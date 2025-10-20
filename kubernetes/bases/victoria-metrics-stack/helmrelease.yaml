@@ -73,6 +73,8 @@ spec:
       enabled: true
     nodeExporter:
       enabled: true
+    vmsingle:
+      enabled: false  # Using vmcluster instead (only one can be enabled)
     vmcluster:
       enabled: true
       spec:
