@@ -113,10 +113,13 @@ spec:
               securityContext:
                 runAsNonRoot: false
                 runAsUser: 0  # Need root for apt-get install
-                allowPrivilegeEscalation: false
+                allowPrivilegeEscalation: true  # Required for apt-get
                 capabilities:
                   drop:
                     - ALL
                   add:
+                    - SETUID
+                    - SETGID
                     - CHOWN
-                    - DAC_OVERRIDE  # For apt-get
+                    - DAC_OVERRIDE
+                    - FOWNER
