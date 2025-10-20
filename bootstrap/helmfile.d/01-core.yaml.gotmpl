@@ -216,7 +216,18 @@ releases:
                 cpu: 50m
                 memory: 128Mi
     hooks:
-      # After flux-instance is deployed, apply GitRepository and initial Kustomization
+      # Wait for Flux CRDs to be established before applying GitRepository
+      - events: ['postsync']
+        showlogs: true
+        command: kubectl
+        args:
+          - wait
+          - --for
+          - condition=established
+          - crd/gitrepositories.source.toolkit.fluxcd.io
+          - crd/kustomizations.kustomize.toolkit.fluxcd.io
+          - --timeout=120s
+      # After flux-instance is deployed and CRDs are ready, apply GitRepository and initial Kustomization
       - events: ['postsync']
         showlogs: true
         command: kubectl
