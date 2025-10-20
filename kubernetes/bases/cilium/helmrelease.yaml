@@ -57,7 +57,7 @@ spec:
         clusterPoolIPv4MaskSize: 24
 
     l2announcements:
-      enabled: true
+      enabled: false
 
     clusterMesh:
       useAPIServer: true
