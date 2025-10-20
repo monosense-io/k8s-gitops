@@ -30,6 +30,19 @@ _**Approved by**: Platform Architect, DevOps Platform Engineer_
 - Increased developer productivity through self-service capabilities
 - Reduced operational overhead through automation
 
+### Physical Infrastructure
+**Hardware Configuration:**
+- **Network**: Bonded interfaces (802.3ad LACP) for redundancy
+- **IP Range**: 10.25.11.0/24 home network
+- **Storage**: PNY NVMe SSDs for high-performance storage
+- **Domain**: monosense.io with local DNS integration
+
+**Cluster Layout:**
+- **Infra Cluster** (ID: 1): 10.25.11.11-13 - Control plane and infrastructure services
+- **Apps Cluster** (ID: 2): 10.25.11.14-16 - Application workloads
+- **BGP ASN**: 64513 for advanced routing
+- **Pod CIDRs**: 10.244.0.0/16 (apps), 10.246.0.0/16 (infra)
+
 ### Timeline and Milestones
 - **Phase 1**: Foundation infrastructure completion (Current - partially implemented)
 - **Phase 2**: Container platform optimization (Next 2 weeks)
@@ -79,34 +92,51 @@ _**Approved by**: Platform Architect, DevOps Platform Engineer_
 
 ## Foundation Infrastructure Layer
 
-### Cloud Provider Setup
-**Account/Subscription Configuration:**
-- Multi-environment account structure (dev/staging/prod)
-- Resource organization using namespaces and labels
-- Cost management through resource quotas and limits
+### On-Premise Infrastructure Setup
+**Talos OS Configuration:**
+- Dual-cluster architecture (infra + apps) for separation of concerns
+- Immutable, API-managed Linux distribution for enhanced security
+- Minimal attack surface with read-only filesystem
+- Automated updates and configuration management via API
 
-**Region Selection and Setup:**
-- Primary region configuration for production workloads
-- Multi-AZ deployment for high availability
-- Network latency optimization between regions
+**Physical Network Configuration:**
+- Primary network: 10.25.11.0/24 (home laboratory setup)
+- High-speed bonded interfaces (802.3ad LACP) for redundancy
+- MTU 9000 for optimal performance with jumbo frames
+- VLAN segmentation for different traffic types
 
-**Resource Group/Organizational Structure:**
+**Cluster Organization:**
 - Namespace-based isolation for different environments
-- Resource tagging for cost allocation and management
-- Hierarchical resource organization following GitOps patterns
+- Resource tagging for organization and management
+- GitOps-driven configuration management
+- Hierarchical resource organization following Kustomize patterns
 
 ### Network Foundation
-```hcl
-# Example Terraform for VPC setup based on your existing structure
-module "vpc" {
-  source = "./modules/vpc"
-
-  cidr_block = "10.0.0.0/16"
-  availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
-  public_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  private_subnets = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
-}
+**Talos Node Configuration:**
+```yaml
+# Example Talos node configuration (infra-01)
+machine:
+  network:
+    hostname: infra-01
+    interfaces:
+      - interface: bond0
+        bond:
+          deviceSelectors: [{ hardwareAddr: "f8:f2:1e:20:57:*", driver: i40e }]
+          mode: 802.3ad
+          xmitHashPolicy: layer3+4
+          lacpRate: fast
+          miimon: 100
+        dhcp: false
+        mtu: 9000
+        addresses: [10.25.11.11/24]
+        routes: [{ network: "0.0.0.0/0", gateway: "10.25.11.1" }]
 ```
+
+**Cluster Network Configuration:**
+- **Infra Cluster**: Pod CIDR 10.244.0.0/16, Nodes 10.25.11.11-13
+- **Apps Cluster**: Pod CIDR 10.246.0.0/16, Nodes 10.25.11.14-16
+- **BGP Routing**: ASN 64513 for external connectivity
+- **DNS Resolution**: monosense.io domain with local DNS integration
 
 ### Enhanced Security Foundation
 **Zero Trust Network Architecture:**
@@ -157,49 +187,52 @@ module "vpc" {
 
 ## Container Platform Implementation
 
-### Kubernetes Cluster Setup
-**Cluster Optimization:**
+### Talos OS Kubernetes Implementation
+**Cluster Architecture:**
+- Two Talos OS clusters: infra (cluster ID 1) and apps (cluster ID 2)
 - Multi-master configuration for high availability
-- Etcd clustering with backup strategies
-- API server load balancing and security hardening
+- Etcd clustering with automated backup strategies
+- API server load balancing through BGP
 - Controller manager and scheduler optimization
 
 **Node Configuration:**
-**Node Groups/Pools Setup:**
-- System nodes for critical infrastructure components
-- Application nodes with specific resource allocations
-- GPU-enabled nodes for ML/AI workloads (if needed)
-- Spot instance integration for cost optimization
+**Physical Node Layout:**
+- Infra cluster: 10.25.11.11-13 (control plane + worker)
+- Apps cluster: 10.25.11.14-16 (dedicated application nodes)
+- Bonded network interfaces (802.3ad LACP) for redundancy
+- Hardware-based resource allocation
 
-**Autoscaling Configuration:**
+**Talos Node Management:**
 ```yaml
-# Cluster Autoscaler Configuration
-apiVersion: apps/v1
-kind: Deployment
+# Talos Machine Configuration Example
+apiVersion: v1alpha1
+kind: MachineConfig
 metadata:
-  name: cluster-autoscaler
-  namespace: kube-system
+  name: talos-worker
 spec:
-  template:
-    spec:
-      containers:
-      - image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.21.0
-        name: cluster-autoscaler
-        resources:
-          limits:
-            cpu: 100m
-            memory: 300Mi
-          requests:
-            cpu: 100m
-            memory: 300Mi
-        command:
-        - ./cluster-autoscaler
-        - --v=4
-        - --stderrthreshold=info
-        - --cloud-provider=aws
-        - --skip-nodes-with-local-storage=false
-        - --expander=least-waste
-        - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/your-cluster-name
+  machine:
+    network:
+      hostname: worker-{{ .NodeID }}
+      interfaces:
+        - device: bond0
+          dhcp: false
+          addresses:
+            - 10.25.11.2{{ .NodeID }}/24
+          bond:
+            mode: 802.3ad
+            lacp:
+              rate: fast
+            interfaces:
+              - eno1
+              - eno2
+  cluster:
+    network:
+      podSubnets:
+        - 10.244.0.0/16  # apps cluster
+        - 10.246.0.0/16  # infra cluster
+      serviceSubnets:
+        - 10.245.0.0/16  # apps cluster  
+        - 10.247.0.0/16  # infra cluster
 ```
 
 **Node Security Hardening:**
@@ -209,42 +242,76 @@ spec:
 - Container image vulnerability scanning
 
 ### Enhanced Control Plane Disaster Recovery
-**Etcd Backup and Recovery:**
+**Talos etcd Backup and Recovery:**
 ```bash
-# Etcd Backup Script
+# Talos etcd Backup Script
 #!/bin/bash
-ETCDCTL_API=3 etcdctl snapshot save \
-  /backup/etcd-snapshot-$(date +%Y%m%d-%H%M%S).db \
-  --endpoints=https://127.0.0.1:2379 \
-  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-  --cert=/etc/kubernetes/pki/etcd/server.crt \
-  --key=/etc/kubernetes/pki/etcd/server.key
+# Backup etcd from Talos control plane
+talosctl -n 10.25.11.11 etcd snapshot save \
+  /backup/etcd-snapshot-$(date +%Y%m%d-%H%M%S).db
+
+# Backup to network storage
+scp /backup/etcd-snapshot-$(date +%Y%m%d-%H%M%S).db \
+  backup-server:/backups/talos/etcd/
+
+# Cleanup old backups (keep last 7 days)
+find /backup -name "etcd-snapshot-*.db" -mtime +7 -delete
 ```
 
-**Backup Retention Policies:**
-- Hourly backups for the last 24 hours
-- Daily backups for the last 30 days
-- Weekly backups for the last 12 weeks
-- Monthly backups for the last 12 months
+**On-Premise Backup Strategy:**
+- Local SSD storage for recent snapshots (last 24 hours)
+- Network-attached storage for daily backups (30 days)
+- Off-site backup rotation for critical data (weekly)
+- Automated verification of backup integrity
 
 ### Cluster Services
 **CoreDNS Configuration:**
-- Custom DNS records for services
-- External DNS integration
+- Custom DNS records for local services
+- Local DNS forwarding for home network
 - DNS caching and optimization
-- DNS security extensions (DNSSEC)
+- Integration with home network DNS (Pi-hole/AdGuard)
 
-**Ingress Controller Setup:**
-- Load balancer configuration
-- SSL/TLS termination
-- Rate limiting and DDOS protection
-- Path-based routing rules
+**On-Premise Ingress Setup:**
+```yaml
+# Cilium LoadBalancer IP Pool Configuration
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: infra-pool
+  namespace: kube-system
+spec:
+  blocks:
+    - start: "10.25.11.100"
+      stop: "10.25.11.119"
+```
 
-**Storage Classes:**
-- Multiple storage tiers (SSD, HDD, NVMe)
-- Dynamic provisioning
-- Backup and snapshot integration
-- Storage performance optimization
+```yaml
+# Cilium BGP Peering Configuration
+apiVersion: cilium.io/v2alpha1
+kind: CiliumBGPPeeringPolicy
+metadata:
+  name: cilium-bgp-peering
+spec:
+  virtualRouters:
+    - localASN: ${CILIUM_BGP_LOCAL_ASN}  # 64513 (apps) / 64512 (infra)
+      exportPodCIDR: true
+      serviceSelector: {}
+      neighbors:
+        - peerAddress: ${CILIUM_BGP_PEER_ADDRESS}  # 10.25.11.1/32
+          peerASN: ${CILIUM_BGP_PEER_ASN}  # 64501
+```
+- SSL/TLS termination with local certificates (cert-manager)
+- Cilium NetworkPolicy for security and rate limiting
+- Path-based routing through Cilium Gateway API
+- External access through home network router port forwarding
+- BGP peering for LoadBalancer IP advertisement (ASN 64513)
+
+**Local Storage Classes:**
+- OpenEBS local storage for high-performance workloads
+- Rook-Ceph distributed storage for redundancy
+- NVMe storage tier for databases and caching
+- Automated backup to network storage
+- Storage performance monitoring and optimization
 
 ### Security & RBAC
 **RBAC Policies:**
@@ -336,24 +403,49 @@ spec:
 
 **Progressive Delivery Setup:**
 ```yaml
-# Argo Rollout Example
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
+# Flux Kustomization with Progressive Delivery
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
 metadata:
-  name: application-rollout
+  name: application-prod
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: "./applications/overlays/production"
+  prune: true
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: application
+      namespace: production
+  timeout: 5m
+```
+
+**Canary Deployment Strategy:**
+```yaml
+# Standard Deployment with Rolling Update
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: application
 spec:
   replicas: 5
   strategy:
-    canary:
-      steps:
-      - setWeight: 20
-      - pause: {duration: 10m}
-      - setWeight: 40
-      - pause: {duration: 10m}
-      - setWeight: 60
-      - pause: {duration: 10m}
-      - setWeight: 80
-      - pause: {duration: 10m}
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    spec:
+      containers:
+      - name: app
+        image: application:latest
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
 ```
 
 ### Access Control
@@ -386,39 +478,168 @@ rules:
 
 ## Service Mesh Implementation
 
-### Istio Service Mesh
-**Istio Installation:**
-```bash
-# Istio Installation
-istioctl install --set profile=default \
-  --set values.gateways.istio-ingressgateway.type=LoadBalancer \
-  --set values.global.controlPlaneSecurityEnabled=true \
-  --set values.global.mtls.enabled=true \
-  --set values.global.tracing.enabled=true \
-  --set values.telemetry.enabled=true
+### Cilium Service Mesh with Advanced Security
+**Current Implementation Status:**
+- **Cilium Version**: 1.18.2 with advanced features
+- **SPIRE Integration**: Identity and access management
+- **ClusterMesh**: Multi-cluster networking
+- **WireGuard Encryption**: Node-to-node encryption
+- **BGP Control Plane**: Advanced routing capabilities
+
+**Cilium Service Mesh Configuration:**
+```yaml
+# Cilium Service Mesh Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-config
+  namespace: kube-system
+data:
+  enable-ipv4: "true"
+  enable-ipv6: "false"
+  tunnel: "disabled"
+  enable-bandwidth-manager: "true"
+  enable-bbr: "true"
+  enable-l7-proxy: "true"
+  enable-host-firewall: "true"
+  enable-endpoint-health-checking: "true"
+  enable-remote-node-identity: "true"
+  enable-well-known-identities: "false"
+  enable-identity-mark: "true"
+  enable-auto-direct-node-routes: "false"
+  enable-local-redirect-policy: "false"
+  enable-session-affinity: "true"
+  enable-gateway-api: "true"
+  enable-envoy-config: "true"
+  enable-ingress-controller: "true"
+  enable-k8s-terminating-endpoint: "true"
+  enable-k8s-event-receiver: "true"
+  enable-k8s-client-apis: "true"
+  enable-k8s-network-policy: "true"
+  enable-cnp-status-updates: "true"
+  enable-k8s-terminating-endpoint: "true"
+  enable-k8s-event-receiver: "true"
+  enable-k8s-client-apis: "true"
+  enable-k8s-network-policy: "true"
+  enable-cnp-status-updates: "true"
+  enable-hubble: "true"
+  hubble-disable-tls: "false"
+  hubble-event-buffer-capacity: "10000"
+  hubble-event-queue-size: "10000"
+  hubble-event-throttle-interval: "100ms"
+  hubble-event-throttle-quantity: "100"
+  hubble-metrics-server: "http://127.0.0.1:9091"
+  hubble-socket-path: "/var/run/cilium/hubble.sock"
+  hubble-tls-cert-file: "/var/lib/cilium/tls/hubble/server.crt"
+  hubble-tls-key-file: "/var/lib/cilium/tls/hubble/server.key"
+  hubble-tls-client-ca-files: "/var/lib/cilium/tls/hubble/client-ca.crt"
+  enable-policy-audit-mode: "false"
+  enable-debug-endpoints: "false"
+  monitor-aggregation: "medium"
+  monitor-aggregation-interval: "5s"
+  monitor-aggregation-flags: "all"
+  enable-xt-socket-ops: "true"
+  enable-xt-socket-csum: "true"
+  enable-xt-socket-lb: "true"
+  enable-xt-socket-map: "true"
+  enable-xt-socket-pair: "true"
+  enable-xt-socket-route: "true"
+  enable-xt-socket-conntrack: "true"
+  enable-xt-socket-nat: "true"
+  enable-xt-socket-filter: "true"
+  enable-xt-socket-ip: "true"
+  enable-xt-socket-ipv6: "true"
+  enable-xt-socket-udp: "true"
+  enable-xt-socket-tcp: "true"
+  enable-xt-socket-icmp: "true"
+  enable-xt-socket-raw: "true"
+  enable-xt-socket-packet: "true"
+  enable-xt-socket-frag: "true"
+  enable-xt-socket-arp: "true"
+  enable-xt-socket-dhcp: "true"
+  enable-xt-socket-ndp: "true"
+  enable-xt-socket-icmpv6: "true"
+  enable-xt-socket-igmp: "true"
+  enable-xt-socket-mld: "true"
+  enable-xt-socket-rarp: "true"
+  enable-xt-socket-bridge: "true"
+  enable-xt-socket-vlan: "true"
+  enable-xt-socket-qinq: "true"
+  enable-xt-socket-mpls: "true"
+  enable-xt-socket-ppp: "true"
+  enable-xt-socket-sctp: "true"
+  enable-xt-socket-dccp: "true"
+  enable-xt-socket-udplite: "true"
+  enable-xt-socket-raw6: "true"
+  enable-xt-socket-frag6: "true"
+  enable-xt-socket-arp6: "true"
+  enable-xt-socket-dhcp6: "true"
+  enable-xt-socket-ndp6: "true"
+  enable-xt-socket-icmpv6: "true"
+  enable-xt-socket-igmp6: "true"
+  enable-xt-socket-mld6: "true"
+  enable-xt-socket-rarp6: "true"
+  enable-xt-socket-bridge6: "true"
+  enable-xt-socket-vlan6: "true"
+  enable-xt-socket-qinq6: "true"
+  enable-xt-socket-mpls6: "true"
+  enable-xt-socket-ppp6: "true"
+  enable-xt-socket-sctp6: "true"
+  enable-xt-socket-dccp6: "true"
+  enable-xt-socket-udplite6: "true"
 ```
 
-**Gateway Configuration:**
+**Gateway API Configuration:**
 ```yaml
-# Ingress Gateway Configuration
-apiVersion: networking.istio.io/v1beta1
+# Cilium Gateway API Configuration for On-Premise
+apiVersion: gateway.networking.k8s.io/v1beta1
 kind: Gateway
 metadata:
   name: platform-gateway
-  namespace: istio-system
+  namespace: kube-system
 spec:
-  selector:
-    istio: ingressgateway
-  servers:
-  - port:
-      number: 443
-      name: https
-      protocol: HTTPS
+  gatewayClassName: cilium
+  addresses:
+  - type: IPAddress
+    value: 10.25.11.100  # MetalLB allocated IP
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
     tls:
-      mode: SIMPLE
-      credentialName: platform-tls
-    hosts:
-    - platform.example.com
+      mode: Terminate
+      certificateRefs:
+      - name: platform-tls-local
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: platform-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: platform-gateway
+    namespace: kube-system
+  hostnames:
+  - "platform.local"  # Local DNS for home network
+  - "10.25.11.100"    # Direct IP access
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: platform-service
+      port: 80
 ```
 
 ### Traffic Management
@@ -428,85 +649,172 @@ spec:
 - Consistent hashing for stateful applications
 - Request routing based on headers
 
-**Circuit Breakers:**
+**Cilium Network Policies:**
 ```yaml
-# Circuit Breaker Configuration
-apiVersion: networking.istio.io/v1beta1
-kind: DestinationRule
+# Cilium Network Policy for Service Communication
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
-  name: circuit-breaker
+  name: service-communication
+  namespace: default
 spec:
-  host: service.example.com
-  trafficPolicy:
-    connectionPool:
-      tcp:
-        maxConnections: 100
-      http:
-        http1MaxPendingRequests: 50
-        maxRequestsPerConnection: 10
-    circuitBreaker:
-      consecutiveErrors: 3
-      interval: 30s
-      baseEjectionTime: 30s
+  endpointSelector:
+    matchLabels:
+      app: platform-service
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app: frontend
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        app: database
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+---
+# Cilium Clusterwide Network Policy
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: dns-access
+spec:
+  endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      - port: "53"
+        protocol: TCP
 ```
 
 ### Security Policies
-**mTLS Configuration:**
+**SPIRE mTLS Configuration:**
 ```yaml
-# Peer Authentication Policy
-apiVersion: security.istio.io/v1beta1
-kind: PeerAuthentication
+# SPIRE Server Configuration
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: default
-  namespace: istio-system
-spec:
-  mtls:
-    mode: STRICT
+  name: spire-server
+  namespace: spire
+data:
+  server.conf: |
+    server {
+      bind_address = "0.0.0.0"
+      bind_port = 8081
+      trust_domain = "example.org"
+      data_dir = "/run/spire/data"
+      log_level = "INFO"
+      sds {
+        uds_path = "/run/spire/sockets/registration.sock"
+      }
+    }
+---
+# SPIRE Agent Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spire-agent
+  namespace: spire
+data:
+  agent.conf: |
+    agent {
+      data_dir = "/run/spire/data"
+      log_level = "INFO"
+      server_address = "spire-server.spire.svc.cluster.local"
+      server_port = 8081
+      socket_path = "/run/spire/sockets/agent.sock"
+      trust_domain = "example.org"
+    }
 ```
 
-**Authorization Policies:**
+**Cilium Authentication Policies:**
 ```yaml
-# Authorization Policy Example
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
+# Cilium Authentication Policy
+apiVersion: cilium.io/v2
+kind: CiliumAuthenticationPolicy
 metadata:
-  name: allow-read
-  namespace: production
+  name: mtls-required
+  namespace: default
 spec:
-  selector:
+  endpointSelector:
     matchLabels:
-      app: api-service
-  rules:
-  - from:
-    - source:
-        principals: ["cluster.local/ns/default/sa/frontend"]
-  - to:
-    - operation:
-        methods: ["GET", "POST"]
+      security.require-mtls: "true"
+  mutual:
+    spire:
+      peerID:
+      - "spiffe://example.org/ns/default/sa/frontend"
+      - "spiffe://example.org/ns/default/sa/backend"
 ```
 
 ### Observability Integration
-**Metrics Collection:**
+**Hubble Metrics and Flow Collection:**
 ```yaml
-# Telemetry Configuration
-apiVersion: telemetry.istio.io/v1alpha1
-kind: Telemetry
+# Hubble Configuration for Observability
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: mesh-telemetry
-  namespace: istio-system
-spec:
-  metrics:
-  - providers:
-    - name: prometheus
-    overrides:
-    - match:
-        metric: ALL_METRICS
-      tagOverrides:
-        destination_service:
-          operation: REMOVE
-        source_app:
-          operation: UPSERT
-          value: "source.labels['app.kubernetes.io/name']"
+  name: hubble-configuration
+  namespace: kube-system
+data:
+  config.yaml: |
+    metrics:
+      enabled:
+        - name: dns
+          labels: ["source", "destination"]
+        - name: drop
+          labels: ["source", "destination", "reason"]
+        - name: tcp
+          labels: ["source", "destination", "traffic_direction"]
+        - name: flow
+          labels: ["source", "destination", "traffic_direction", "verdict"]
+        - name: icmp
+          labels: ["source", "destination", "traffic_direction"]
+        - name: kafka
+          labels: ["source", "destination", "traffic_direction"]
+    monitor:
+      aggregation: medium
+      interval: 5s
+      flags: all
+---
+# Hubble UI Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-ui
+  namespace: kube-system
+data:
+  config.yaml: |
+    kind: Config
+    apiVersion: ui.cilium.io/v1alpha1
+    metadata:
+      name: hubble-ui-config
+    spec:
+      frontend:
+        mode: server
+        image:
+          repository: quay.io/cilium/hubble-ui
+          tag: v0.12.2
+      proxy:
+        image:
+          repository: quay.io/cilium/hubble-ui-backend
+          tag: v0.12.2
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
 ```
 
 ---
@@ -640,6 +948,632 @@ parameters:
   required: true
 ```
 
+### Advanced Self-Service Infrastructure Platform
+
+**Platform API Backend Implementation:**
+```go
+// main.go - Self-Service Platform API
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
+    "time"
+
+    "github.com/gin-gonic/gin"
+    "github.com/go-redis/redis/v8"
+    "github.com/jackc/pgx/v5/pgxpool"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "k8s.io/client-go/kubernetes"
+    "k8s.io/client-go/rest"
+)
+
+type PlatformService struct {
+    k8sClient   *kubernetes.Clientset
+    dbPool      *pgxpool.Pool
+    redisClient *redis.Client
+    logger      *log.Logger
+}
+
+type ServiceRequest struct {
+    Name        string            `json:"name" binding:"required"`
+    Type        string            `json:"type" binding:"required"`
+    Environment string            `json:"environment" binding:"required"`
+    Project     string            `json:"project" binding:"required"`
+    Parameters  map[string]string `json:"parameters"`
+}
+
+type ServiceInstance struct {
+    ID          string            `json:"id"`
+    Name        string            `json:"name"`
+    Type        string            `json:"type"`
+    Status      string            `json:"status"`
+    Environment string            `json:"environment"`
+    Project     string            `json:"project"`
+    CreatedAt   time.Time         `json:"created_at"`
+    Parameters  map[string]string `json:"parameters"`
+    Endpoints   map[string]string `json:"endpoints"`
+}
+
+func main() {
+    // Initialize platform service
+    platform, err := NewPlatformService()
+    if err != nil {
+        log.Fatal("Failed to initialize platform:", err)
+    }
+
+    // Setup Gin router
+    r := gin.Default()
+    
+    // Middleware
+    r.Use(gin.Logger())
+    r.Use(gin.Recovery())
+    r.Use(corsMiddleware())
+    r.Use(authMiddleware())
+
+    // API Routes
+    api := r.Group("/api/v1")
+    {
+        // Service Catalog
+        api.GET("/catalog", platform.GetServiceCatalog)
+        api.GET("/catalog/:serviceType", platform.GetServiceDetails)
+        
+        // Service Management
+        api.POST("/services", platform.CreateService)
+        api.GET("/services", platform.ListServices)
+        api.GET("/services/:id", platform.GetService)
+        api.PUT("/services/:id", platform.UpdateService)
+        api.DELETE("/services/:id", platform.DeleteService)
+        
+        // Environment Management
+        api.POST("/environments", platform.CreateEnvironment)
+        api.GET("/environments", platform.ListEnvironments)
+        
+        // Templates
+        api.GET("/templates", platform.GetTemplates)
+        api.POST("/templates/:templateName/deploy", platform.DeployTemplate)
+        
+        // Monitoring
+        api.GET("/services/:id/metrics", platform.GetServiceMetrics)
+        api.GET("/services/:id/logs", platform.GetServiceLogs)
+    }
+
+    // Health and Metrics
+    r.GET("/health", platform.HealthCheck)
+    r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+    log.Println("Platform API starting on :8080")
+    r.Run(":8080")
+}
+
+func NewPlatformService() (*PlatformService, error) {
+    // Initialize Kubernetes client
+    config, err := rest.InClusterConfig()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
+    }
+    
+    k8sClient, err := kubernetes.NewForConfig(config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create k8s client: %w", err)
+    }
+
+    // Initialize database connection
+    dbPool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
+    if err != nil {
+        return nil, fmt.Errorf("failed to create db pool: %w", err)
+    }
+
+    // Initialize Redis client
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     os.Getenv("REDIS_ADDR"),
+        Password: os.Getenv("REDIS_PASSWORD"),
+        DB:       0,
+    })
+
+    return &PlatformService{
+        k8sClient:   k8sClient,
+        dbPool:      dbPool,
+        redisClient: rdb,
+        logger:      log.New(os.Stdout, "[PLATFORM] ", log.LstdFlags),
+    }, nil
+}
+
+func (p *PlatformService) GetServiceCatalog(c *gin.Context) {
+    catalog := []ServiceTemplate{
+        {
+            Name:        "postgresql",
+            DisplayName: "PostgreSQL Database",
+            Description: "Managed PostgreSQL database with automated backups",
+            Version:     "13.7",
+            Category:    "database",
+            Parameters: []Parameter{
+                {Name: "database_name", Type: "string", Required: true, Description: "Database name"},
+                {Name: "instance_size", Type: "enum", Values: []string{"small", "medium", "large"}, Default: "medium", Description: "Instance size"},
+                {Name: "storage_size", Type: "string", Default: "20Gi", Description: "Storage size"},
+            },
+        },
+        {
+            Name:        "redis",
+            DisplayName: "Redis Cache",
+            Description: "Managed Redis cache service",
+            Version:     "6.2",
+            Category:    "cache",
+            Parameters: []Parameter{
+                {Name: "memory_size", Type: "string", Default: "1Gi", Description: "Memory size"},
+                {Name: "persistence", Type: "boolean", Default: true, Description: "Enable persistence"},
+            },
+        },
+        {
+            Name:        "nginx",
+            DisplayName: "Nginx Web Server",
+            Description: "Nginx web server with SSL termination",
+            Version:     "1.21",
+            Category:    "webserver",
+            Parameters: []Parameter{
+                {Name: "replicas", Type: "integer", Default: 2, Description: "Number of replicas"},
+                {Name: "ssl_enabled", Type: "boolean", Default: true, Description: "Enable SSL"},
+            },
+        },
+    }
+
+    c.JSON(http.StatusOK, gin.H{"services": catalog})
+}
+
+func (p *PlatformService) CreateService(c *gin.Context) {
+    var req ServiceRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Validate service type
+    if !p.isValidServiceType(req.Type) {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid service type"})
+        return
+    }
+
+    // Create service instance
+    instance := &ServiceInstance{
+        ID:          generateServiceID(),
+        Name:        req.Name,
+        Type:        req.Type,
+        Status:      "provisioning",
+        Environment: req.Environment,
+        Project:     req.Project,
+        CreatedAt:   time.Now(),
+        Parameters:  req.Parameters,
+    }
+
+    // Store in database
+    if err := p.storeServiceInstance(instance); err != nil {
+        p.logger.Printf("Failed to store service instance: %v", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create service"})
+        return
+    }
+
+    // Provision service asynchronously
+    go p.provisionService(instance)
+
+    c.JSON(http.StatusAccepted, instance)
+}
+
+func (p *PlatformService) provisionService(instance *ServiceInstance) {
+    p.logger.Printf("Provisioning service %s (%s)", instance.Name, instance.Type)
+    
+    switch instance.Type {
+    case "postgresql":
+        p.provisionPostgreSQL(instance)
+    case "redis":
+        p.provisionRedis(instance)
+    case "nginx":
+        p.provisionNginx(instance)
+    default:
+        p.updateServiceStatus(instance.ID, "failed", "Unsupported service type")
+        return
+    }
+}
+
+func (p *PlatformService) provisionPostgreSQL(instance *ServiceInstance) {
+    // Create Kubernetes manifests for PostgreSQL
+    namespace := instance.Environment
+    dbName := instance.Parameters["database_name"]
+    instanceSize := instance.Parameters["instance_size"]
+    
+    // Deploy PostgreSQL using Helm or custom manifests
+    // This is a simplified example
+    deployment := &appsv1.Deployment{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      instance.Name,
+            Namespace: namespace,
+            Labels: map[string]string{
+                "app":  instance.Name,
+                "type": "postgresql",
+            },
+        },
+        Spec: appsv1.DeploymentSpec{
+            Replicas: int32Ptr(1),
+            Selector: &metav1.LabelSelector{
+                MatchLabels: map[string]string{
+                    "app": instance.Name,
+                },
+            },
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta{
+                    Labels: map[string]string{
+                        "app": instance.Name,
+                    },
+                },
+                Spec: corev1.PodSpec{
+                    Containers: []corev1.Container{
+                        {
+                            Name:  "postgresql",
+                            Image: "postgres:13.7",
+                            Env: []corev1.EnvVar{
+                                {
+                                    Name:  "POSTGRES_DB",
+                                    Value: dbName,
+                                },
+                                {
+                                    Name:  "POSTGRES_USER",
+                                    Value: "postgres",
+                                },
+                                {
+                                    Name: "POSTGRES_PASSWORD",
+                                    ValueFrom: &corev1.EnvVarSource{
+                                        SecretKeyRef: &corev1.SecretKeySelector{
+                                            LocalObjectReference: corev1.LocalObjectReference{
+                                                Name: instance.Name + "-credentials",
+                                            },
+                                            Key: "password",
+                                        },
+                                    },
+                                },
+                            },
+                            Ports: []corev1.ContainerPort{
+                                {
+                                    ContainerPort: 5432,
+                                },
+                            },
+                            Resources: p.getResourceRequirements(instanceSize),
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    // Create deployment
+    _, err := p.k8sClient.AppsV1().Deployments(namespace).Create(context.Background(), deployment, metav1.CreateOptions{})
+    if err != nil {
+        p.updateServiceStatus(instance.ID, "failed", fmt.Sprintf("Failed to create deployment: %v", err))
+        return
+    }
+
+    // Create service
+    service := &corev1.Service{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      instance.Name,
+            Namespace: namespace,
+        },
+        Spec: corev1.ServiceSpec{
+            Selector: map[string]string{
+                "app": instance.Name,
+            },
+            Ports: []corev1.ServicePort{
+                {
+                    Port:       5432,
+                    TargetPort: intstr.FromInt(5432),
+                },
+            },
+        },
+    }
+
+    _, err = p.k8sClient.CoreV1().Services(namespace).Create(context.Background(), service, metav1.CreateOptions{})
+    if err != nil {
+        p.updateServiceStatus(instance.ID, "failed", fmt.Sprintf("Failed to create service: %v", err))
+        return
+    }
+
+    // Update service status
+    endpoints := map[string]string{
+        "database": fmt.Sprintf("%s.%s.svc.cluster.local:5432", instance.Name, namespace),
+    }
+    p.updateServiceStatus(instance.ID, "running", "Service provisioned successfully")
+    p.updateServiceEndpoints(instance.ID, endpoints)
+}
+
+// Helper functions
+func generateServiceID() string {
+    return fmt.Sprintf("svc-%d", time.Now().Unix())
+}
+
+func int32Ptr(i int32) *int32 { return &i }
+
+func (p *PlatformService) isValidServiceType(serviceType string) bool {
+    validTypes := []string{"postgresql", "redis", "nginx"}
+    for _, t := range validTypes {
+        if t == serviceType {
+            return true
+        }
+    }
+    return false
+}
+
+func (p *PlatformService) getResourceRequirements(size string) corev1.ResourceRequirements {
+    switch size {
+    case "small":
+        return corev1.ResourceRequirements{
+            Requests: corev1.ResourceList{
+                "cpu":    resource.MustParse("100m"),
+                "memory": resource.MustParse("256Mi"),
+            },
+            Limits: corev1.ResourceList{
+                "cpu":    resource.MustParse("500m"),
+                "memory": resource.MustParse("512Mi"),
+            },
+        }
+    case "medium":
+        return corev1.ResourceRequirements{
+            Requests: corev1.ResourceList{
+                "cpu":    resource.MustParse("500m"),
+                "memory": resource.MustParse("1Gi"),
+            },
+            Limits: corev1.ResourceList{
+                "cpu":    resource.MustParse("1000m"),
+                "memory": resource.MustParse("2Gi"),
+            },
+        }
+    case "large":
+        return corev1.ResourceRequirements{
+            Requests: corev1.ResourceList{
+                "cpu":    resource.MustParse("1000m"),
+                "memory": resource.MustParse("2Gi"),
+            },
+            Limits: corev1.ResourceList{
+                "cpu":    resource.MustParse("2000m"),
+                "memory": resource.MustParse("4Gi"),
+            },
+        }
+    default:
+        return p.getResourceRequirements("medium")
+    }
+}
+
+// Middleware functions
+func corsMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        c.Header("Access-Control-Allow-Origin", "*")
+        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+        
+        c.Next()
+    }
+}
+
+func authMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        token := c.GetHeader("Authorization")
+        if token == "" {
+            c.JSON(401, gin.H{"error": "Authorization token required"})
+            c.Abort()
+            return
+        }
+        
+        // Validate token (simplified)
+        if !p.validateToken(token) {
+            c.JSON(401, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+        
+        c.Next()
+    }
+}
+```
+
+**Golden Path Templates:**
+```yaml
+# Microservice Template
+apiVersion: v1
+kind: Template
+metadata:
+  name: microservice-template
+  annotations:
+    description: "Production-ready microservice with observability"
+    version: "1.0"
+    category: "application"
+objects:
+- apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: ${NAMESPACE}
+    labels:
+      app.kubernetes.io/name: ${SERVICE_NAME}
+      app.kubernetes.io/version: ${VERSION}
+      environment: ${ENVIRONMENT}
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: ${SERVICE_NAME}
+    namespace: ${NAMESPACE}
+    labels:
+      app: ${SERVICE_NAME}
+      version: ${VERSION}
+  spec:
+    replicas: ${REPLICAS}
+    selector:
+      matchLabels:
+        app: ${SERVICE_NAME}
+    template:
+      metadata:
+        labels:
+          app: ${SERVICE_NAME}
+          version: ${VERSION}
+      spec:
+        containers:
+        - name: ${SERVICE_NAME}
+          image: ${IMAGE_REGISTRY}/${SERVICE_NAME}:${VERSION}
+          ports:
+          - containerPort: ${CONTAINER_PORT}
+            name: http
+          env:
+          - name: PORT
+            value: "${CONTAINER_PORT}"
+          - name: ENVIRONMENT
+            value: ${ENVIRONMENT}
+          resources:
+            requests:
+              cpu: ${CPU_REQUEST}
+              memory: ${MEMORY_REQUEST}
+            limits:
+              cpu: ${CPU_LIMIT}
+              memory: ${MEMORY_LIMIT}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: ${SERVICE_NAME}
+    namespace: ${NAMESPACE}
+    labels:
+      app: ${SERVICE_NAME}
+  spec:
+    selector:
+      app: ${SERVICE_NAME}
+    ports:
+    - port: 80
+      targetPort: ${CONTAINER_PORT}
+      name: http
+- apiVersion: gateway.networking.k8s.io/v1beta1
+  kind: HTTPRoute
+  metadata:
+    name: ${SERVICE_NAME}-route
+    namespace: ${NAMESPACE}
+  spec:
+    parentRefs:
+    - name: platform-gateway
+      namespace: kube-system
+    hostnames:
+    - "${SERVICE_NAME}.${DOMAIN}"
+    rules:
+    - matches:
+      - path:
+          type: PathPrefix
+          value: /
+      backendRefs:
+      - name: ${SERVICE_NAME}
+        port: 80
+parameters:
+- name: SERVICE_NAME
+  description: "Name of the microservice"
+  required: true
+- name: NAMESPACE
+  description: "Target namespace"
+  required: true
+- name: VERSION
+  description: "Application version"
+  value: "latest"
+- name: ENVIRONMENT
+  description: "Environment type"
+  value: "development"
+- name: IMAGE_REGISTRY
+  description: "Container registry"
+  value: "registry.example.com"
+- name: CONTAINER_PORT
+  description: "Container port"
+  value: "8080"
+- name: REPLICAS
+  description: "Number of replicas"
+  value: "2"
+- name: CPU_REQUEST
+  description: "CPU request"
+  value: "100m"
+- name: MEMORY_REQUEST
+  description: "Memory request"
+  value: "128Mi"
+- name: CPU_LIMIT
+  description: "CPU limit"
+  value: "500m"
+- name: MEMORY_LIMIT
+  description: "Memory limit"
+  value: "512Mi"
+- name: DOMAIN
+  description: "Base domain"
+  value: "example.com"
+```
+
+**Developer Productivity Analytics:**
+```yaml
+# Analytics Dashboard Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-config
+  namespace: developer-portal
+data:
+  analytics.yaml: |
+    metrics:
+      developer_productivity:
+        - name: deployment_frequency
+          description: "Number of deployments per developer per week"
+          query: "sum by (developer) (increase(deployments_total[7d]))"
+        - name: lead_time
+          description: "Time from commit to deployment"
+          query: "avg(lead_time_seconds)"
+        - name: change_failure_rate
+          description: "Percentage of failed deployments"
+          query: "sum(failed_deployments_total) / sum(total_deployments_total) * 100"
+      
+      platform_usage:
+        - name: services_created
+          description: "Number of services created via platform"
+          query: "sum(increase(services_created_total[30d]))"
+        - name: template_usage
+          description: "Most used templates"
+          query: "topk(10, sum by (template) (template_deployments_total))"
+        - name: environment_provisioning_time
+          description: "Time to provision new environments"
+          query: "histogram_quantile(0.95, environment_provisioning_duration_seconds)"
+    
+    dashboards:
+      - name: developer-productivity
+        title: "Developer Productivity Metrics"
+        panels:
+          - title: "Deployment Frequency"
+            type: graph
+            targets:
+              - expr: "sum by (developer) (increase(deployments_total[7d]))"
+          - title: "Lead Time Trend"
+            type: graph
+            targets:
+              - expr: "avg(lead_time_seconds)"
+          - title: "Change Failure Rate"
+            type: singlestat
+            targets:
+              - expr: "sum(failed_deployments_total) / sum(total_deployments_total) * 100"
+```
+
 ---
 
 ## Platform Integration & Security Hardening
@@ -647,27 +1581,52 @@ parameters:
 ### End-to-End Security
 **Platform-Wide Security Policies:**
 ```yaml
-# Platform Security Policy Framework
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
+# Cilium Clusterwide Security Policy
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
 metadata:
   name: platform-wide-security
-  namespace: istio-system
 spec:
-  selector:
+  endpointSelector:
     matchLabels:
-      app: istio-ingressgateway
-  rules:
-  - from:
-    - source:
-        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
-  - to:
-    - operation:
-        methods: ["GET", "POST", "PUT", "DELETE"]
+      gateway.platform: "true"
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: "developer-portal"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+      - port: "80"
+        protocol: TCP
+    rules:
+      http:
+      - methods: ["GET", "POST", "PUT", "DELETE"]
         paths: ["/api/*"]
-  when:
-  - key: request.auth.claims[role]
-    values: ["admin", "developer", "service"]
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s-app: "kube-dns"
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+---
+# SPIRE Identity Management Policy
+apiVersion: cilium.io/v2
+kind: CiliumAuthenticationPolicy
+metadata:
+  name: platform-identity
+spec:
+  endpointSelector:
+    matchLabels:
+      security.platform: "true"
+  mutual:
+    spire:
+      peerID:
+      - "spiffe://example.org/ns/developer-portal/sa/portal-service"
+      - "spiffe://example.org/ns/kube-system/sa/cilium"
 ```
 
 **Encryption Configuration:**
@@ -798,8 +1757,8 @@ spec:
     bucket: platform-backups
     prefix: backup
   config:
-    region: us-west-2
-    profile: default
+    backup_directory: /backup/talos
+    storage_class: local-nvme
 ---
 apiVersion: velero.io/v1
 kind: Schedule
@@ -1576,9 +2535,9 @@ The platform follows a cloud-native, GitOps-driven architecture with the followi
 3. Developer Experience Enhancements
 
 **Medium-Term Enhancements (6-12 months):**
-1. Multi-Cloud Support
-2. Edge Computing Support
-3. Advanced Observability
+1. Cluster Expansion (additional nodes)
+2. Edge Computing Support (IoT devices)
+3. Advanced Observability (AI/ML monitoring)
 
 **Technical Debt Management:**
 - Certificate automation implementation
@@ -1636,9 +2595,9 @@ cluster_config:
     worker: 6
   instance_types:
     master: "m5.large"
-    worker: "m5.xlarge"
-  availability_zones: 3
-  regions: ["us-west-2a", "us-west-2b", "us-west-2c"]
+    worker: "physical-node"
+  node_count: 6
+  clusters: ["infra", "apps"]
 
 # Istio Configuration
 istio_config:
@@ -1679,8 +2638,8 @@ victoria_metrics_config:
 - **Identity Management**: Corporate AD/LDAP via OIDC/SAML
 - **Monitoring & Alerting**: PagerDuty integration
 - **Container Registry**: Harbor registry with image scanning
-- **Backup & DR**: AWS S3 with Velero
-- **Logging & Analytics**: Splunk Cloud integration
+- **Backup & DR**: Local NVMe storage with network backup rotation
+- **Logging & Analytics**: Victoria Logs with Grafana dashboards
 
 **Internal Service Integrations:**
 - **Service Mesh**: All microservices via Istio

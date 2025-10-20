@@ -3,21 +3,21 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: flux-instance
+  name: flux-gitops
   namespace: flux-system
   labels:
-    app.kubernetes.io/name: flux-instance
+    app.kubernetes.io/name: flux
     app.kubernetes.io/component: gitops
-    app.kubernetes.io/part-of: flux
     cluster: ${CLUSTER}
 spec:
   dependsOn:
-    - name: flux-operator
+    # Must wait for cilium-gatewayclass so Gateway API CRDs exist for HTTPRoute validation
+    - name: cilium-gatewayclass
       namespace: flux-system
   interval: 10m
   timeout: 5m
   retryInterval: 1m
-  path: ./kubernetes/infrastructure/gitops/flux-instance
+  path: ./kubernetes/infrastructure/gitops
   prune: true
   wait: true
   sourceRef:
@@ -25,11 +25,6 @@ spec:
     name: flux-system
     namespace: flux-system
   targetNamespace: flux-system
-  healthChecks:
-    - apiVersion: fluxcd.controlplane.io/v1
-      kind: FluxInstance
-      name: flux
-      namespace: flux-system
   postBuild:
     substituteFrom:
       - kind: ConfigMap

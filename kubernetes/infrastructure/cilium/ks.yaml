@@ -3,33 +3,37 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: flux-instance
+  name: cilium-helmrelease
   namespace: flux-system
   labels:
-    app.kubernetes.io/name: flux-instance
-    app.kubernetes.io/component: gitops
-    app.kubernetes.io/part-of: flux
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: networking
+    app.kubernetes.io/part-of: cni
     cluster: ${CLUSTER}
 spec:
   dependsOn:
-    - name: flux-operator
+    - name: flux-repositories
       namespace: flux-system
   interval: 10m
-  timeout: 5m
+  timeout: 15m
   retryInterval: 1m
-  path: ./kubernetes/infrastructure/gitops/flux-instance
+  path: ./kubernetes/infrastructure/cilium
   prune: true
   wait: true
   sourceRef:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  targetNamespace: flux-system
+  targetNamespace: kube-system
   healthChecks:
-    - apiVersion: fluxcd.controlplane.io/v1
-      kind: FluxInstance
-      name: flux
-      namespace: flux-system
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: cilium
+      namespace: kube-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cilium-operator
+      namespace: kube-system
   postBuild:
     substituteFrom:
       - kind: ConfigMap

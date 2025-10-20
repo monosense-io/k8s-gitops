@@ -5,11 +5,14 @@ kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
 resources:
   # - networking  # Day 2 - Cilium/CoreDNS/Spegel already deployed via Helmfile
-  - gitops  # Flux GitOps infrastructure Kustomizations
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
   - storage  # Rook-Ceph distributed storage (includes OpenEBS)
   # - databases  # Day 2 - CloudNativePG
-  - networking/cilium/ks.yaml              # Cilium base kustomization (required by OpenEBS)
-  - networking/cilium/clustermesh/ks.yaml  # Manage clustermesh secret via ExternalSecrets
-  - networking/cilium/bgp/ks.yaml          # Own BGP peering policy via Flux
-  - networking/cilium/gateway/ks.yaml      # Cilium Gateway API (using Cilium's native implementation)
+  # Cilium deployment sequence (must be in order):
+  - cilium/ks.yaml                          # Deploy cilium HelmRelease (prerequisite for Gateway API CRDs)
+  - networking/cilium/ks.yaml               # Cilium day-2 kustomization (depends on cilium)
+  - networking/cilium/clustermesh/ks.yaml   # Manage clustermesh secret via ExternalSecrets
+  - networking/cilium/bgp/ks.yaml           # Own BGP peering policy via Flux
+  - networking/cilium/gateway/ks.yaml       # Cilium Gateway API (using Cilium's native implementation)
+  # Flux GitOps (depends on cilium for Gateway API CRDs):
+  - gitops/ks.yaml                          # Flux operator + instance (HTTPRoute requires Gateway API CRDs)
