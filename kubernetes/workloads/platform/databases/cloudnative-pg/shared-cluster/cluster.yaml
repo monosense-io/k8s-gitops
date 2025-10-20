@@ -210,11 +210,9 @@ spec:
           key: secret-key
       wal:
         compression: gzip
-        encryption: AES256
         maxParallel: 4
       data:
         compression: gzip
-        encryption: AES256
         jobs: 2
         immediateCheckpoint: true
       serverName: shared-postgres
