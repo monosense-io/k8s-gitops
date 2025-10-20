@@ -64,8 +64,8 @@ spec:
     routingMode: native
     autoDirectNodeRoutes: true
 
-    # Tunnel protocol (empty for native routing)
-    tunnelProtocol: ""
+    # Tunnel protocol (only used if direct routing unavailable)
+    tunnelProtocol: vxlan
 
     # ==============================================================================
     # ENCRYPTION & SECURITY
@@ -250,8 +250,10 @@ spec:
 
     policyEnforcementMode: "default"  # Policies enforced when explicitly defined
 
-    # proxy.prometheus: REMOVED - deprecated in v1.14, removed in v1.16
-    # Prometheus metrics are now configured via the top-level prometheus settings
+    # L7 proxy configuration
+    proxy:
+      prometheus:
+        enabled: true
 
     # Enable L7 protocol parsers
     enableL7Proxy: true
