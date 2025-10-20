@@ -4,14 +4,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Note: repositories is handled separately by flux-repositories Kustomization
 # Note: storage is cluster-specific (deployed by infra only, via cluster infrastructure.yaml)
+# Note: cilium is deployed via bootstrap helmfile (not via Flux), day-2 features deployed here
 resources:
   # - networking  # Day 2 - Cilium/CoreDNS/Spegel already deployed via Helmfile
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
   # - storage  # Cluster-specific via infrastructure/storage/ks.yaml (infra cluster only)
   # - databases  # Day 2 - CloudNativePG
-  # Cilium deployment sequence (must be in order):
-  - cilium/ks.yaml                          # Deploy cilium HelmRelease (prerequisite for Gateway API CRDs)
-  - networking/cilium/ks.yaml               # Cilium day-2 kustomization (depends on cilium)
+  # Cilium day-2 features (cilium core deployed via bootstrap helmfile):
+  - networking/cilium/ks.yaml               # Cilium day-2 kustomization (depends on cilium from bootstrap)
   - networking/cilium/clustermesh/ks.yaml   # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml           # Own BGP peering policy via Flux
   - networking/cilium/gateway/ks.yaml       # Cilium Gateway API (using Cilium's native implementation)
