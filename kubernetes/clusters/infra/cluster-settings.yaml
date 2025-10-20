@@ -76,7 +76,7 @@ data:
   # CloudNative-PG Configuration
   CNPG_OPERATOR_VERSION: "0.26.0"  # Chart version (contains operator 1.27.0)
   CNPG_POSTGRES_VERSION: "16.8"
-  CNPG_STORAGE_CLASS: "openebs-local-nvme-immediate"  # Immediate binding to avoid WaitForFirstConsumer deadlock
+  CNPG_STORAGE_CLASS: "rook-ceph-block"  # Use Rook-Ceph instead of OpenEBS for better WaitForFirstConsumer handling
   CNPG_DATA_SIZE: "80Gi"
   CNPG_WAL_SIZE: "20Gi"
   CNPG_INSTANCES: "3"
