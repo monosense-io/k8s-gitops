@@ -35,9 +35,17 @@ spec:
                   BUCKET_PATH="${CNPG_BACKUP_BUCKET}/shared-postgres"
                   MINIO_ENDPOINT="${CNPG_MINIO_ENDPOINT_URL}"
 
+                  # Debug: Check environment variables
+                  echo "DEBUG: CNPG_BACKUP_BUCKET=${CNPG_BACKUP_BUCKET}"
+                  echo "DEBUG: MINIO_ENDPOINT=${MINIO_ENDPOINT}"
+                  echo "DEBUG: MINIO_ACCESS_KEY length: ${#MINIO_ACCESS_KEY}"
+                  echo "DEBUG: MINIO_SECRET_KEY length: ${#MINIO_SECRET_KEY}"
+
                   # Check backup credentials
                   if [[ -z "${MINIO_ACCESS_KEY}" || -z "${MINIO_SECRET_KEY}" ]]; then
                     echo "ERROR: MinIO credentials not found"
+                    echo "MINIO_ACCESS_KEY is empty: $([ -z \"${MINIO_ACCESS_KEY}\" ] && echo yes || echo no)"
+                    echo "MINIO_SECRET_KEY is empty: $([ -z \"${MINIO_SECRET_KEY}\" ] && echo yes || echo no)"
                     exit 1
                   fi
                   echo "✓ MinIO credentials are available"
