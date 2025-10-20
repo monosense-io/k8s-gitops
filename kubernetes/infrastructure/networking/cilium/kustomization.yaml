@@ -2,7 +2,8 @@
 # yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+# Note: Cilium core is deployed via bootstrap/helmfile.d/01-core.yaml
+# Flux manages ONLY day-2 features (configuration, policies, IPAM, etc.)
 resources:
-  - ../../../bases/cilium
   - prometheusrule.yaml
   - ipam/ks.yaml
