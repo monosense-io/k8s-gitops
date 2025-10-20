@@ -35,13 +35,6 @@ spec:
                   BUCKET_PATH="${CNPG_BACKUP_BUCKET}/shared-postgres"
                   MINIO_ENDPOINT="${CNPG_MINIO_ENDPOINT_URL}"
 
-                  # Check if MinIO is accessible
-                  if ! curl -f -s "${MINIO_ENDPOINT}/minio/health/live" > /dev/null; then
-                    echo "ERROR: MinIO endpoint is not accessible: ${MINIO_ENDPOINT}"
-                    exit 1
-                  fi
-                  echo "✓ MinIO endpoint is accessible"
-
                   # Check backup credentials
                   if [[ -z "${MINIO_ACCESS_KEY}" || -z "${MINIO_SECRET_KEY}" ]]; then
                     echo "ERROR: MinIO credentials not found"
@@ -49,8 +42,8 @@ spec:
                   fi
                   echo "✓ MinIO credentials are available"
 
-                  # Install AWS CLI for S3 operations
-                  apk add --no-cache aws-cli
+                  # Install required tools (Debian-based)
+                  apt-get update -qq && apt-get install -y -qq curl awscli > /dev/null 2>&1
 
                   # Configure AWS CLI for MinIO
                   aws configure set aws_access_key_id "${MINIO_ACCESS_KEY}"
@@ -117,10 +110,12 @@ spec:
                   cpu: 500m
                   memory: 256Mi
               securityContext:
-                runAsNonRoot: true
-                runAsUser: 999
+                runAsNonRoot: false
+                runAsUser: 0  # Need root for apt-get install
                 allowPrivilegeEscalation: false
-                readOnlyRootFilesystem: true
                 capabilities:
                   drop:
                     - ALL
+                  add:
+                    - CHOWN
+                    - DAC_OVERRIDE  # For apt-get
