@@ -6,4 +6,5 @@ resources:
   - ../../../bases/cert-manager
   - clusterissuers.yaml
   - externalsecret-cloudflare.yaml
+  - wildcard-certificate.yaml
   - prometheusrule.yaml

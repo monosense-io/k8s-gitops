@@ -9,4 +9,5 @@ resources:
   # - rbac  # Day 2 - RoleBindings reference monitoring, databases, rook-ceph namespaces
   - external-secrets/ks.yaml              # Flux Kustomization for External Secrets
   - external-secrets                      # Underlying manifests (HelmRelease, CRDs, rules)
-  # - cert-manager  # Day 2 - cert-manager already deployed via Helmfile
+  - cert-manager/ks.yaml                  # Flux Kustomization for cert-manager (ClusterIssuers and Certificates)
+  - cert-manager                          # Underlying manifests (ClusterIssuers, ExternalSecrets, PrometheusRules)

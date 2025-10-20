@@ -1,0 +1,44 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/cert-manager.io/certificate_v1.json
+# Wildcard certificate for main domain (*.monosense.io)
+# Used by Cilium Gateway for HTTPS termination
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-domain
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: wildcard-certificate
+    app.kubernetes.io/component: tls
+    app.kubernetes.io/managed-by: cert-manager
+spec:
+  # Secret that will be created with the certificate
+  secretName: wildcard-tls
+
+  # Certificate validity and renewal
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+
+  # Use Let's Encrypt staging for initial validation
+  # Switch to letsencrypt-prod after successful validation
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+  # DNS names covered by this certificate
+  commonName: "*.${SECRET_DOMAIN}"
+  dnsNames:
+    - "*.${SECRET_DOMAIN}"
+    - "${SECRET_DOMAIN}"
+
+  # Use RSA for broader compatibility
+  privateKey:
+    algorithm: RSA
+    size: 2048
+
+  # Ensure certificate is usable for TLS
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
