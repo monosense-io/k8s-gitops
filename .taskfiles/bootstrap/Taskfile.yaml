@@ -89,7 +89,7 @@ tasks:
       - echo "✅ Prerequisites applied"
     vars:
       CLUSTER: '{{.CLUSTER}}'
-      CONTEXT: '{{.CONTEXT}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
 
   phase:1:
     desc: 🔧 Phase 1 - Install CRDs
@@ -100,7 +100,7 @@ tasks:
       - echo "✅ CRDs installed and established"
     vars:
       CLUSTER: '{{.CLUSTER}}'
-      CONTEXT: '{{.CONTEXT}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
 
   phase:2:
     desc: 🚀 Phase 2 - Deploy core infrastructure
@@ -111,7 +111,7 @@ tasks:
       - echo "✅ Core infrastructure deployed"
     vars:
       CLUSTER: '{{.CLUSTER}}'
-      CONTEXT: '{{.CONTEXT}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
 
   phase:3:
     desc: ✅ Phase 3 - Validate deployment
@@ -122,7 +122,7 @@ tasks:
       - echo "✅ Validation complete"
     vars:
       CLUSTER: '{{.CLUSTER}}'
-      CONTEXT: '{{.CONTEXT}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
 
   # ============================================================================
   # Core Bootstrap Tasks
