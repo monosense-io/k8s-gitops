@@ -1,6 +1,6 @@
 # STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Status: Ready for Review
+Status: Ready for Merge
 Owner: Product → Platform Engineering
 Date: 2025-10-21
 Links: docs/architecture.md §6 (Bootstrap Architecture); .taskfiles/cluster/Taskfile.yaml; .taskfiles/bootstrap/Taskfile.yaml; talos/**; docs/epics/EPIC-greenfield-multi-cluster-gitops.md; docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md; docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md; docs/runbooks/bootstrapping-from-zero.md
@@ -211,7 +211,7 @@ Claude Sonnet 4.5 (dev persona, James)
   - Priority: P0 5 • P1 4 • P2 1
   - Mapping covers AC1–AC7; AC2 runtime coverage focuses on kubeconfig export + API reachability (nodes Ready validated by STORY‑BOOT‑CORE).
 
-- Gate Recommendation: CONCERNS — scope limited to Phase −1; apps cluster meets requirements; infra needs etcd multi‑member health evidence and idempotency artifact.
+- Gate Recommendation: PASS — Phase −1 validated on infra and apps (kubeconfig export, API reachability, etcd multi‑member health). Node readiness will be validated by STORY‑BOOT‑CORE.
 
 ### Review Date: 2025-10-21
 
