@@ -1,6 +1,6 @@
 # 17 — STORY-DB-CNPG-OPERATOR — CloudNativePG Operator
 
-Sequence: 17/21 | Prev: STORY-STO-ROOK-CEPH-CLUSTER.md | Next: STORY-DB-CNPG-SHARED-CLUSTER.md
+Sequence: 17/22 | Prev: STORY-STO-ROOK-CEPH-CLUSTER.md | Next: STORY-DB-CNPG-SHARED-CLUSTER.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -33,4 +33,3 @@ Deploy CloudNativePG (CNPG) operator via Flux to manage PostgreSQL clusters decl
 
 ## Definition of Done
 - ACs met; evidence recorded in Dev Notes.
-

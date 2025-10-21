@@ -1,6 +1,6 @@
 # 15 — STORY-STO-ROOK-CEPH-OPERATOR — Deploy Rook-Ceph Operator (infra)
 
-Sequence: 15/21 | Prev: STORY-STO-OPENEBS-BASE.md | Next: STORY-STO-ROOK-CEPH-CLUSTER.md
+Sequence: 15/22 | Prev: STORY-STO-OPENEBS-BASE.md | Next: STORY-STO-ROOK-CEPH-CLUSTER.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -34,4 +34,3 @@ Deploy the Rook-Ceph operator on the infra cluster to manage Ceph clusters and p
 
 ## Definition of Done
 - ACs met; evidence captured in Dev Notes.
-

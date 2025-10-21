@@ -1,6 +1,6 @@
 # 12 — STORY-NET-CILIUM-CLUSTERMESH — Cross-Cluster Connectivity
 
-Sequence: 12/21 | Prev: STORY-NET-CILIUM-BGP.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
+Sequence: 12/22 | Prev: STORY-NET-CILIUM-BGP.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
 
 Status: Draft
 Owner: Platform Engineering

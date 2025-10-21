@@ -1,6 +1,6 @@
 # 19 — STORY-OBS-VM-STACK — VictoriaMetrics K8s Stack (operator, Grafana, vmalert)
 
-Sequence: 19/21 | Prev: STORY-DB-CNPG-SHARED-CLUSTER.md | Next: STORY-OBS-VICTORIA-LOGS.md
+Sequence: 19/22 | Prev: STORY-DB-CNPG-SHARED-CLUSTER.md | Next: STORY-OBS-VICTORIA-LOGS.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -37,4 +37,3 @@ Deploy the VictoriaMetrics operator and a multi‑cluster stack: infra runs a `v
 
 ## Definition of Done
 - ACs met; evidence captured.
-

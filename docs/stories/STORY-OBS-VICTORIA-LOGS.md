@@ -1,6 +1,6 @@
 # 20 — STORY-OBS-VICTORIA-LOGS — VictoriaLogs (infra) + vmauth
 
-Sequence: 20/21 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-FLUENT-BIT.md
+Sequence: 20/22 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-FLUENT-BIT.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -33,4 +33,3 @@ Deploy VictoriaLogs on infra with vmauth endpoints for write/read, to serve as t
 
 ## Definition of Done
 - ACs met; evidence captured.
-

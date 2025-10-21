@@ -1,6 +1,6 @@
 # 16 — STORY-STO-ROOK-CEPH-CLUSTER — Ceph Cluster (infra)
 
-Sequence: 16/21 | Prev: STORY-STO-ROOK-CEPH-OPERATOR.md | Next: STORY-DB-CNPG-OPERATOR.md
+Sequence: 16/22 | Prev: STORY-STO-ROOK-CEPH-OPERATOR.md | Next: STORY-DB-CNPG-OPERATOR.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -36,4 +36,3 @@ Deploy the Rook-Ceph cluster on the infra nodes with the desired MON/MGR/OSD top
 
 ## Definition of Done
 - ACs met with logs/commands stored in Dev Notes.
-

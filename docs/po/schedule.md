@@ -37,6 +37,9 @@ Date: 2025-10-21
   - STORY-OBS-VICTORIA-LOGS (infra)
   - STORY-OBS-FLUENT-BIT (infra+apps)
 
+- Sprint 6 (Jan 19–Jan 30, 2026)
+  - STORY-NET-SPEGEL-REGISTRY-MIRROR (after OpenEBS is available)
+
 ## Sequencing & Dependencies
 
 - BOOT-CRDS → BOOT-CORE → CILIUM-CORE-GITOPS

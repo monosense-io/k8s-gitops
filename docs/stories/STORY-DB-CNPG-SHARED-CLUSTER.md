@@ -1,6 +1,6 @@
 # 18 — STORY-DB-CNPG-SHARED-CLUSTER — Multi‑Tenant Postgres Cluster
 
-Sequence: 18/21 | Prev: STORY-DB-CNPG-OPERATOR.md | Next: STORY-OBS-VM-STACK.md
+Sequence: 18/22 | Prev: STORY-DB-CNPG-OPERATOR.md | Next: STORY-OBS-VM-STACK.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -34,4 +34,3 @@ Provision a shared CNPG PostgreSQL cluster on infra with scheduled backups, moni
 
 ## Definition of Done
 - ACs met with evidence.
-

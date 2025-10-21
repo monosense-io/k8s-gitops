@@ -1,6 +1,6 @@
 # 21 — STORY-OBS-FLUENT-BIT — Cluster Log Shipping
 
-Sequence: 21/21 | Prev: STORY-OBS-VICTORIA-LOGS.md
+Sequence: 21/22 | Prev: STORY-OBS-VICTORIA-LOGS.md | Next: STORY-NET-SPEGEL-REGISTRY-MIRROR.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -34,4 +34,3 @@ Deploy Fluent Bit on infra and apps to collect container logs and Kubernetes API
 
 ## Definition of Done
 - ACs met; evidence captured.
-

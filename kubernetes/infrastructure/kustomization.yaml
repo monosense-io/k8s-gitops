@@ -17,4 +17,6 @@ resources:
   - networking/cilium/clustermesh/ks.yaml   # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml           # Own BGP peering policy via Flux
   - networking/cilium/gateway/ks.yaml       # Cilium Gateway API (using Cilium's native implementation)
+  # Registry mirror (Flux-managed)
+  - networking/spegel/ks.yaml
   # Flux GitOps: Bootstrapped via Helmfile; not self-managed in this repo

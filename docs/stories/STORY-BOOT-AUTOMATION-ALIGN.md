@@ -1,6 +1,6 @@
 # 13 — STORY-BOOT-AUTOMATION-ALIGN — Canonicalize Bootstrap via Taskfiles
 
-Sequence: 13/21 | Prev: STORY-NET-CILIUM-CLUSTERMESH.md | Next: STORY-STO-OPENEBS-BASE.md
+Sequence: 13/22 | Prev: STORY-NET-CILIUM-CLUSTERMESH.md | Next: STORY-STO-OPENEBS-BASE.md
 
 Status: Draft
 Owner: Product → Platform Engineering

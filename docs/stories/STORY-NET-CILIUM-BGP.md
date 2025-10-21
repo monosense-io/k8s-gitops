@@ -1,6 +1,6 @@
 # 11 — STORY-NET-CILIUM-BGP — Cilium BGP Policy via GitOps
 
-Sequence: 11/21 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-NET-CILIUM-CLUSTERMESH.md
+Sequence: 11/22 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-NET-CILIUM-CLUSTERMESH.md
 
 Status: Draft
 Owner: Platform Engineering

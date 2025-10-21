@@ -1,6 +1,6 @@
 # 14 — STORY-STO-OPENEBS-BASE — OpenEBS LocalPV (infra)
 
-Sequence: 14/21 | Prev: STORY-BOOT-AUTOMATION-ALIGN.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
+Sequence: 14/22 | Prev: STORY-BOOT-AUTOMATION-ALIGN.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -37,4 +37,3 @@ Deploy OpenEBS LocalPV on the infra cluster to provide simple local storage clas
 
 ## Definition of Done
 - ACs met on infra; Dev Notes include sample PVC/POD YAML and status outputs.
-

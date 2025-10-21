@@ -1,6 +1,6 @@
 # 06 — STORY-SEC-CERT-MANAGER-ISSUERS — Issuers and Wildcard Certificates
 
-Sequence: 06/21 | Prev: STORY-SEC-EXTERNAL-SECRETS-BASE.md | Next: STORY-DNS-COREDNS-BASE.md
+Sequence: 06/22 | Prev: STORY-SEC-EXTERNAL-SECRETS-BASE.md | Next: STORY-DNS-COREDNS-BASE.md
 
 Status: Draft
 Owner: Platform Engineering
