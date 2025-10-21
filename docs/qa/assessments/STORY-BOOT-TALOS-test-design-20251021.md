@@ -24,12 +24,12 @@ Designer: Quinn (Test Architect)
 | BOOT-TALOS-E2E-001     | E2E         | P0       | Run `task cluster:create-<cluster>` end‑to‑end               | Primary user journey                   |
 | BOOT-TALOS-E2E-002     | E2E         | P1       | Run `task bootstrap:talos` → phases 0..3 sequentially        | Alternate canonical path               |
 
-### AC2 — Kubeconfig exported; CP nodes Ready
+### AC2 — Kubeconfig exported; API reachable
 
 | ID                     | Level       | Priority | Test                                                         | Justification                         |
 |------------------------|-------------|----------|--------------------------------------------------------------|---------------------------------------|
 | BOOT-TALOS-INT-003     | Integration | P0       | Validate kubeconfig path/contexts exist                      | Config/interface contract              |
-| BOOT-TALOS-E2E-004     | E2E         | P0       | `kubectl --context=<cluster> get nodes` shows CP Ready       | End‑state readiness check              |
+| BOOT-TALOS-E2E-004     | E2E         | P0       | `kubectl --context=<cluster> cluster-info` responds          | API reachability post‑bootstrap       |
 
 ### AC3 — Health gate via `task cluster:health`
 
@@ -72,7 +72,7 @@ Designer: Quinn (Test Architect)
 
 ## Recommended Execution Order
 1. P0 Integration: BOOT‑TALOS‑INT‑003 (kubeconfig)
-2. P0 E2E: BOOT‑TALOS‑E2E‑001/002/004/005
+2. P0 E2E: BOOT‑TALOS‑E2E‑001/002/004
 3. P1 E2E: BOOT‑TALOS‑E2E‑006/007/010; P1 Integration: BOOT‑TALOS‑INT‑011
 4. P2 Integration: BOOT‑TALOS‑INT‑008 (only if workers exist)
 

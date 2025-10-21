@@ -59,7 +59,7 @@ Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
 
 ### Tasks ↔ Acceptance Criteria Mapping
 - AC1 (tasks only) → T0, T1, T2, T3, T4, T5
-- AC2 (kubeconfig/nodes Ready) → T1, T2, Validation Steps
+- AC2 (kubeconfig/API reachable) → T1, T2, Validation Steps
 - AC3 (health) → T5, Validation Steps
 - AC4 (idempotency) → T0b (detector), re‑run of T1/T3 (documented in Dev Notes)
 - AC5 (role‑aware optional) → Appendix notes; future extension

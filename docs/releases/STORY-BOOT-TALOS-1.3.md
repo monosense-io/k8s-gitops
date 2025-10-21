@@ -25,9 +25,9 @@ How To Produce Live Evidence (both clusters)
 1) End‑to‑end create or stepwise:
    - `task cluster:create-<cluster>`
    - or `task bootstrap:talos CLUSTER=<cluster>` → `task :bootstrap:phase:{0,1,2,3} CLUSTER=<cluster>`
-2) Verify readiness:
-   - `kubectl --context=<cluster> get nodes` (control planes Ready)
-   - `task cluster:health CLUSTER=<cluster>`
+2) Verify API reachability (Phase −1 scope):
+   - `kubectl --context=<cluster> cluster-info` responds
+   - (Node Ready will be validated by STORY‑BOOT‑CORE after CNI install)
 3) Re‑run to assert idempotency (short‑circuit messages, no errors)
 4) Save key excerpts to `docs/qa/evidence/BOOT-TALOS-live-<cluster>-YYYYMMDD.txt`
 
