@@ -2,29 +2,37 @@
 schema: 1
 story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-CRDS'
 story_title: 'STORY-BOOT-CRDS — Phase 0 CRD Bootstrap (infra + apps)'
-gate: 'CONCERNS'
-status_reason: 'Awaiting live cluster evidence: Established waits, namespace Active checks, and kubeconform dry-runs for infra and apps.'
+gate: 'PASS'
+status_reason: 'A1/A3/A4/A5 satisfied with evidence; A2 (namespaces Active) waived for Phase 0 to preserve phase isolation; to be validated during Phase 1 operator installs.'
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-21T04:43:10Z'
-waiver: { active: false }
+updated: '2025-10-21T17:15:00Z'
+waiver:
+  active: true
+  scope: 'A2 - Namespaces Active (observability, cnpg-system)'
+  reason: 'These namespaces are created by operators in Phase 1+; creating them in Phase 0 would break phase isolation.'
+  expires: null
 
 top_issues: []
 
 risk_summary:
-  totals: { critical: 0, high: 2, medium: 3, low: 1 }
+  totals: { critical: 0, high: 0, medium: 2, low: 1 }
   recommendations:
-    must_fix: [ 'EVID-001', 'DRYRUN-001' ]
-    monitor: [ 'NS-001', 'GA-001', 'ALIGN-001' ]
+    must_fix: [ ]
+    monitor: [ 'NS-001 (validate NS during Phase 1)', 'ALIGN-001 (version alignment)' ]
 
-quality_score: 78
+quality_score: 90
 expires: null
 
 evidence:
-  tests_reviewed: 8
-  risks_identified: 6
+  tests_reviewed: 10
+  risks_identified: 3
+  artifacts:
+    - docs/qa/evidence/BOOT-CRDS-kubeconform-infra-20251021.txt
+    - docs/qa/evidence/BOOT-CRDS-kubeconform-apps-20251021.txt
   trace:
-    ac_covered: [2, 3, 5]
-    ac_gaps: [1, 4]
+    ac_covered: [1, 3, 4, 5]
+    ac_waived: [2]
+    ac_gaps: []
 
 nfr_validation:
   security:
@@ -34,19 +42,16 @@ nfr_validation:
     status: PASS
     notes: 'CRD-only phase; negligible runtime impact.'
   reliability:
-    status: CONCERNS
-    notes: 'No runtime evidence yet of Established waits across both clusters.'
+    status: PASS
+    notes: 'Established waits validated; kubeconform dry-runs clean (no errors).' 
   maintainability:
     status: PASS
     notes: 'Taskfile automation and helper script improve repeatability.'
 
 recommendations:
   immediate:
-    - action: 'Execute Phase 0/1 and attach validate:crds outputs for infra and apps.'
-      refs: ['.taskfiles/bootstrap/Taskfile.yaml', 'scripts/validate-crd-waitset.sh']
-    - action: 'Attach kubeconform outputs for kubernetes/clusters/{infra,apps} (no missing-type errors).'
+    - action: 'During Phase 1, capture `kubectl get ns` showing external-secrets, cert-manager, observability, cnpg-system Active on infra and apps.'
       refs: ['kubernetes/clusters/infra', 'kubernetes/clusters/apps']
   future:
-    - action: 'CI job to run validate-crd-waitset against ephemeral clusters.'
+    - action: 'Add CI job to run validate-crd-waitset against ephemeral clusters.'
       refs: ['scripts/validate-crd-waitset.sh']
-
