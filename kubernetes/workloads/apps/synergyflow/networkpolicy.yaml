@@ -20,11 +20,11 @@ spec:
     - Egress
 
   ingress:
-    # Allow ingress from gateway
+    # Allow ingress from Gateway API implementation (Cilium Gateway runs in kube-system)
     - from:
         - namespaceSelector:
             matchLabels:
-              app.kubernetes.io/name: envoy-gateway
+              kubernetes.io/metadata.name: kube-system
       ports:
         - protocol: TCP
           port: 8080

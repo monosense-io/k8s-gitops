@@ -9,8 +9,8 @@ metadata:
     app.kubernetes.io/part-of: synergyflow
 spec:
   parentRefs:
-    - name: edge-gateway
-      namespace: envoy-gateway-system
+    - name: cilium-gateway
+      namespace: kube-system
   hostnames:
     - "synergyflow.${SECRET_DOMAIN}"
   rules:
@@ -21,4 +21,3 @@ spec:
       backendRefs:
         - name: synergyflow-backend
           port: 8080
-
