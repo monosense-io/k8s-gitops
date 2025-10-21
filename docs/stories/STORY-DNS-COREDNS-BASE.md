@@ -1,4 +1,6 @@
-# STORY-DNS-COREDNS-BASE — CoreDNS via GitOps
+# 07 — STORY-DNS-COREDNS-BASE — CoreDNS via GitOps
+
+Sequence: 07/13 | Prev: STORY-SEC-CERT-MANAGER-ISSUERS.md | Next: STORY-GITOPS-SELF-MGMT-FLUX.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -30,4 +32,3 @@ Manage CoreDNS via Flux with per‑cluster replica and ClusterIP settings, and e
 
 ## Definition of Done
 - ACs met; outputs attached to Dev Notes.
-

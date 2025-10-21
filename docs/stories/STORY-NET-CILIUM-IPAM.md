@@ -1,4 +1,6 @@
-# STORY-NET-CILIUM-IPAM — LB IP Pools via GitOps
+# 09 — STORY-NET-CILIUM-IPAM — LB IP Pools via GitOps
+
+Sequence: 09/13 | Prev: STORY-GITOPS-SELF-MGMT-FLUX.md | Next: STORY-NET-CILIUM-GATEWAY.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -31,4 +33,3 @@ Define LoadBalancer IP pools for infra and apps clusters using Cilium IPAM resou
 
 ## Definition of Done
 - ACs met; proof in Dev Notes.
-

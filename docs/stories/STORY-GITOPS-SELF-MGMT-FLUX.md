@@ -1,4 +1,6 @@
-# STORY-GITOPS-SELF-MGMT-FLUX — Flux Self‑Management via Operator/Instance
+# 08 — STORY-GITOPS-SELF-MGMT-FLUX — Flux Self‑Management via Operator/Instance
+
+Sequence: 08/13 | Prev: STORY-DNS-COREDNS-BASE.md | Next: STORY-NET-CILIUM-IPAM.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -33,4 +35,3 @@ Transition Flux controllers to self‑management using `flux-operator` and a `fl
 
 ## Definition of Done
 - ACs met on infra and apps; evidence recorded.
-

@@ -1,4 +1,6 @@
-# STORY-NET-CILIUM-CORE-GITOPS — Put Cilium Core under GitOps Control
+# 04 — STORY-NET-CILIUM-CORE-GITOPS — Put Cilium Core under GitOps Control
+
+Sequence: 04/13 | Prev: STORY-BOOT-CORE.md | Next: STORY-SEC-EXTERNAL-SECRETS-BASE.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -30,4 +32,3 @@ As a platform team, we want Cilium (CNI + operator) to be managed declaratively 
 ## Dev Notes
 - Initial bootstrap of Cilium is still required to allow Flux controllers to start; see `.taskfiles/bootstrap/Taskfile.yaml` `core:gitops`.
 - `kubernetes/infrastructure/cilium/ocirepository.yaml` semver aligned to 1.18.x for parity with bootstrap values.
-

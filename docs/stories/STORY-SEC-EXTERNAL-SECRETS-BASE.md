@@ -1,4 +1,6 @@
-# STORY-SEC-EXTERNAL-SECRETS-BASE — External Secrets Operator Base
+# 05 — STORY-SEC-EXTERNAL-SECRETS-BASE — External Secrets Operator Base
+
+Sequence: 05/13 | Prev: STORY-NET-CILIUM-CORE-GITOPS.md | Next: STORY-SEC-CERT-MANAGER-ISSUERS.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -33,4 +35,3 @@ Deploy External Secrets operator via Flux and configure a ClusterSecretStore (1P
 
 ## Definition of Done
 - ACs met on both clusters with evidence.
-

@@ -1,4 +1,6 @@
-# STORY-NET-CILIUM-CLUSTERMESH — Cross-Cluster Connectivity
+# 12 — STORY-NET-CILIUM-CLUSTERMESH — Cross-Cluster Connectivity
+
+Sequence: 12/13 | Prev: STORY-NET-CILIUM-BGP.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -32,4 +34,3 @@ Enable Cilium ClusterMesh between infra and apps using a shared ExternalSecret f
 
 ## Definition of Done
 - ACs met; Dev Notes include command outputs.
-

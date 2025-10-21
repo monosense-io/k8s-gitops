@@ -1,4 +1,6 @@
-# STORY-SEC-CERT-MANAGER-ISSUERS — Issuers and Wildcard Certificates
+# 06 — STORY-SEC-CERT-MANAGER-ISSUERS — Issuers and Wildcard Certificates
+
+Sequence: 06/13 | Prev: STORY-SEC-EXTERNAL-SECRETS-BASE.md | Next: STORY-DNS-COREDNS-BASE.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -33,4 +35,3 @@ Deploy cert-manager via Flux and configure ClusterIssuers (e.g., Let’s Encrypt
 
 ## Definition of Done
 - ACs met on both clusters; evidence in Dev Notes.
-

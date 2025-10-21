@@ -1,4 +1,6 @@
-# STORY-NET-CILIUM-BGP — Cilium BGP Policy via GitOps
+# 11 — STORY-NET-CILIUM-BGP — Cilium BGP Policy via GitOps
+
+Sequence: 11/13 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-NET-CILIUM-CLUSTERMESH.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -38,4 +40,3 @@ Publish Kubernetes Service VIPs and PodCIDRs to the upstream router using Cilium
 
 ## Definition of Done
 - ACs met on infra and apps; validation outputs recorded in Dev Notes.
-

@@ -1,4 +1,6 @@
-# STORY-NET-CILIUM-GATEWAY — Gateway API with Cilium
+# 10 — STORY-NET-CILIUM-GATEWAY — Gateway API with Cilium
+
+Sequence: 10/13 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-NET-CILIUM-BGP.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -36,4 +38,3 @@ Expose L7 HTTP(S) traffic using Gateway API implemented by Cilium, managed by Fl
 
 ## Definition of Done
 - ACs met on both clusters; evidence captured in Dev Notes.
-
