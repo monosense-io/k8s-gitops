@@ -12,9 +12,9 @@ tasks:
         --define "cluster={{.CLUSTER}}" \
         --define "pod_subnets={{.POD_SUBNETS}}" \
         --define "service_subnets={{.SERVICE_SUBNETS}}" \
-        {{.TALOS_DIR}}/machineconfig.yaml.j2 \
+        {{.TALOS_DIR}}/machineconfig-multicluster.yaml.j2 \
         | op inject \
-        | talosctl --nodes {{.NODE}} apply-config \
+        | talosctl --context {{.CLUSTER}} --nodes {{.NODE}} apply-config \
           --mode {{.MODE}} \
           --config-patch @{{.TALOS_DIR}}/{{.CLUSTER}}/{{.NODE}}.yaml \
           --file /dev/stdin {{if .INSECURE}}--insecure{{end}}
@@ -25,15 +25,17 @@ tasks:
       POD_SUBNETS: '{{ if eq .CLUSTER "infra" }}["10.244.0.0/16"]{{ else }}["10.246.0.0/16"]{{ end }}'
       SERVICE_SUBNETS: '{{ if eq .CLUSTER "infra" }}["10.245.0.0/16"]{{ else }}["10.247.0.0/16"]{{ end }}'
       INSECURE:
-        sh: talosctl --nodes {{.NODE}} get machineconfig &> /dev/null || echo true
+        sh: talosctl --context {{.CLUSTER}} --nodes {{.NODE}} get machineconfig &> /dev/null || echo true
     requires:
       vars: [NODE, CLUSTER]
     preconditions:
-      - op user get --me
+      - sh: op account list &> /dev/null
+        msg: "1Password CLI not authenticated. Run: eval $(op signin)"
       - talosctl config info
-      - test -f {{.TALOS_DIR}}/machineconfig.yaml.j2
+      - test -f {{.TALOS_DIR}}/machineconfig-multicluster.yaml.j2
       - test -f {{.TALOS_DIR}}/{{.CLUSTER}}/{{.NODE}}.yaml
-      - which curl jq minijinja-cli op talosctl
+      - sh: command -v minijinja-cli && command -v op && command -v talosctl
+        msg: "Missing required tools. Run preflight checks."
 
   re-apply-node:
     desc: Re-apply Talos config to a node [NODE=required] [CLUSTER=required] [MODE=auto]
@@ -43,9 +45,9 @@ tasks:
         --define "cluster={{.CLUSTER}}" \
         --define "pod_subnets={{.POD_SUBNETS}}" \
         --define "service_subnets={{.SERVICE_SUBNETS}}" \
-        {{.TALOS_DIR}}/machineconfig.yaml.j2 \
+        {{.TALOS_DIR}}/machineconfig-multicluster.yaml.j2 \
         | op inject \
-        | talosctl --nodes {{.NODE}} apply-config \
+        | talosctl --context {{.CLUSTER}} --nodes {{.NODE}} apply-config \
           --mode {{.MODE}} \
           --config-patch @{{.TALOS_DIR}}/{{.CLUSTER}}/{{.NODE}}.yaml \
           --file /dev/stdin {{if .INSECURE}}--insecure{{end}}
@@ -55,7 +57,7 @@ tasks:
       POD_SUBNETS: '{{ if eq .CLUSTER "infra" }}["10.244.0.0/16"]{{ else }}["10.246.0.0/16"]{{ end }}'
       SERVICE_SUBNETS: '{{ if eq .CLUSTER "infra" }}["10.245.0.0/16"]{{ else }}["10.247.0.0/16"]{{ end }}'
       INSECURE:
-        sh: talosctl --nodes {{.NODE}} get machineconfig &> /dev/null || echo true
+        sh: talosctl --context {{.CLUSTER}} --nodes {{.NODE}} get machineconfig &> /dev/null || echo true
       MACHINE_TYPE:
         sh: |-
           talosctl --nodes {{.NODE}} get machinetypes --output=jsonpath='{.spec}' 2> /dev/null \

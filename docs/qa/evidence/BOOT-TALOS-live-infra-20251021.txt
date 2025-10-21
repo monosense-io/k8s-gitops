@@ -1,0 +1,230 @@
+# STORY-BOOT-TALOS Phase -1 Evidence - infra cluster
+# Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+# Cluster: infra
+# Test Type: Phase -1 Talos Bootstrap ONLY
+
+## Summary
+Phase -1 (Talos Bootstrap) partially completed:
+- Config applied to all 3 control plane nodes
+- Bootstrap executed successfully on first node
+- etcd running on bootstrap node
+- Kubeconfig generated
+- Kubernetes API responding
+- Additional nodes having etcd join issues (network/timeout)
+
+## Node Configuration Status
+
+### Node 10.25.11.11 (infra-01) - Bootstrap Node
+node: 10.25.11.11
+metadata:
+    namespace: config
+    type: MachineConfigs.config.talos.dev
+    id: v1alpha1
+    version: 1
+    owner:
+    phase: running
+    created: 2025-10-21T06:45:51Z
+    updated: 2025-10-21T06:45:51Z
+spec: |
+    version: v1alpha1
+    machine:
+        type: controlplane
+        token: qle15j.6jtu0reh6o1mrx8x
+        ca:
+            crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQekNCOHFBREFnRUNBaEVBczJkUFZSRC9zL1RVeUt1bWlQQyt0ekFGQmdNclpYQXdFREVPTUF3R0ExVUUKQ2hNRmRHRnNiM013SGhjTk1qVXhNREUwTVRBeU56VTJXaGNOTXpVeE1ERXlNVEF5TnpVMldqQVFNUTR3REFZRApWUVFLRXdWMFlXeHZjekFxTUFVR0F5dGxjQU1oQUFuWlV6b1NQS1M5SWlXeWhWNVBtQnpIaGRpM1ZxblNZNkpCCk1CR0c4ME5JbzJFd1h6QU9CZ05WSFE4QkFmOEVCQU1DQW9Rd0hRWURWUjBsQkJZd0ZBWUlLd1lCQlFVSEF3RUcKQ0NzR0FRVUZCd01DTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3SFFZRFZSME9CQllFRkRib0JmeFpIdDMvU3FhcQpGQzlIRmw4bFVsbkpNQVVHQXl0bGNBTkJBTTJnRWRHb2owYTloZFd6L0tkMWpqR3FDdzZ5QURVSlJvRWRqNi9GCk9XMnIvYmNPTCt6cGhVUVA1RGRVNUJDb1ZCSHUzaFlaY3dXNnZ5R1lDNWpyWGdjPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+            key: LS0tLS1CRUdJTiBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0KTUM0Q0FRQXdCUVlESzJWd0JDSUVJSURwWjQ4Z1BrclhTRHozYW50QU43K2c3WTBYZGhNMkdJRG1zdEgrZzhNZQotLS0tLUVORCBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0K
+        certSANs: []
+        kubelet:
+            image: ghcr.io/siderolabs/kubelet:v1.34.1
+            extraConfig:
+                featureGates:
+                    ImageVolume: true
+                serializeImagePulls: false
+            defaultRuntimeSeccompProfileEnabled: true
+            nodeIP:
+                validSubnets:
+                    - 10.25.11.0/24
+            disableManifestsDirectory: true
+        network:
+            hostname: infra-01
+            interfaces:
+                - interface: eno1
+                  ignore: true
+                - interface: bond0
+                  addresses:
+                    - 10.25.11.11/24
+                  routes:
+                    - network: 0.0.0.0/0
+                      gateway: 10.25.11.1
+                  bond:
+                    interfaces: []
+                    deviceSelectors:
+                        - hardwareAddr: f8:f2:1e:20:57:*
+                          driver: i40e
+                    mode: 802.3ad
+                    xmitHashPolicy: layer3+4
+                    lacpRate: fast
+                    miimon: 100
+
+### Node 10.25.11.12 (infra-02)
+node: 10.25.11.12
+metadata:
+    namespace: config
+    type: MachineConfigs.config.talos.dev
+    id: v1alpha1
+    version: 1
+    owner:
+    phase: running
+    created: 2025-10-21T06:46:04Z
+    updated: 2025-10-21T06:46:04Z
+spec: |
+    version: v1alpha1
+    machine:
+        type: controlplane
+        token: qle15j.6jtu0reh6o1mrx8x
+        ca:
+            crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQekNCOHFBREFnRUNBaEVBczJkUFZSRC9zL1RVeUt1bWlQQyt0ekFGQmdNclpYQXdFREVPTUF3R0ExVUUKQ2hNRmRHRnNiM013SGhjTk1qVXhNREUwTVRBeU56VTJXaGNOTXpVeE1ERXlNVEF5TnpVMldqQVFNUTR3REFZRApWUVFLRXdWMFlXeHZjekFxTUFVR0F5dGxjQU1oQUFuWlV6b1NQS1M5SWlXeWhWNVBtQnpIaGRpM1ZxblNZNkpCCk1CR0c4ME5JbzJFd1h6QU9CZ05WSFE4QkFmOEVCQU1DQW9Rd0hRWURWUjBsQkJZd0ZBWUlLd1lCQlFVSEF3RUcKQ0NzR0FRVUZCd01DTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3SFFZRFZSME9CQllFRkRib0JmeFpIdDMvU3FhcQpGQzlIRmw4bFVsbkpNQVVHQXl0bGNBTkJBTTJnRWRHb2owYTloZFd6L0tkMWpqR3FDdzZ5QURVSlJvRWRqNi9GCk9XMnIvYmNPTCt6cGhVUVA1RGRVNUJDb1ZCSHUzaFlaY3dXNnZ5R1lDNWpyWGdjPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+            key: LS0tLS1CRUdJTiBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0KTUM0Q0FRQXdCUVlESzJWd0JDSUVJSURwWjQ4Z1BrclhTRHozYW50QU43K2c3WTBYZGhNMkdJRG1zdEgrZzhNZQotLS0tLUVORCBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0K
+        certSANs: []
+        kubelet:
+            image: ghcr.io/siderolabs/kubelet:v1.34.1
+            extraConfig:
+                featureGates:
+                    ImageVolume: true
+                serializeImagePulls: false
+            defaultRuntimeSeccompProfileEnabled: true
+            nodeIP:
+                validSubnets:
+                    - 10.25.11.0/24
+            disableManifestsDirectory: true
+        network:
+            hostname: infra-02
+            interfaces:
+                - interface: eno1
+                  ignore: true
+                - interface: bond0
+                  addresses:
+                    - 10.25.11.12/24
+                  routes:
+                    - network: 0.0.0.0/0
+                      gateway: 10.25.11.1
+                  bond:
+                    interfaces: []
+                    deviceSelectors:
+                        - hardwareAddr: 3c:fd:fe:35:10:*
+                          driver: i40e
+                    mode: 802.3ad
+                    xmitHashPolicy: layer3+4
+                    lacpRate: fast
+                    miimon: 100
+
+### Node 10.25.11.13 (infra-03)
+node: 10.25.11.13
+metadata:
+    namespace: config
+    type: MachineConfigs.config.talos.dev
+    id: v1alpha1
+    version: 1
+    owner:
+    phase: running
+    created: 2025-10-21T06:46:08Z
+    updated: 2025-10-21T06:46:08Z
+spec: |
+    version: v1alpha1
+    machine:
+        type: controlplane
+        token: qle15j.6jtu0reh6o1mrx8x
+        ca:
+            crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJQekNCOHFBREFnRUNBaEVBczJkUFZSRC9zL1RVeUt1bWlQQyt0ekFGQmdNclpYQXdFREVPTUF3R0ExVUUKQ2hNRmRHRnNiM013SGhjTk1qVXhNREUwTVRBeU56VTJXaGNOTXpVeE1ERXlNVEF5TnpVMldqQVFNUTR3REFZRApWUVFLRXdWMFlXeHZjekFxTUFVR0F5dGxjQU1oQUFuWlV6b1NQS1M5SWlXeWhWNVBtQnpIaGRpM1ZxblNZNkpCCk1CR0c4ME5JbzJFd1h6QU9CZ05WSFE4QkFmOEVCQU1DQW9Rd0hRWURWUjBsQkJZd0ZBWUlLd1lCQlFVSEF3RUcKQ0NzR0FRVUZCd01DTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3SFFZRFZSME9CQllFRkRib0JmeFpIdDMvU3FhcQpGQzlIRmw4bFVsbkpNQVVHQXl0bGNBTkJBTTJnRWRHb2owYTloZFd6L0tkMWpqR3FDdzZ5QURVSlJvRWRqNi9GCk9XMnIvYmNPTCt6cGhVUVA1RGRVNUJDb1ZCSHUzaFlaY3dXNnZ5R1lDNWpyWGdjPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+            key: LS0tLS1CRUdJTiBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0KTUM0Q0FRQXdCUVlESzJWd0JDSUVJSURwWjQ4Z1BrclhTRHozYW50QU43K2c3WTBYZGhNMkdJRG1zdEgrZzhNZQotLS0tLUVORCBFRDI1NTE5IFBSSVZBVEUgS0VZLS0tLS0K
+        certSANs: []
+        kubelet:
+            image: ghcr.io/siderolabs/kubelet:v1.34.1
+            extraConfig:
+                featureGates:
+                    ImageVolume: true
+                serializeImagePulls: false
+            defaultRuntimeSeccompProfileEnabled: true
+            nodeIP:
+                validSubnets:
+                    - 10.25.11.0/24
+            disableManifestsDirectory: true
+        network:
+            hostname: infra-03
+            interfaces:
+                - interface: eno1
+                  ignore: true
+                - interface: bond0
+                  addresses:
+                    - 10.25.11.13/24
+                  routes:
+                    - network: 0.0.0.0/0
+                      gateway: 10.25.11.1
+                  bond:
+                    interfaces: []
+                    deviceSelectors:
+                        - hardwareAddr: 3c:fd:fe:35:02:*
+                          driver: i40e
+                    mode: 802.3ad
+                    xmitHashPolicy: layer3+4
+                    lacpRate: fast
+                    miimon: 100
+
+## etcd Status
+
+### etcd Members
+NODE          ID                 HOSTNAME   PEER URLS                  CLIENT URLS                LEARNER
+10.25.11.11   1514f7a537dcc0d4   infra-01   https://10.25.11.11:2380   https://10.25.11.11:2379   false
+10.25.11.11   4417389304f056d4   infra-03   https://10.25.11.13:2380   https://10.25.11.13:2379   true
+
+### etcd Service Status on All Nodes
+Node 10.25.11.11:
+NODE     10.25.11.11
+ID       etcd
+STATE    Running
+HEALTH   OK
+EVENTS   [Running]: Health check successful (2m24s ago)
+         [Running]: Started task etcd (PID 3412) for container etcd (2m29s ago)
+         [Preparing]: Creating service runner (2m29s ago)
+         [Preparing]: Running pre state (2m29s ago)
+         [Waiting]: Waiting for volume "/var/lib" to be mounted, volume "ETCD" to be mounted, service "cri" to be "up", time sync, network, etcd spec (2m29s ago)
+         [Starting]: Starting service (2m29s ago)
+
+Node 10.25.11.12:
+NODE     10.25.11.12
+ID       etcd
+STATE    Preparing
+HEALTH   ?
+EVENTS   [Preparing]: Running pre state (16m16s ago)
+         [Waiting]: Waiting for time sync (16m27s ago)
+         [Waiting]: Waiting for service "cri" to be "up", time sync (16m28s ago)
+         [Waiting]: Waiting for volume "/var/lib" to be mounted, volume "ETCD" to be mounted, service "cri" to be "up", time sync, network, etcd spec (16m29s ago)
+         [Starting]: Starting service (16m29s ago)
+
+Node 10.25.11.13:
+NODE                  10.25.11.13
+ID                    etcd
+STATE                 Running
+HEALTH                Fail
+LAST HEALTH MESSAGE   etcdserver: rpc not supported for learner
+EVENTS                [Running]: Health check failed: etcdserver: rpc not supported for learner (2m23s ago)
+                      [Running]: Started task etcd (PID 3390) for container etcd (2m28s ago)
+                      [Preparing]: Creating service runner (2m29s ago)
+                      [Preparing]: Running pre state (16m13s ago)
+                      [Waiting]: Waiting for time sync (16m23s ago)
+                      [Waiting]: Waiting for service "cri" to be "up", time sync (16m24s ago)
+                      [Waiting]: Waiting for volume "/var/lib" to be mounted, volume "ETCD" to be mounted, service "cri" to be "up", time sync, network, etcd spec (16m25s ago)
+                      [Starting]: Starting service (16m25s ago)
+
+## Kubernetes API Status
+
+NAME       STATUS     ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE          KERNEL-VERSION   CONTAINER-RUNTIME
+infra-01   NotReady   control-plane   50s   v1.34.1   10.25.11.11   <none>        Talos (v1.11.2)   6.12.48-talos    containerd://2.1.4
+infra-02   NotReady   control-plane   67s   v1.34.1   10.25.11.12   <none>        Talos (v1.11.2)   6.12.48-talos    containerd://2.1.4
+infra-03   NotReady   control-plane   70s   v1.34.1   10.25.11.13   <none>        Talos (v1.11.2)   6.12.48-talos    containerd://2.1.4
+
+## Cluster Member Discovery
+NODE          NAMESPACE   TYPE     ID         VERSION   HOSTNAME   MACHINE TYPE   OS                ADDRESSES
+10.25.11.11   cluster     Member   infra-01   19        infra-01   controlplane   Talos (v1.11.2)   ["10.25.11.11","fd33:b048:2428:75f:faf2:1eff:fe20:5720"]
+10.25.11.11   cluster     Member   infra-02   10        infra-02   controlplane   Talos (v1.11.2)   ["10.25.11.12","fd33:b048:2428:75f:3efd:feff:fe35:10e0"]
+10.25.11.11   cluster     Member   infra-03   3         infra-03   controlplane   Talos (v1.11.2)   ["10.25.11.13","fd33:b048:2428:75f:3efd:feff:fe35:260"]

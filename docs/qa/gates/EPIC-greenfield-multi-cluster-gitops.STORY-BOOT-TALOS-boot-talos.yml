@@ -4,6 +4,10 @@ story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS'
 story_title: 'STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)'
 gate: 'CONCERNS'
 status_reason: 'Pending live-cluster validation: need execution evidence (Talos bootstrap, Kubernetes readiness, CRDs/core phases) for infra and apps; only dry-run evidence is present.'
+evidence:
+  files:
+    - docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt
+    - docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt
 reviewer: 'Quinn (Test Architect)'
 updated: '$DATE'
 waiver: { active: false }
@@ -11,9 +15,9 @@ waiver: { active: false }
 top_issues: []
 
 risk_summary:
-  totals: { critical: 0, high: 2, medium: 3, low: 2 }
+  totals: { critical: 0, high: 1, medium: 3, low: 2 }
   recommendations:
-    must_fix: ['EVID-LIVE-001', 'DRYRUN-L2-001']
+    must_fix: ['READY-001 (nodes Ready after Phase 2/3)', 'HEALTH-001 (cluster:health PASS)']
     monitor: ['TECH-003 (future worker scale-out)', 'OPS-002 (observability CRDs growth)']
 
 # Optional extended fields
@@ -36,14 +40,14 @@ nfr_validation:
     notes: 'No performance blockers in bootstrap path observed.'
   reliability:
     status: CONCERNS
-    notes: 'Idempotency and detector robustness look good on paper, but live bootstrap/re-run evidence is missing.'
+    notes: 'Phase −1 evidence received (apps ✓, infra partial). Need Phase 0–3 evidence for nodes Ready and health PASS.'
   maintainability:
     status: PASS
     notes: 'Story structure, mapping, and runbooks are clear.'
 
 recommendations:
   immediate:
-    - action: 'Execute Talos bring-up end-to-end on infra and apps, attach logs of T0–T5 from Taskfile.'
+    - action: 'Execute Phases 0–3 on infra and apps; attach logs of T0–T5 from Taskfile.'
       refs: ['.taskfiles/cluster/Taskfile.yaml']
     - action: 'Capture kubeconfig export + kubectl get nodes (Ready) for both contexts.'
       refs: ['kubernetes/kubeconfig']

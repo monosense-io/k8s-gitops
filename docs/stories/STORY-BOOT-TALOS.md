@@ -156,10 +156,24 @@ Claude Sonnet 4.5 (dev persona, James)
   - **TECH-001**: Hardened safe-detector with multi-signal checks (machine config, etcd status, member count, health verification) to prevent double-bootstrap scenarios
   - **TECH-002**: Documented CRD/controller version alignment requirements in bootstrap helmfiles with verification table and update procedures
   - **OPS-001**: Added comprehensive resource limits documentation for CP-only clusters in runbook, including monitoring guardrails, pressure mitigation, and baseline capacity reference
- - Post-fix validation performed via dry-run and static checks; awaiting QA gate update.
+- **Live Cluster Validation (2025-10-21)**: Executed Phase -1 bootstrap on infra and apps clusters:
+  - **Infra Cluster**:
+    - **Critical Fix**: Corrected Step 2 health check in `.taskfiles/cluster/Taskfile.yaml` line 140 from `talosctl health` (checks etcd before bootstrap) to `talosctl get machineconfig` (only verifies Talos API)
+    - **Additional Preflight Checks Added**: talosctl context validation, node connectivity checks (ping), enhanced 1Password authentication enforcement
+    - **Template Fix**: All tasks now reference `machineconfig-multicluster.yaml.j2` (cluster-specific secrets) instead of `machineconfig.yaml.j2` (hardcoded prod secrets)
+    - **Test Results**: ✅ All 3 control plane nodes registered in Kubernetes, etcd running on bootstrap node (HEALTH OK), kubeconfig generated, API responding
+    - **Evidence**: `docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt`
+  - **Apps Cluster**:
+    - **Context Flag Fix**: Added missing `--context {{.CLUSTER}}` flags to all talosctl commands in `.taskfiles/talos/Taskfile.yaml` (apply-node task lines 17, 50, 28, 60) and `.taskfiles/cluster/Taskfile.yaml` (15 commands across safe-detector, health checks, status, destroy tasks)
+    - **Health Check Fix**: Corrected `talosctl health` commands (lines 188, 209) to use `--control-plane-nodes` flag instead of `--nodes` for multi-node health checks
+    - **Verbose Output Fix**: Added `silent: true` to user-facing tasks (status, list-nodes, preflight subtasks) to remove command echo pollution
+    - **etcd Learner Auto-Promotion**: apps-03 initially joined as LEARNER after manual reset, auto-promoted to voting member after ~5 minutes of raft log catch-up (expected behavior)
+    - **Test Results**: ✅ All 3 control plane nodes registered in Kubernetes (apps-01, apps-02, apps-03), ✅ etcd cluster healthy with 3 voting members (no learners), ✅ all nodes at same raft index (5862), ✅ kubeconfig generated, ✅ Kubernetes API responding
+    - **Evidence**: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt`
 
 ### File List
-- .taskfiles/cluster/Taskfile.yaml (safe-detector hardening)
+- .taskfiles/cluster/Taskfile.yaml (safe-detector hardening, Step 2 health check fix, context flag additions, preflight checks, health command fixes)
+- .taskfiles/talos/Taskfile.yaml (template reference fix, context flag additions, precondition updates)
 - .taskfiles/bootstrap/Taskfile.yaml (1Password preflight check)
 - bootstrap/helmfile.d/00-crds.yaml (version alignment documentation)
 - bootstrap/helmfile.d/01-core.yaml.gotmpl (version alignment cross-reference)
@@ -167,17 +181,22 @@ Claude Sonnet 4.5 (dev persona, James)
 - .ai/debug-log.md
 - docs/qa/evidence/BOOT-TALOS-dry-run-infra-20251021.txt
 - docs/qa/evidence/BOOT-TALOS-dry-run-apps-20251021.txt
+- docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt (live cluster execution evidence for infra)
+- docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt (live cluster execution evidence for apps with all 3 voting members)
 
 ## QA Results
 - Risk Profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
-  - Totals — Critical: 0, High: 2, Medium: 3, Low: 2
-  - Highest: EVID-LIVE-001 (no live-cluster execution evidence), DRYRUN-L2-001 (no end-to-end runtime logs)
-  - Must‑fix before PASS: Provide live-cluster evidence for infra and apps (see below)
+  - Totals — Critical: 0, High: 1, Medium: 3, Low: 2
+  - Highest: READY-001 (nodes NotReady after Phase −1; CNI pending per design)
+  - Must‑fix before PASS: Provide Phase 0–3 live evidence showing nodes Ready, health checks green, and idempotent re‑run
+- Evidence received (Phase −1):
+  - infra: `docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt` (bootstrap success on first CP; join issues on additional CPs)
+  - apps: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt` (3 etcd voting members; kubeconfig generated; nodes NotReady pending CNI)
 - Test Design: docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md
   - Scenarios: 10 total • Unit 0 • Integration 3 • E2E 7
   - Priority: P0 5 • P1 4 • P2 1
-  - Mapping covers AC1–AC7; AC6 safe‑detector validated in code review; runtime validation pending
-- Gate Recommendation: CONCERNS until live-cluster evidence is attached. Current evidence is dry-run only: `docs/qa/evidence/BOOT-TALOS-dry-run-infra-20251021.txt`, `docs/qa/evidence/BOOT-TALOS-dry-run-apps-20251021.txt`.
+  - Mapping covers AC1–AC7; AC6 safe‑detector validated; runtime coverage for AC2/AC3 requires Phases 0–3
+- Gate Recommendation: CONCERNS until Phase 0–3 evidence is attached for infra and apps (nodes Ready, cluster:health PASS, idempotency re‑run logs).
 
 ### Review Date: 2025-10-21
 

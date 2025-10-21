@@ -119,15 +119,41 @@ tasks:
           exit 1
         fi
 
-        printf '  step 1: apply bootstrap control plane (%s)\n' "$BOOTSTRAP_NODE"
-        task --silent :talos:apply-node NODE="$BOOTSTRAP_NODE" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
+        printf '  step 1: apply config to all control planes (avoid op session timeout)\n'
+        printf '    • %s (bootstrap node)\n' "$BOOTSTRAP_NODE"
+        task --silent talos:apply-node NODE="$BOOTSTRAP_NODE" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
 
-        printf '  step 2: wait for Talos API...'
-        sleep 15
-        if talosctl --nodes "$BOOTSTRAP_NODE" health --wait-timeout 2m --server=false; then
-          echo " ok"
-        else
-          echo " failed"
+        ADDITIONAL_COUNT=0
+        for node in $ADDITIONAL_CP; do
+          if [ -n "$node" ]; then
+            ADDITIONAL_COUNT=$((ADDITIONAL_COUNT + 1))
+            printf '    • %s\n' "$node"
+            task --silent talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
+          fi
+        done
+        if [ "$ADDITIONAL_COUNT" -eq 0 ]; then
+          printf '    (no additional control planes)\n'
+        fi
+
+        printf '  step 2: wait for bootstrap node Talos API...'
+        RETRIES=0
+        MAX_RETRIES=20
+        WAIT_INTERVAL=15
+
+        while [ $RETRIES -lt $MAX_RETRIES ]; do
+          sleep $WAIT_INTERVAL
+          if talosctl --context "$CLUSTER" --nodes "$BOOTSTRAP_NODE" get machineconfig -o json &> /dev/null; then
+            echo " ok (after $((RETRIES * WAIT_INTERVAL + WAIT_INTERVAL)) seconds)"
+            break
+          fi
+          RETRIES=$((RETRIES + 1))
+          if [ $RETRIES -lt $MAX_RETRIES ]; then
+            printf "."
+          fi
+        done
+
+        if [ $RETRIES -eq $MAX_RETRIES ]; then
+          echo " failed (Talos API not responding after $((MAX_RETRIES * WAIT_INTERVAL)) seconds)"
           exit 1
         fi
 
@@ -135,31 +161,16 @@ tasks:
           printf '  step 3: bootstrap already healthy, skipping talosctl bootstrap\n'
         else
           printf '  step 3: talosctl bootstrap\n'
-          talosctl --nodes "$BOOTSTRAP_NODE" bootstrap
+          talosctl --context "$CLUSTER" --nodes "$BOOTSTRAP_NODE" bootstrap
           sleep 10
         fi
 
-        printf '  step 4: apply remaining control planes'
-        NODE_COUNT=0
-        for node in $ADDITIONAL_CP; do
-          if [ -n "$node" ]; then
-            NODE_COUNT=$((NODE_COUNT + 1))
-            printf '\n    • %s' "$node"
-            task --silent :talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
-            sleep 5
-          fi
-        done
-        if [ "$NODE_COUNT" -eq 0 ]; then
-          printf ' (none)'
-        fi
-        printf '\n'
-
-        printf '  step 5: wait for etcd status'
+        printf '  step 4: wait for etcd status'
         START_TIME=$(date +%s)
         ATTEMPTS=0
         MAX_ATTEMPTS=20
         WAIT_SECONDS=15
-        until talosctl --nodes "$BOOTSTRAP_NODE" etcd status >/dev/null 2>&1; do
+        until talosctl --context "$CLUSTER" --nodes "$BOOTSTRAP_NODE" etcd status >/dev/null 2>&1; do
           ATTEMPTS=$((ATTEMPTS + 1))
           if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
             ELAPSED=$(( $(date +%s) - START_TIME ))
@@ -173,8 +184,8 @@ tasks:
         printf ' ok (%ds)\n' "$ELAPSED"
 
         if [ -n "$CONTROLPLANE_CSV" ]; then
-          printf '  step 6: wait for control planes healthy...'
-          if talosctl --nodes "$CONTROLPLANE_CSV" health --wait-timeout 5m; then
+          printf '  step 5: wait for control planes healthy...'
+          if talosctl --context "$CLUSTER" health --nodes "$BOOTSTRAP_NODE" --control-plane-nodes "$CONTROLPLANE_CSV" --wait-timeout 5m; then
             echo " ok"
           else
             echo " failed"
@@ -183,19 +194,19 @@ tasks:
         fi
 
         if [ -n "$WORKER_NODES" ]; then
-          printf '  step 7: apply workers'
+          printf '  step 6: apply workers'
           WORKER_COUNT=0
           for node in $WORKER_NODES; do
             if [ -n "$node" ]; then
               WORKER_COUNT=$((WORKER_COUNT + 1))
               printf '\n    • %s' "$node"
-              task --silent :talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=worker
+              task --silent talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=worker
               sleep 5
             fi
           done
           if [ -n "$ALL_NODES_CSV" ]; then
-            printf '\n  step 8: wait for all nodes healthy...'
-            if talosctl --nodes "$ALL_NODES_CSV" health --wait-timeout 5m; then
+            printf '\n  step 7: wait for all nodes healthy...'
+            if talosctl --context "$CLUSTER" health --nodes "$BOOTSTRAP_NODE" --control-plane-nodes "$CONTROLPLANE_CSV" --worker-nodes "$WORKER_NODES" --wait-timeout 5m; then
               echo " ok"
             else
               echo " failed"
@@ -207,7 +218,7 @@ tasks:
         fi
 
         printf '  kubeconfig: generating\n'
-        task --silent :talos:generate-kubeconfig
+        task --silent talos:generate-kubeconfig
 
         printf 'Layer 1 complete.\n'
     vars:
@@ -290,26 +301,26 @@ tasks:
           fi
 
           # Check 1: Machine config must be applied
-          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} get machineconfig &>/dev/null; then
+          if ! talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} get machineconfig &>/dev/null; then
             echo false
             exit 0
           fi
 
           # Check 2: etcd status must be available
-          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null 2>&1; then
+          if ! talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null 2>&1; then
             echo false
             exit 0
           fi
 
           # Check 3: etcd must have at least one member
-          MEMBER_COUNT=$(talosctl --nodes {{.BOOTSTRAP_NODE}} etcd members 2>/dev/null | grep -c "{{.BOOTSTRAP_NODE}}" || echo "0")
+          MEMBER_COUNT=$(talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd members 2>/dev/null | grep -c "{{.BOOTSTRAP_NODE}}" || echo "0")
           if [ "$MEMBER_COUNT" -lt 1 ]; then
             echo false
             exit 0
           fi
 
           # Check 4: etcd health check
-          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | grep -q "true"; then
+          if ! talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | grep -q "true"; then
             echo false
             exit 0
           fi
@@ -357,7 +368,7 @@ tasks:
       # Verify etcd
       - echo ""
       - echo "🔍 Verifying etcd health..."
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+      - talosctl --context {{.CONTEXT}} --nodes {{.BOOTSTRAP_NODE}} etcd status
 
       - echo ""
       - 'echo "✅ Layer 2 Complete: Kubernetes is ready"'
@@ -449,10 +460,11 @@ tasks:
     internal: true
     cmds:
       - echo "🔍 Validating Talos layer..."
-      - talosctl --nodes {{.ALL_NODES}} health --wait-timeout 30s
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+      - talosctl --context {{.CLUSTER}} --nodes {{.ALL_NODES}} health --wait-timeout 30s
+      - talosctl --context {{.CLUSTER}} --nodes {{.BOOTSTRAP_NODE}} etcd status
       - echo "  ✅ Talos health check passed"
     vars:
+      CLUSTER: '{{.CLUSTER}}'
       BOOTSTRAP_NODE:
         sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//'
       ALL_NODES:
@@ -506,6 +518,7 @@ tasks:
 
   status:
     desc: 📊 Show complete cluster status (all layers)
+    silent: true
     cmds:
       - echo "=============================================="
       - 'echo "📊 Complete Cluster Status: {{.CLUSTER}}"'
@@ -517,8 +530,8 @@ tasks:
       - |
         for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
           if [ -n "$node" ]; then
-            if talosctl --nodes $node get members --output json &> /dev/null; then
-              VERSION=$(talosctl --nodes $node version --short 2>/dev/null | grep 'Tag:' | awk '{print $2}' || echo "unknown")
+            if talosctl --context "{{.CONTEXT}}" --nodes $node get members --output json &> /dev/null; then
+              VERSION=$(talosctl --context "{{.CONTEXT}}" --nodes $node version --short 2>/dev/null | grep 'Tag:' | awk '{print $2}' || echo "unknown")
               echo "    - $node: ✅ Online (Talos $VERSION)"
             else
               echo "    - $node: ❌ Offline"
@@ -528,7 +541,7 @@ tasks:
 
       - echo ""
       - echo "  Etcd:"
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | head -10 || echo "    ❌ Not available"
+      - talosctl --context {{.CONTEXT}} --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | head -10 || echo "    ❌ Not available"
 
       - echo ""
       - echo "🖥️  Kubernetes Layer:"
@@ -545,10 +558,10 @@ tasks:
       - echo ""
       - echo "⚠️  CRDs:"
       - |
-        VM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | grep -c victoriametrics || echo "0")
-        PROM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | grep -c monitoring.coreos || echo "0")
-        echo "  VictoriaMetrics CRDs: $VM_CRDS"
-        echo "  Prometheus CRDs: $PROM_CRDS"
+        VM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | { grep victoriametrics 2>/dev/null || true; } | wc -l | tr -d ' ')
+        PROM_CRDS=$(kubectl --context={{.CONTEXT}} get crd 2>/dev/null | { grep monitoring.coreos 2>/dev/null || true; } | wc -l | tr -d ' ')
+        echo "  VictoriaMetrics CRDs: ${VM_CRDS:-0}"
+        echo "  Prometheus CRDs: ${PROM_CRDS:-0}"
 
       - echo "=============================================="
     vars:
@@ -581,7 +594,7 @@ tasks:
         HEALTHY=true
         for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
           if [ -n "$node" ]; then
-            if talosctl --nodes $node health --wait-timeout 5s &> /dev/null; then
+            if talosctl --context "{{.CONTEXT}}" --nodes $node health --wait-timeout 5s &> /dev/null; then
               echo "  ✅ Talos node $node: Healthy"
             else
               echo "  ❌ Talos node $node: Unhealthy"
@@ -596,7 +609,7 @@ tasks:
         fi
       - 'kubectl --context={{.CONTEXT}} get nodes &> /dev/null && echo "✅ Kubernetes: Healthy" || echo "❌ Kubernetes: Unhealthy"'
       - 'kubectl --context={{.CONTEXT}} get crd prometheusrules.monitoring.coreos.com &> /dev/null && echo "✅ CRDs: Installed" || echo "❌ CRDs: Not installed"'
-      - 'flux --context={{.CONTEXT}} check --pre &> /dev/null && echo "✅ Flux: Healthy" || echo "❌ Flux: Not installed"'
+      - 'kubectl --context={{.CONTEXT}} get deployment -n flux-system source-controller &> /dev/null && echo "✅ Flux: Healthy" || echo "❌ Flux: Not installed"'
     vars:
       CLUSTER: '{{.CLUSTER | default "infra"}}'
       CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
@@ -642,7 +655,7 @@ tasks:
         for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
           if [ -n "$node" ]; then
             echo "  → Resetting node: $node"
-            talosctl --nodes $node reset --graceful=false --reboot 2>/dev/null || true
+            talosctl --context "{{.CONTEXT}}" --nodes $node reset --graceful=false --reboot 2>/dev/null || true
           fi
         done
 
@@ -659,7 +672,7 @@ tasks:
       - |
         for node in $(echo "{{.ALL_NODES}}" | tr ',' ' '); do
           if [ -n "$node" ]; then
-            if talosctl --nodes $node health --wait-timeout 5s &> /dev/null; then
+            if talosctl --context "{{.CONTEXT}}" --nodes $node health --wait-timeout 5s &> /dev/null; then
               echo "  ⚠️  Node $node is still responding (may be rebooting)"
             else
               echo "  ✅ Node $node is offline"
@@ -718,12 +731,16 @@ tasks:
       - task: preflight:tools
       - task: preflight:talos
         vars: {CLUSTER: "{{.CLUSTER}}"}
+      - task: preflight:talosctl-context
       - task: preflight:1password
+      - task: preflight:nodes
+        vars: {CLUSTER: "{{.CLUSTER}}"}
     vars:
-      CLUSTER: '{{.CLUSTER}}'
+      CLUSTER: '{{.CLUSTER | default "infra"}}'
 
   preflight:tools:
     internal: true
+    silent: true
     cmds:
       - echo "🔍 Checking required tools..."
       - |
@@ -746,10 +763,11 @@ tasks:
 
   preflight:talos:
     internal: true
+    silent: true
     cmds:
       - echo ""
       - echo "🔍 Checking Talos configuration..."
-      - test -f {{.TALOS_DIR}}/machineconfig.yaml.j2 || (echo "  ❌ machineconfig.yaml.j2 not found" && exit 1)
+      - test -f {{.TALOS_DIR}}/machineconfig-multicluster.yaml.j2 || (echo "  ❌ machineconfig-multicluster.yaml.j2 not found" && exit 1)
       - test -d {{.TALOS_DIR}}/{{.CLUSTER}} || (echo "  ❌ {{.CLUSTER}} directory not found" && exit 1)
       - |
         NODE_COUNT=$(find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | wc -l | tr -d ' ')
@@ -764,20 +782,66 @@ tasks:
 
   preflight:1password:
     internal: true
+    silent: true
     cmds:
       - echo ""
       - echo "🔍 Checking 1Password connectivity..."
       - |
-        if command -v op &> /dev/null; then
-          if op account list &> /dev/null 2>&1; then
-            echo "  ✅ 1Password CLI authenticated"
-          else
-            echo "  ⚠️  1Password CLI not authenticated"
-            echo "     Run: eval \$(op signin)"
-          fi
-        else
-          echo "  ⚠️  1Password CLI not installed (optional)"
+        if ! command -v op &> /dev/null; then
+          echo "  ❌ 1Password CLI not installed"
+          echo "     Install: brew install 1password-cli"
+          exit 1
         fi
+
+        if ! op account list &> /dev/null 2>&1; then
+          echo "  ❌ 1Password CLI not authenticated"
+          echo "     Run: eval \$(op signin)"
+          exit 1
+        fi
+
+        echo "  ✅ 1Password CLI authenticated"
+
+  preflight:talosctl-context:
+    internal: true
+    silent: true
+    cmds:
+      - echo ""
+      - echo "🔍 Checking talosctl context..."
+      - |
+        if ! talosctl config info &> /dev/null; then
+          echo "  ❌ talosctl not configured"
+          echo "     Run: talosctl config merge <config-file>"
+          exit 1
+        fi
+        echo "  ✅ talosctl context configured"
+
+  preflight:nodes:
+    internal: true
+    silent: true
+    cmds:
+      - echo ""
+      - echo "🔍 Checking node connectivity..."
+      - |
+        NODES=$(find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/.yaml//')
+        UNREACHABLE=""
+
+        for node in $NODES; do
+          if ping -c 1 -W 1 "$node" &> /dev/null; then
+            echo "  ✅ $node (reachable)"
+          else
+            echo "  ❌ $node (unreachable)"
+            UNREACHABLE="$UNREACHABLE $node"
+          fi
+        done
+
+        if [ -n "$UNREACHABLE" ]; then
+          echo ""
+          echo "❌ Unreachable nodes:$UNREACHABLE"
+          echo "   Verify network connectivity and node power state"
+          exit 1
+        fi
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
 
   # ============================================================================
   # Utility Tasks
@@ -785,6 +849,7 @@ tasks:
 
   list-nodes:
     desc: 📋 List all nodes for a cluster
+    silent: true
     cmds:
       - echo "Nodes for {{.CLUSTER}} cluster:"
       - |
