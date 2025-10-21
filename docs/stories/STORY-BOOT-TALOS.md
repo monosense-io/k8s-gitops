@@ -1,6 +1,6 @@
 # STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Status: Ready for Merge
+Status: Done
 Owner: Product → Platform Engineering
 Date: 2025-10-21
 Links: docs/architecture.md §6 (Bootstrap Architecture); .taskfiles/cluster/Taskfile.yaml; .taskfiles/bootstrap/Taskfile.yaml; talos/**; docs/epics/EPIC-greenfield-multi-cluster-gitops.md; docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md; docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md; docs/runbooks/bootstrapping-from-zero.md
@@ -231,6 +231,19 @@ Claude Sonnet 4.5 (dev persona, James)
   - Mapping covers AC1–AC7; AC2 runtime coverage focuses on kubeconfig export + API reachability (nodes Ready validated by STORY‑BOOT‑CORE).
 
 - Gate Recommendation: PASS — Phase −1 validated on infra and apps (kubeconfig export, API reachability, etcd multi‑member health). Node readiness will be validated by STORY‑BOOT‑CORE.
+
+## PO Validation (Final)
+
+Status: Done — Accepted
+Date: 2025-10-21
+
+Summary
+- QA Gate: PASS for Phase −1 on infra and apps.
+- Evidence: API reachable via kubectl cluster-info and etcd multi‑member health for both clusters.
+- Scope note: Node readiness deferred to STORY‑BOOT‑CORE.
+
+Decision
+- Marking story Done. Proceed to CORE story for CNI and node readiness validation.
 
 ### Review Date: 2025-10-21
 
