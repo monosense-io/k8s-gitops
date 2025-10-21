@@ -170,6 +170,9 @@ graph TB
 ┃  ┣━ 📁 workloads/
 ┃  ┃  ┣━ 🏗️ platform/                    # platform apps (observability, registry, CICD, databases)
 ┃  ┃  ┗━ 👥 tenants/                     # optional multi‑tenant applications
+┃  ┣━ 📁 components/                     # reusable Kustomize components (namespaced building blocks)
+┃  ┃  ┣━ namespace/                      # standard namespace component with labels/PSS
+┃  ┃  ┗━ volsync/                        # app-level VolSync pieces: ExternalSecret, Replication{Source,Destination}, PVC restore
 ┣━ 📁 bootstrap/
 ┃  ┣━ 📄 helmfile.d/00-crds.yaml       # CRD-only phase
 ┃  ┣━ 📄 helmfile.d/01-apps.yaml       # ordered bootstrap charts (cilium→coredns→spegel→cert-manager→flux-operator→flux-instance)
@@ -188,6 +191,7 @@ graph TB
 | **🔧 Helmfile bootstrap** | Predictable, idempotent installation | Reliable cluster bring-up |
 | **📁 Cluster-specific settings** | `cluster-settings.yaml` per cluster | Environment-specific configuration |
 | **🔄 Git as source of truth** | Flux reconciles directories directly | No configuration drift |
+| **🧩 Components pattern** | Reusable, namespaced Kustomize components for app teams (e.g., VolSync) | Promotes consistency; no cluster-scoped side effects |
 
 ### 🔧 Bootstrap vs Day‑2 Management
 

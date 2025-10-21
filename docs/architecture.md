@@ -170,6 +170,9 @@ graph TB
 ┃  ┣━ 📁 workloads/
 ┃  ┃  ┣━ 🏗️ platform/                    # platform apps (observability, registry, CICD, databases)
 ┃  ┃  ┗━ 👥 tenants/                     # optional multi‑tenant applications
+┃  ┣━ 📁 components/                     # reusable Kustomize components (namespaced building blocks)
+┃  ┃  ┣━ namespace/                      # standard namespace component with labels/PSS
+┃  ┃  ┗━ volsync/                        # app-level VolSync pieces: ExternalSecret, Replication{Source,Destination}, PVC restore
 ┣━ 📁 bootstrap/
 ┃  ┣━ 📄 helmfile.d/00-crds.yaml       # CRD-only phase
 ┃  ┣━ 📄 helmfile.d/01-apps.yaml       # ordered bootstrap charts (cilium→coredns→spegel→cert-manager→flux-operator→flux-instance)
@@ -188,6 +191,7 @@ graph TB
 | **🔧 Helmfile bootstrap** | Predictable, idempotent installation | Reliable cluster bring-up |
 | **📁 Cluster-specific settings** | `cluster-settings.yaml` per cluster | Environment-specific configuration |
 | **🔄 Git as source of truth** | Flux reconciles directories directly | No configuration drift |
+| **🧩 Components pattern** | Reusable, namespaced Kustomize components for app teams (e.g., VolSync) | Promotes consistency; no cluster-scoped side effects |
 
 ### 🔧 Bootstrap vs Day‑2 Management
 
@@ -195,6 +199,14 @@ graph TB
 | :--- | :--- | :--- |
 | **🚀 Bootstrap** | Helmfile + Task | Core infrastructure installation (Cilium, Flux) |
 | **📅 Day‑2** | Flux | All ongoing configuration management via Git |
+
+### 🧩 Components Usage
+
+- Components live under `kubernetes/components/` and are imported by app/team overlays as Kustomize components.
+- Examples:
+  - `components/namespace`: standard namespace with labels and PSS defaults
+  - `components/volsync`: VolSync app artifacts (ExternalSecret with MinIO S3 env vars, ReplicationSource/ReplicationDestination, optional PVC restore)
+- Components are namespaced and safe to apply per‑team; they do not create cluster‑scoped controllers. Controllers (e.g., VolSync operator, snapshot-controller) are deployed under `workloads/platform/**` and wired by cluster Kustomizations.
 
 ---
 
