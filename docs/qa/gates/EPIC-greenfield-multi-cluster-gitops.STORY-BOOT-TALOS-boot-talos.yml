@@ -3,7 +3,7 @@ schema: 1
 story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS'
 story_title: 'STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)'
 gate: 'CONCERNS'
-status_reason: 'Pending live-cluster validation: need execution evidence (Talos bootstrap, Kubernetes readiness, CRDs/core phases) for infra and apps; only dry-run evidence is present.'
+status_reason: 'Pending Phase −1 live-cluster validation: need execution evidence of kubeconfig export, API reachability (cluster-info), and Talos/etcd health for infra and apps. Node readiness is validated by STORY-BOOT-CORE.'
 evidence:
   files:
     - docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt
@@ -17,7 +17,7 @@ top_issues: []
 risk_summary:
   totals: { critical: 0, high: 1, medium: 3, low: 2 }
   recommendations:
-    must_fix: ['READY-001 (nodes Ready after Phase 2/3)', 'HEALTH-001 (cluster:health PASS)']
+    must_fix: ['API-001 (cluster-info reachable on infra/apps)', 'ETCD-001 (Talos etcd health evidence)']
     monitor: ['TECH-003 (future worker scale-out)', 'OPS-002 (observability CRDs growth)']
 
 # Optional extended fields
@@ -40,14 +40,14 @@ nfr_validation:
     notes: 'No performance blockers in bootstrap path observed.'
   reliability:
     status: CONCERNS
-    notes: 'Phase −1 evidence received (apps ✓, infra partial). Need Phase 0–3 evidence for nodes Ready and health PASS.'
+    notes: 'Phase −1 evidence received (apps ✓, infra partial). Need Phase −1 evidence for both clusters (API reachable, etcd healthy). Nodes Ready validated in STORY-BOOT-CORE.'
   maintainability:
     status: PASS
     notes: 'Story structure, mapping, and runbooks are clear.'
 
 recommendations:
   immediate:
-    - action: 'Execute Phases 0–3 on infra and apps; attach logs of T0–T5 from Taskfile.'
+    - action: 'Execute Phase −1 (Talos bootstrap) on infra and apps; attach kubeconfig, cluster-info, and etcd status outputs.'
       refs: ['.taskfiles/cluster/Taskfile.yaml']
     - action: 'Capture kubeconfig export + kubectl get nodes (Ready) for both contexts.'
       refs: ['kubernetes/kubeconfig']

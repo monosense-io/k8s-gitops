@@ -39,6 +39,7 @@ Non‑Goals
 ## Acceptance Criteria
 1) Phase separation respected: Helmfile for core installs controllers only; no CRDs are created here. A `helmfile template` of `bootstrap/helmfile.d/01-core.yaml.gotmpl` shows zero CustomResourceDefinition kinds.
 2) On both clusters, the following are Ready:
+   - Control plane nodes (selector `node-role.kubernetes.io/control-plane`) are Ready (CNI operational).
    - Cilium DaemonSet and Operator (Ready/Available across all nodes).
    - CoreDNS Deployment replicas match `cluster-settings.yaml` (infra: 2; apps: 2) and are Available.
    - External Secrets controller Deployment Available in `external-secrets` namespace.

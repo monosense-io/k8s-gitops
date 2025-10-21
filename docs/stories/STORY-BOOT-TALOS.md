@@ -42,7 +42,8 @@ Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
    - `task cluster:create-<cluster>` completes end‑to‑end, OR
    - `task bootstrap:talos` → `task bootstrap:phase:{0,1,2,3}` completes for <cluster>.
 2) Kubeconfig is exported to `kubernetes/kubeconfig` and contexts `infra` and `apps` are usable:
-   - `kubectl --context=<cluster> get nodes` shows all control planes Ready.
+   - `kubectl --context=<cluster> cluster-info` responds (API reachable).
+   - Note: Nodes may be NotReady until CNI is installed by STORY-BOOT-CORE.
 3) Health gate passes: `task cluster:health CLUSTER=<cluster>` reports Talos/K8s/CRDs/Flux healthy.
 4) Idempotency:
    - Re‑running `task cluster:create-<cluster>` or `task bootstrap:talos` short‑circuits without error.
@@ -187,16 +188,16 @@ Claude Sonnet 4.5 (dev persona, James)
 ## QA Results
 - Risk Profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
   - Totals — Critical: 0, High: 1, Medium: 3, Low: 2
-  - Highest: READY-001 (nodes NotReady after Phase −1; CNI pending per design)
-  - Must‑fix before PASS: Provide Phase 0–3 live evidence showing nodes Ready, health checks green, and idempotent re‑run
+  - Highest: API-001 (need live evidence that `cluster-info` responds for both contexts)
+  - Must‑fix before PASS: Provide Phase −1 live evidence showing kubeconfig exported, API reachable, and Talos/etcd health for both clusters
 - Evidence received (Phase −1):
   - infra: `docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt` (bootstrap success on first CP; join issues on additional CPs)
-  - apps: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt` (3 etcd voting members; kubeconfig generated; nodes NotReady pending CNI)
+  - apps: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt` (3 etcd voting members; kubeconfig generated; nodes NotReady expected until CNI)
 - Test Design: docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md
   - Scenarios: 10 total • Unit 0 • Integration 3 • E2E 7
   - Priority: P0 5 • P1 4 • P2 1
-  - Mapping covers AC1–AC7; AC6 safe‑detector validated; runtime coverage for AC2/AC3 requires Phases 0–3
-- Gate Recommendation: CONCERNS until Phase 0–3 evidence is attached for infra and apps (nodes Ready, cluster:health PASS, idempotency re‑run logs).
+  - Mapping covers AC1–AC7; AC6 safe‑detector validated; runtime coverage for AC2 focuses on kubeconfig export + API reachability (nodes Ready validated by STORY‑BOOT‑CORE)
+- Gate Recommendation: CONCERNS until Phase −1 evidence is complete for both clusters (kubeconfig export, API reachable, Talos/etcd health). Node Ready will be validated by STORY‑BOOT‑CORE.
 
 ### Review Date: 2025-10-21
 
@@ -243,14 +244,14 @@ Risk profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
 NFR assessment: Security PASS; Reliability CONCERNS pending runtime evidence; Performance/Maintainability PASS
 
 ### Evidence To Collect (both clusters: infra, apps)
-- Phase −1 to 3 logs via Taskfile:
-  - `task cluster:create-<cluster>` OR stepwise `task bootstrap:talos` → `task :bootstrap:phase:{0,1,2,3}`
-- Kubeconfig and node readiness:
-  - `kubectl --context=<cluster> get nodes` shows control planes Ready
-- Health gate:
-  - `task cluster:health CLUSTER=<cluster>` outputs
+- Phase −1 logs via Taskfile:
+  - `task bootstrap:talos CLUSTER=<cluster>` (or `task cluster:create-<cluster>` through Phase −1)
+- Kubeconfig and API reachability:
+  - Kubeconfig file exists under `kubernetes/kubeconfig`; `kubectl --context=<cluster> cluster-info` responds
+- Talos/etcd health:
+  - `talosctl --nodes <bootstrap-node> etcd status` success; etcd members healthy
 - Idempotency:
-  - Re-run bootstrap tasks; confirm short-circuit/skip behavior and no errors
+  - Re-run Phase −1; confirm detector skip and no errors
 - Save key excerpts under `docs/qa/evidence/BOOT-TALOS-live-<cluster>-YYYYMMDD.txt`
 
 ### Recommended Status
