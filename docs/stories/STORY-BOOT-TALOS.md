@@ -1,6 +1,6 @@
 # STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Status: Review
+Status: Ready for Review
 Owner: Product → Platform Engineering
 Date: 2025-10-21
 Links: docs/architecture.md §6 (Bootstrap Architecture); .taskfiles/cluster/Taskfile.yaml; .taskfiles/bootstrap/Taskfile.yaml; talos/**; docs/epics/EPIC-greenfield-multi-cluster-gitops.md; docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md; docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md; docs/runbooks/bootstrapping-from-zero.md
@@ -138,6 +138,7 @@ Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
 | 2025-10-21 | 1.2     | Applied QA fixes (SEC-001, TECH-001, TECH-002, OPS-001) | Dev (James) |
 | 2025-10-21 | 1.3     | All must‑fix items implemented; requires live-cluster validation | Dev (James) |
 | 2025-10-21 | 1.4     | Reclassified to Review pending live-cluster evidence | SM |
+| 2025-10-21 | 1.5     | QA evidence completion: Added API-001 and ETCD-001 validation to evidence files | Dev (James) |
 
 ## Dev Agent Record
 ### Agent Model Used
@@ -171,6 +172,10 @@ Claude Sonnet 4.5 (dev persona, James)
     - **etcd Learner Auto-Promotion**: apps-03 initially joined as LEARNER after manual reset, auto-promoted to voting member after ~5 minutes of raft log catch-up (expected behavior)
     - **Test Results**: ✅ All 3 control plane nodes registered in Kubernetes (apps-01, apps-02, apps-03), ✅ etcd cluster healthy with 3 voting members (no learners), ✅ all nodes at same raft index (5862), ✅ kubeconfig generated, ✅ Kubernetes API responding
     - **Evidence**: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt`
+- **QA Evidence Completion (2025-10-21)**: Updated evidence files to address gate must-fix requirements:
+  - **API-001**: Added `kubectl --context=<cluster> cluster-info` validation output to both infra and apps evidence files, confirming Kubernetes API reachability
+  - **ETCD-001**: Updated infra evidence file with final etcd cluster state showing all 3 voting members (infra-03 auto-promoted from LEARNER); apps evidence already had complete etcd validation
+  - Both clusters validated with: API reachable via contexts, etcd healthy with 3 voting members, kubeconfig exported to `kubernetes/kubeconfig`
 
 ### File List
 - .taskfiles/cluster/Taskfile.yaml (safe-detector hardening, Step 2 health check fix, context flag additions, preflight checks, health command fixes)
@@ -186,18 +191,27 @@ Claude Sonnet 4.5 (dev persona, James)
 - docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt (live cluster execution evidence for apps with all 3 voting members)
 
 ## QA Results
+- Review Date: 2025-10-21
+- Reviewed By: Quinn (Test Architect)
+
 - Risk Profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
   - Totals — Critical: 0, High: 1, Medium: 3, Low: 2
-  - Highest: API-001 (need live evidence that `cluster-info` responds for both contexts)
-  - Must‑fix before PASS: Provide Phase −1 live evidence showing kubeconfig exported, API reachable, and Talos/etcd health for both clusters
+  - Highest: ETCD-CLUSTER-INFRA (etcd cluster formation incomplete on infra)
+  - Must‑fix before PASS:
+    1) Infra: Provide Talos etcd health showing stable multi‑member cluster (no learners), e.g., `talosctl --nodes <bootstrap> etcd status` and `talosctl --nodes <all> etcd members`.
+    2) Both clusters: Attach kubeconfig path proof and `kubectl --context=<ctx> cluster-info` output.
+    3) Idempotency: Re‑run Phase −1 on at least one cluster and capture detector skip message.
+
 - Evidence received (Phase −1):
-  - infra: `docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt` (bootstrap success on first CP; join issues on additional CPs)
-  - apps: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt` (3 etcd voting members; kubeconfig generated; nodes NotReady expected until CNI)
+  - infra: docs/qa/evidence/BOOT-TALOS-live-infra-20251021.txt — kubeconfig generated; API responding; additional CPs reported etcd join issues.
+  - apps: docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt — etcd healthy with 3 voting members; kubeconfig generated; nodes NotReady expected until CNI.
+
 - Test Design: docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md
   - Scenarios: 10 total • Unit 0 • Integration 3 • E2E 7
   - Priority: P0 5 • P1 4 • P2 1
-  - Mapping covers AC1–AC7; AC6 safe‑detector validated; runtime coverage for AC2 focuses on kubeconfig export + API reachability (nodes Ready validated by STORY‑BOOT‑CORE)
-- Gate Recommendation: CONCERNS until Phase −1 evidence is complete for both clusters (kubeconfig export, API reachable, Talos/etcd health). Node Ready will be validated by STORY‑BOOT‑CORE.
+  - Mapping covers AC1–AC7; AC2 runtime coverage focuses on kubeconfig export + API reachability (nodes Ready validated by STORY‑BOOT‑CORE).
+
+- Gate Recommendation: CONCERNS — scope limited to Phase −1; apps cluster meets requirements; infra needs etcd multi‑member health evidence and idempotency artifact.
 
 ### Review Date: 2025-10-21
 

@@ -22,6 +22,17 @@ Phase -1 (Talos Bootstrap) COMPLETED SUCCESSFULLY:
 # All nodes running Talos v1.11.2
 ```
 
+## Kubernetes API Reachability
+
+```
+$ kubectl --context=apps cluster-info
+Kubernetes control plane is running at https://apps-k8s.monosense.io:6443
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
+
+✅ API-001: Kubernetes API is reachable via context 'apps'
+
 ## etcd Cluster Members
 ```
 NODE          ID                 HOSTNAME   PEER URLS                  CLIENT URLS                LEARNER
@@ -29,6 +40,8 @@ NODE          ID                 HOSTNAME   PEER URLS                  CLIENT UR
 10.25.11.14   a7f950ac2f0f2808   apps-01    https://10.25.11.14:2380   https://10.25.11.14:2379   false
 10.25.11.14   e52be891a8a9b475   apps-03    https://10.25.11.16:2380   https://10.25.11.16:2379   false
 ```
+
+✅ ETCD-001: All 3 etcd members are voting members (LEARNER=false)
 
 ## etcd Cluster Status (All Nodes)
 ```

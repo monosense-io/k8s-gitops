@@ -17,7 +17,7 @@ top_issues: []
 risk_summary:
   totals: { critical: 0, high: 1, medium: 3, low: 2 }
   recommendations:
-    must_fix: ['API-001 (cluster-info reachable on infra/apps)', 'ETCD-001 (Talos etcd health evidence)']
+    must_fix: ['API-001 (cluster-info reachable on infra/apps)', 'ETCD-CLUSTER-INFRA (stable multi-member etcd on infra)', 'IDEMP-001 (detector skip on rerun)']
     monitor: ['TECH-003 (future worker scale-out)', 'OPS-002 (observability CRDs growth)']
 
 # Optional extended fields
@@ -47,7 +47,9 @@ nfr_validation:
 
 recommendations:
   immediate:
-    - action: 'Execute Phase −1 (Talos bootstrap) on infra and apps; attach kubeconfig, cluster-info, and etcd status outputs.'
+    - action: 'Execute/complete Phase −1 on infra and apps; attach kubeconfig path, cluster-info output, and etcd status/members (no learners).'
+      refs: ['.taskfiles/cluster/Taskfile.yaml']
+    - action: 'Demonstrate idempotency: re-run Phase −1 and capture detector skip log.'
       refs: ['.taskfiles/cluster/Taskfile.yaml']
     - action: 'Capture kubeconfig export + kubectl get nodes (Ready) for both contexts.'
       refs: ['kubernetes/kubeconfig']
