@@ -1,0 +1,35 @@
+=== Cluster Creation Dry-Run for infra ===
+
+Layer 1 dry-run (cluster=infra)
+  bootstrap: 10.25.11.11
+  control-planes: 10.25.11.12 10.25.11.13
+  workers: none
+  bootstrap action: run talosctl bootstrap
+  actions: apply control planes 10.25.11.11,10.25.11.12,10.25.11.13
+Dry-run complete.
+
+Layer 2: Kubernetes Waiting
+
+  - Wait for API server
+  - Wait for nodes Ready
+  - Verify etcd health
+
+Layer 3: CRD Bootstrap
+  - Install prerequisites
+  - Install VictoriaMetrics CRDs
+  - Install cert-manager CRDs
+  - Install external-secrets CRDs
+
+Layer 4: Core Infrastructure
+  - Deploy Cilium CNI
+  - Deploy CoreDNS
+  - Deploy cert-manager
+  - Deploy external-secrets
+  - Deploy Flux
+
+Layer 5: Validation
+  - Validate Talos health
+  - Validate Kubernetes health
+  - Validate CRDs
+  - Validate networking
+  - Validate Flux

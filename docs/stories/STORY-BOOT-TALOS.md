@@ -146,6 +146,7 @@ Codex GPT-5 (dev persona)
 - Implemented safe-detector aware bootstrap flow in `.taskfiles/cluster/Taskfile.yaml` to skip `talosctl bootstrap` when control plane is already healthy while preserving kubeconfig generation.
 - Added explicit dry-run path (via `DRY_RUN=true`) that prints succinct node ordering/actions without executing Talos commands and wired `task cluster:dry-run` to reuse it.
 - Introduced role-aware node ordering, with optional worker node application after control-plane readiness, consolidated Talos health checks, a retry-based etcd readiness gate, and silent dry-run output for clean operator logs.
+- Captured dry-run evidence for infra/apps in `docs/qa/evidence/BOOT-TALOS-dry-run-<cluster>-20251021.txt` to support QA gate review.
 
 ### File List
 - .taskfiles/cluster/Taskfile.yaml
