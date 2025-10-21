@@ -1,6 +1,6 @@
 # 22 — STORY-NET-SPEGEL-REGISTRY-MIRROR — Node-local OCI Registry Mirror (Flux-managed)
 
-Sequence: 22/22 | Prev: STORY-OBS-FLUENT-BIT.md
+Sequence: 22/23 | Prev: STORY-OBS-FLUENT-BIT.md | Next: STORY-BACKUP-VOLSYNC-APPS.md
 
 Status: Draft
 Owner: Platform Engineering

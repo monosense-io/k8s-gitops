@@ -39,6 +39,7 @@ Date: 2025-10-21
 
 - Sprint 6 (Jan 19–Jan 30, 2026)
   - STORY-NET-SPEGEL-REGISTRY-MIRROR (after OpenEBS is available)
+  - STORY-BACKUP-VOLSYNC-APPS (apps cluster → MinIO @ 10.25.11.3)
 
 ## Sequencing & Dependencies
 

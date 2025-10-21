@@ -6,5 +6,6 @@ resources:
   - flux-system
   - cluster-settings.yaml
   - infrastructure.yaml
+  - volsync.yaml
   - cicd.yaml
   - workloads.yaml

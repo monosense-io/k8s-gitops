@@ -1,0 +1,17 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: volsync
+  namespace: volsync-system
+spec:
+  groups:
+    - name: volsync.rules
+      rules:
+        - alert: VolSyncComponentAbsent
+          expr: absent(up{job="volsync-metrics"})
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: VolSync metrics are absent
