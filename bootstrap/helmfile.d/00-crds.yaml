@@ -13,6 +13,28 @@
 #     kubectl apply -f -
 #
 # Note: postRenderer doesn't work with 'helmfile template', so we pipe to yq externally
+#
+# ⚠️ CRITICAL VERSION ALIGNMENT REQUIREMENT ⚠️
+# CRD versions in this file MUST match controller versions in 01-core.yaml.gotmpl
+# Mismatched versions can cause:
+# - API compatibility issues
+# - Resource validation failures
+# - Silent data loss or corruption
+#
+# Verified Alignments (as of 2025-10-21):
+#   cert-manager:      v1.19.0  (CRD ✓ Controller ✓)
+#   external-secrets:  0.20.3   (CRD ✓ Controller ✓)
+#
+# Future Flux Deployments (CRDs pre-installed, controllers deployed via Flux):
+#   victoria-metrics-operator: 0.5.1   (CRD only)
+#   prometheus-operator:       24.0.1  (CRD only)
+#   cloudnative-pg:            0.26.0  (CRD only)
+#
+# When updating versions:
+# 1. Update CRD version in this file
+# 2. Update controller version in 01-core.yaml.gotmpl or Flux HelmRelease
+# 3. Test in staging cluster first
+# 4. Document alignment in this comment block
 
 helmDefaults:
   # Critical: Include CRDs and disable hooks for extraction

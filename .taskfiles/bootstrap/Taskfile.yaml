@@ -186,10 +186,31 @@ tasks:
     cmds:
       - |
         {{if eq .DRY_RUN "true"}}
+        echo "  → [DRY-RUN] Would check 1Password Connect Secret exists"
         echo "  → [DRY-RUN] Would sync core infrastructure via helmfile:"
         helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/01-core.yaml.gotmpl -e {{.CLUSTER}} list 2>/dev/null || echo "    (helm releases)"
         echo "  → [DRY-RUN] Would wait for Flux to be ready"
         {{else}}
+        echo "  → Checking 1Password Connect Secret..."
+        if ! kubectl --context={{.CONTEXT}} get secret onepassword-connect-token -n external-secrets &>/dev/null; then
+          echo ""
+          echo "❌ ERROR: 1Password Connect Secret not found!"
+          echo ""
+          echo "The secret 'onepassword-connect-token' must exist in namespace 'external-secrets'"
+          echo "before deploying core infrastructure (external-secrets controller requires it)."
+          echo ""
+          echo "To fix this issue:"
+          echo "  1. Ensure Phase 0 completed successfully (namespaces created)"
+          echo "  2. Apply prerequisites with secret injection:"
+          echo "     op inject -i bootstrap/prerequisites/resources.yaml | kubectl --context={{.CONTEXT}} apply -f -"
+          echo ""
+          echo "Or manually create the secret:"
+          echo "  kubectl --context={{.CONTEXT}} create secret generic onepassword-connect-token \\"
+          echo "    -n external-secrets --from-literal=token=YOUR_1PASSWORD_CONNECT_TOKEN"
+          echo ""
+          exit 1
+        fi
+        echo "    ✅ 1Password Connect Secret found"
         echo "  → Syncing core infrastructure via helmfile..."
         helmfile -f {{.BOOTSTRAP_DIR}}/helmfile.d/01-core.yaml.gotmpl -e {{.CLUSTER}} sync
         echo "  → Waiting for Flux to be ready..."

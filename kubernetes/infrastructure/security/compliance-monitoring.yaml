@@ -443,7 +443,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: compliance-automation
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: compliance-automation
     app.kubernetes.io/component: automation
@@ -917,7 +917,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: audit-trail-management
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: audit-trail-management
     app.kubernetes.io/component: audit-integrity

@@ -6,6 +6,10 @@
 # Usage:
 #   helmfile -e infra sync    # Bootstrap infra cluster
 #   helmfile -e apps sync     # Bootstrap apps cluster
+#
+# ⚠️ CRITICAL VERSION ALIGNMENT REQUIREMENT ⚠️
+# Controller versions in this file MUST match CRD versions in 00-crds.yaml
+# See 00-crds.yaml header for version alignment table and update procedure
 
 helmDefaults:
   cleanupOnFail: true

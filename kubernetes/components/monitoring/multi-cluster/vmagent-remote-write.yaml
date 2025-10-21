@@ -48,14 +48,13 @@ spec:
           target_label: instance
           regex: '([^:]+)(:[0-9]+)?'
           replacement: '${1}'
-        # Remove unnecessary labels
-        - regex: 'job'
+        # Remove unnecessary labels by name
+        - regex: 'job|endpoint'
           action: labeldrop
-        - regex: 'endpoint'
-          action: labeldrop
-        - regex: 'namespace'
-          regex: 'kube-system|monitoring|observability'
-          action: labeldrop
+        # Drop samples from specific namespaces (match by value)
+        - source_labels: [namespace]
+          regex: 'kube-system|observability'
+          action: drop
 
   # Scrape configuration
   scrapeInterval: 30s
@@ -167,9 +166,9 @@ spec:
     - job_name: 'cilium-agent'
       kubernetes_sd_configs:
         - role: endpoints
-        namespaces:
-          names:
-            - kube-system
+      namespaces:
+        names:
+          - kube-system
       relabel_configs:
         - source_labels: [__meta_kubernetes_service_name]
           action: keep
@@ -186,9 +185,9 @@ spec:
     - job_name: 'hubble-relay'
       kubernetes_sd_configs:
         - role: endpoints
-        namespaces:
-          names:
-            - kube-system
+      namespaces:
+        names:
+          - kube-system
       relabel_configs:
         - source_labels: [__meta_kubernetes_service_name]
           action: keep

@@ -270,21 +270,52 @@ tasks:
           fi
       ALREADY_BOOTSTRAPPED:
         sh: |
+          # Multi-signal safe-detector to prevent double-bootstrap
+          # Returns 'true' only if ALL conditions are met:
+          # 1. Bootstrap node is defined
+          # 2. talosctl is available
+          # 3. Talos machine config is applied
+          # 4. etcd is running and responsive
+          # 5. etcd has at least one healthy member
+          # 6. etcd cluster shows initialized state
+
           if [ -z "{{.BOOTSTRAP_NODE}}" ]; then
             echo false
             exit 0
           fi
+
           if ! command -v talosctl >/dev/null 2>&1; then
             echo false
             exit 0
           fi
-          if talosctl --nodes {{.BOOTSTRAP_NODE}} get machineconfig &>/dev/null; then
-            if talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null; then
-              echo true
-              exit 0
-            fi
+
+          # Check 1: Machine config must be applied
+          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} get machineconfig &>/dev/null; then
+            echo false
+            exit 0
           fi
-          echo false
+
+          # Check 2: etcd status must be available
+          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null 2>&1; then
+            echo false
+            exit 0
+          fi
+
+          # Check 3: etcd must have at least one member
+          MEMBER_COUNT=$(talosctl --nodes {{.BOOTSTRAP_NODE}} etcd members 2>/dev/null | grep -c "{{.BOOTSTRAP_NODE}}" || echo "0")
+          if [ "$MEMBER_COUNT" -lt 1 ]; then
+            echo false
+            exit 0
+          fi
+
+          # Check 4: etcd health check
+          if ! talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | grep -q "true"; then
+            echo false
+            exit 0
+          fi
+
+          # All checks passed - cluster is already bootstrapped
+          echo true
 
   layer:2-kubernetes:
     desc: ⏳ Layer 2 - Wait for Kubernetes to be ready

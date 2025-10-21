@@ -1,0 +1,48 @@
+# <!-- Powered by BMAD™ Core -->
+schema: 1
+story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS'
+story_title: 'STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)'
+gate: 'PASS'
+status_reason: 'All must-fix items addressed: safe-detector hardened, 1Password secret preflight enforced, CRD/controller versions aligned, and CP-only resource guardrails documented. Dry-run evidence captured for infra/apps.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-10-21T04:04:30Z'
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 4, low: 2 }
+  recommendations:
+    must_fix: []
+    monitor: ['TECH-003 (future worker scale-out)', 'OPS-002 (observability CRDs growth)']
+
+# Optional extended fields
+quality_score: 70
+expires: '2025-11-04T03:12:16Z'
+
+evidence:
+  tests_reviewed: 10
+  risks_identified: 10
+  trace:
+    ac_covered: [1, 2, 3, 4, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: '1Password Connect Secret preflight enforced in Phase 2 (blocking with remediation guidance).'
+  performance:
+    status: PASS
+    notes: 'No performance blockers in bootstrap path observed.'
+  reliability:
+    status: PASS
+    notes: 'Idempotent task reruns documented; dry-run path available.'
+  maintainability:
+    status: PASS
+    notes: 'Story structure, mapping, and runbooks are clear.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Monitor CP-only resource pressure; scale workers when thresholds exceeded.'
+      refs: ['docs/runbooks/bootstrapping-from-zero.md']

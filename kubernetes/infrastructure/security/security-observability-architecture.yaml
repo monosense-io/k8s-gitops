@@ -610,7 +610,7 @@ data:
     kind: ConfigMap
     metadata:
       name: security-integrations
-      namespace: monitoring
+      namespace: observability
     data:
       # Threat Intelligence Feeds
       threat_intelligence.yaml: |
