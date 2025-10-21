@@ -36,16 +36,12 @@ spec:
     recreate: true
     cleanupOnFail: true
   values:
-    tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        effect: NoSchedule
-      - key: node-role.kubernetes.io/master
-        effect: NoSchedule
-    persistence:
+    grafanaDashboard:
       enabled: true
-      accessMode: ReadWriteOnce
-      size: 5Gi
     serviceMonitor:
       enabled: true
-    podAnnotations:
-      secret.reloader.stakater.com/reload: spegel-config
+    spegel:
+      containerdRegistryConfigPath: /etc/cri/conf.d/hosts
+    service:
+      registry:
+        hostPort: 29999

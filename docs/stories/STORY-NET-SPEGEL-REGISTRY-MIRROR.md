@@ -24,8 +24,7 @@ Deploy Spegel as a node‑local OCI registry mirror via Flux to reduce image pul
 
 ## Dependencies / Inputs
 - Networking: Cilium CNI (Story 04) operational.
-- Storage: Local RWO PVCs available per node; recommend OpenEBS LocalPV (Story 14) or equivalent for DaemonSet PVCs.
-- Node image policies & containerd config compatible with Spegel mirror endpoints (document any required CRI settings).
+- Node image policies & containerd config compatible with Spegel mirror endpoints (document any required CRI settings). No PVCs required (stateless cache).
 
 ## Tasks / Subtasks
 - [ ] Reconcile `kubernetes/infrastructure/kustomization.yaml` and ensure `networking/spegel/ks.yaml` is included.
@@ -35,8 +34,8 @@ Deploy Spegel as a node‑local OCI registry mirror via Flux to reduce image pul
 ## Validation Steps
 - flux -n flux-system --context=<ctx> reconcile ks spegel --with-source
 - kubectl --context=<ctx> -n kube-system get ds spegel
+- Verify hostPort 29999 open on nodes; confirm `/etc/cri/conf.d/hosts` populated
 - Observe cache hits via metrics/logs while pulling a common image repeatedly.
 
 ## Definition of Done
 - ACs met; Dev Notes include metrics snapshots and pull timing comparison.
-
