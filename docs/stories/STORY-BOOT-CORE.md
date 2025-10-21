@@ -6,7 +6,7 @@ Date: 2025-10-21
 Links: docs/architecture.md §6, §7, §4; docs/epics/EPIC-greenfield-multi-cluster-gitops.md §8; bootstrap/helmfile.d/00-crds.yaml; bootstrap/helmfile.d/01-core.yaml.gotmpl; bootstrap/helmfile.yaml; .taskfiles/bootstrap/Taskfile.yaml
 
 ## Story
-As a Platform Engineer, I want to deploy the core infrastructure components to both clusters (infra, apps) using the Phase 1/"core" Helmfile, so that Flux can take over day‑2 management reliably with deterministic ordering and health validation.
+As a Platform Engineer, I want to deploy the core infrastructure components to both clusters (infra, apps) using a GitOps‑first approach: perform a minimal one‑time bootstrap of the Cilium CNI, install Flux, and then let Flux reconcile all core components from `kubernetes/**` with deterministic ordering and health validation.
 
 [Source: docs/architecture.md §6 (Bootstrap Architecture), §5 (Ordering/Health), §7 (Cluster Settings)]
 
@@ -20,13 +20,12 @@ As a Platform Engineer, I want to deploy the core infrastructure components to b
 
 ## Scope
 Clusters: infra, apps
-Components (exact chart versions pinned in `bootstrap/helmfile.d/01-core.yaml.gotmpl`):
-- Cilium (agent + operator)
-- CoreDNS
-- Spegel (image cache/mirror) — optional
-- cert‑manager (controller/webhook) with CRDs disabled
-- External Secrets (operator) with CRDs disabled
-- Flux (flux‑operator + flux‑instance)
+Components (managed by Flux under `kubernetes/**`; Cilium bootstrapped once via Helm CLI):
+- Cilium (agent + operator) — GitOps HelmRelease at `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml` (post‑bootstrap)
+- CoreDNS — `kubernetes/infrastructure/networking/coredns/`
+- cert‑manager — `kubernetes/infrastructure/security/cert-manager/`
+- External Secrets — `kubernetes/infrastructure/security/external-secrets/`
+- Flux (operator + instance) — `kubernetes/infrastructure/gitops/`
 
 Namespaces expected/present prior to or during bootstrap:
 - flux-system, external-secrets, cert-manager (others by chart defaults)
@@ -37,7 +36,7 @@ Non‑Goals
 [Source: docs/architecture.md §6 (Phases), §9 (Networking day‑2), §8 (Secrets), §12 (CI/Policy)]
 
 ## Acceptance Criteria
-1) Phase separation respected: Helmfile for core installs controllers only; no CRDs are created here. A `helmfile template` of `bootstrap/helmfile.d/01-core.yaml.gotmpl` shows zero CustomResourceDefinition kinds.
+1) Phase separation respected: Phase 0 installs CRDs; Phase 1 performs a one‑time imperative install of Cilium via Helm CLI, installs Flux, and then all components are reconciled via GitOps. No non‑GitOps controllers remain unmanaged after handover.
 2) On both clusters, the following are Ready:
    - Control plane nodes (selector `node-role.kubernetes.io/control-plane`) are Ready (CNI operational).
    - Cilium DaemonSet and Operator (Ready/Available across all nodes).
@@ -51,6 +50,7 @@ Non‑Goals
 5) All commands, outputs (key excerpts), and any deviations captured in Dev Notes.
 
 6) All P0 test scenarios from docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md pass on both clusters (infra, apps); execution artifacts captured in Dev Notes. QA gate moves from CONCERNS to PASS or waivers are documented.
+7) Cilium core is under GitOps control post‑bootstrap: `kubernetes/infrastructure/kustomization.yaml` includes `networking/cilium/core/ks.yaml`; a reconcile after uninstalling the Helm‑CLI release results in Flux re‑creating the Cilium resources.
 
 [Source: docs/architecture.md §6 (Handover Criteria), §5 (Health/dependsOn), §4 (Repo Layout)]
 
@@ -58,9 +58,9 @@ Non‑Goals
 - STORY‑BOOT‑CRDS completed and validated (CRDs Established on both clusters).
 - KUBECONFIG contexts `infra`, `apps` configured and working.
 - bootstrap resources prepared:
-  - `bootstrap/prerequisites/resources.yaml` applies namespaces and the 1Password Connect bootstrap Secret (`external-secrets/onepassword-connect` with base64 token).
-- `bootstrap/helmfile.d/01-core.yaml.gotmpl` pinned to intended versions (CRDs disabled for cert‑manager/external-secrets), or use orchestrator `bootstrap/helmfile.yaml`.
-- Optional: Taskfile automation available in `.taskfiles/bootstrap/Taskfile.yaml` (phase:2 → core).
+  - `bootstrap/prerequisites/resources.yaml` applies namespaces and the 1Password Connect bootstrap Secret (`external-secrets/onepassword-connect`).
+- Taskfile automation available in `.taskfiles/bootstrap/Taskfile.yaml` (phase:2 now calls `core:gitops`).
+- Cilium values for imperative bootstrap present in `bootstrap/clusters/<cluster>/cilium-values.yaml`.
 
 [Source: docs/epics/EPIC-greenfield-multi-cluster-gitops.md §8; docs/architecture.md §6]
 
@@ -68,7 +68,7 @@ Non‑Goals
 - [ ] T0 — Preflight (AC: —)
   - [ ] `task :bootstrap:phase:0 CLUSTER=infra` and `task :bootstrap:phase:0 CLUSTER=apps`
 - [ ] T1 — Deploy core (Phase 2) (AC: 2)
-  - [ ] `task :bootstrap:phase:2 CLUSTER=infra` and `task :bootstrap:phase:2 CLUSTER=apps`
+  - [ ] `task :bootstrap:phase:2 CLUSTER=infra` and `task :bootstrap:phase:2 CLUSTER=apps` (uses `core:gitops` → Cilium via Helm CLI → Flux install → Flux reconcile)
 - [ ] T2 — Validate (Phase 3) (AC: 2)
   - [ ] `task :bootstrap:phase:3 CLUSTER=infra` and `task :bootstrap:phase:3 CLUSTER=apps`
   - [ ] `task bootstrap:status CLUSTER=infra` and `task bootstrap:status CLUSTER=apps`
@@ -149,6 +149,13 @@ File/Path pointers for this story:
 ### Testing
 - Preferred: use `kubectl rollout status` and `flux get` commands in Validation Steps.
 - CI (separate story): kubeconform, `kustomize build`, `flux build` to ensure manifests converge.
+
+### Refactor Notes (Option A — GitOps‑first)
+- Deprecated: Helmfile `01-core.yaml.gotmpl` for ongoing management; retained for historical reference only.
+- New GitOps resources:
+  - `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
+  - `kubernetes/infrastructure/networking/cilium/core/ks.yaml`
+  - `kubernetes/infrastructure/kustomization.yaml` now includes `networking/cilium/core/ks.yaml`
 
 ## Change Log
 | Date       | Version | Description                                   | Author |

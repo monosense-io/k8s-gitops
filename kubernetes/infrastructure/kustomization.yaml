@@ -10,7 +10,9 @@ resources:
   - security  # ClusterSecretStore (external-secrets only, RBAC/cert-manager disabled)
   # - storage  # Cluster-specific via cluster-level Kustomization (no local ks.yaml)
   # - databases  # Day 2 - CloudNativePG
-  # Cilium day-2 features (cilium core deployed via bootstrap helmfile):
+  # Cilium core managed by GitOps (after one-time imperative bootstrap); day-2 features below
+  - networking/cilium/core/ks.yaml         # Cilium core HelmRelease under GitOps control
+  # Cilium day-2 features:
   - networking/cilium/ks.yaml               # Cilium day-2 kustomization (depends on cilium from bootstrap)
   - networking/cilium/clustermesh/ks.yaml   # Manage clustermesh secret via ExternalSecrets
   - networking/cilium/bgp/ks.yaml           # Own BGP peering policy via Flux

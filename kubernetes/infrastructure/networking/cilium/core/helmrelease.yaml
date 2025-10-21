@@ -1,0 +1,56 @@
+---
+# yaml-language-server: $schema=https://kube-schemas.pages.dev/helm.toolkit.fluxcd.io/helmrelease_v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 30m
+  chartRef:
+    kind: OCIRepository
+    name: cilium-charts
+    namespace: flux-system
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 2
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    cluster:
+      name: ${CLUSTER}
+      id: ${CLUSTER_ID}
+
+    kubeProxyReplacement: "true"
+
+    cni:
+      install: true
+      exclusive: true
+
+    ipam:
+      mode: kubernetes
+
+    ipv4: { enabled: true }
+    ipv4NativeRoutingCIDR: ${POD_CIDR_STRING}
+    routingMode: native
+    autoDirectNodeRoutes: true
+
+    encryption:
+      enabled: true
+      type: wireguard
+      nodeEncryption: false
+
+    hubble:
+      enabled: true
+      relay: { enabled: true, replicas: 1 }
+      ui: { enabled: false }
+

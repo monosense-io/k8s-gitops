@@ -39,6 +39,42 @@ tasks:
         vars: {CLUSTER: infra, CONTEXT: infra, DRY_RUN: "{{.DRY_RUN}}"}
     vars:
       DRY_RUN: '{{.DRY_RUN | default "false"}}'
+  
+  core:gitops:
+    internal: true
+    cmds:
+      - |
+        {{if eq .DRY_RUN "true"}}
+        echo "  → [DRY-RUN] Would bootstrap Cilium via Helm using:"
+        echo "     helm upgrade --install cilium cilium/cilium -n kube-system -f bootstrap/clusters/{{.CLUSTER}}/cilium-values.yaml --version 1.18.2"
+        echo "  → [DRY-RUN] Would install Flux controllers and apply flux-system kustomization"
+        echo "  → [DRY-RUN] Would reconcile cluster root and wait for controllers"
+        {{else}}
+        echo "  → Bootstrapping Cilium (imperative, one-time) via Helm CLI..."
+        helm repo add cilium https://helm.cilium.io >/dev/null 2>&1 || true
+        helm repo update cilium >/dev/null 2>&1 || true
+        helm upgrade --install cilium cilium/cilium \
+          --kube-context {{.CONTEXT}} \
+          --namespace kube-system \
+          --create-namespace \
+          --version 1.18.2 \
+          -f {{.BOOTSTRAP_DIR}}/clusters/{{.CLUSTER}}/cilium-values.yaml
+        echo "  → Waiting for Cilium DaemonSet to be Ready..."
+        kubectl --context={{.CONTEXT}} -n kube-system rollout status daemonset/cilium --timeout=5m
+
+        echo "  → Installing Flux and bootstrapping cluster Git source (GitOps-first)..."
+        task kubernetes:bootstrap CLUSTER={{.CLUSTER}} CONTEXT={{.CONTEXT}}
+
+        echo "  → Reconciling cluster root and waiting for controllers..."
+        task kubernetes:reconcile CLUSTER={{.CLUSTER}} CONTEXT={{.CONTEXT}}
+        kubectl --context={{.CONTEXT}} -n flux-system wait --for=condition=Available deploy/source-controller --timeout=5m || true
+        kubectl --context={{.CONTEXT}} -n flux-system wait --for=condition=Available deploy/kustomize-controller --timeout=5m || true
+        kubectl --context={{.CONTEXT}} -n flux-system wait --for=condition=Available deploy/helm-controller --timeout=5m || true
+        {{end}}
+    vars:
+      CLUSTER: '{{.CLUSTER}}'
+      CONTEXT: '{{.CONTEXT}}'
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
 
   apps-crds:
     desc: 🔧 Install CRDs only on apps cluster (victoria-metrics-operator CRDs, prometheus-operator CRDs, etc.)
@@ -106,7 +142,7 @@ tasks:
     desc: 🚀 Phase 2 - Deploy core infrastructure
     cmds:
       - 'echo "🚀 Phase 2: Deploying core infrastructure..."'
-      - task: core
+      - task: core:gitops
         vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
       - echo "✅ Core infrastructure deployed"
     vars:
