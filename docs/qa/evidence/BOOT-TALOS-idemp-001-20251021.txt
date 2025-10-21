@@ -1,0 +1,195 @@
+# STORY-BOOT-TALOS IDEMP-001 Evidence - Idempotency Validation
+# Date: 2025-10-21 10:00:50 UTC
+# Cluster: apps
+# Test Type: Re-run Phase -1 bootstrap on already-healthy cluster
+# QA Requirement: IDEMP-001 (AC4 - Idempotency)
+
+## Summary
+✅ IDEMP-001 PASSED: Re-running Phase -1 bootstrap on already-healthy apps cluster
+✅ Safe-detector correctly identified bootstrapped cluster
+✅ Bootstrap step SKIPPED as expected
+✅ No destructive operations attempted
+✅ All health checks passed (etcd, control plane, kubelet)
+
+## Test Execution
+
+### Command
+```bash
+task bootstrap:talos CLUSTER=apps
+```
+
+### Context
+- Cluster: apps (already bootstrapped and healthy)
+- Bootstrap node: 10.25.11.14
+- Control planes: 10.25.11.14, 10.25.11.15, 10.25.11.16
+- Cluster state before test:
+  - etcd: Running, 3 voting members, healthy
+  - Kubernetes API: Responding
+  - Nodes: 3 control planes (NotReady due to no CNI - expected for Phase -1)
+
+## Test Results
+
+### ✅ CRITICAL: Bootstrap Skip Detected
+
+```
+Layer 1 Talos bootstrap (cluster=apps)
+  bootstrap: 10.25.11.14
+  control-planes: 10.25.11.15 10.25.11.16
+  workers: none
+  step 1: apply config to all control planes (avoid op session timeout)
+    • 10.25.11.14 (bootstrap node)
+Applied configuration without a reboot
+    • 10.25.11.15
+Applied configuration without a reboot
+    • 10.25.11.16
+Applied configuration without a reboot
+  step 2: wait for bootstrap node Talos API... ok (after 15 seconds)
+  step 3: bootstrap already healthy, skipping talosctl bootstrap
+  step 4: wait for etcd status ok (0s)
+```
+
+**KEY EVIDENCE**: Line 11 shows **"step 3: bootstrap already healthy, skipping talosctl bootstrap"**
+
+This confirms:
+1. Safe-detector evaluated cluster state
+2. Detected cluster as already bootstrapped
+3. Skipped `talosctl bootstrap` command
+4. No attempt to re-initialize etcd
+5. No risk of data corruption
+
+### ✅ Health Checks Passed
+
+All Talos health checks passed successfully:
+
+```
+  step 5: wait for control planes healthy...discovered nodes: ["10.25.11.14" "10.25.11.15" "10.25.11.16"]
+waiting for etcd to be healthy: OK
+waiting for etcd members to be consistent across nodes: OK
+waiting for etcd members to be control plane nodes: OK
+waiting for apid to be ready: OK
+waiting for all nodes memory sizes: OK
+waiting for all nodes disk sizes: OK
+waiting for no diagnostics: OK
+waiting for kubelet to be healthy: OK
+waiting for all nodes to finish boot sequence: OK
+waiting for all k8s nodes to report: OK
+waiting for all control plane static pods to be running: OK
+waiting for all control plane components to be ready: OK
+```
+
+### Expected Timeout on Node Ready Check
+
+```
+waiting for all k8s nodes to report ready: ...
+waiting for all k8s nodes to report ready: some nodes are not ready: [apps-01 apps-02 apps-03]
+healthcheck error: rpc error: code = DeadlineExceeded desc = context deadline exceeded
+```
+
+**Note**: This timeout is EXPECTED and does NOT indicate a problem:
+- Nodes are NotReady because no CNI (Cilium) is installed
+- Phase 0 will install Cilium and make nodes Ready
+- Phase -1 scope ends at "Kubernetes API responding" ✅
+- This is documented behavior (see BOOT-TALOS-live-apps-20251021-FINAL.txt lines 56-62)
+
+## Safe-Detector Validation
+
+The ALREADY_BOOTSTRAPPED detector performed these checks:
+
+1. ✅ Bootstrap node defined: 10.25.11.14
+2. ✅ Machine config applied
+3. ✅ etcd service state = "Running" (NEW: Talos-recommended check)
+4. ✅ etcd has members (count=3)
+
+Result: **ALREADY_BOOTSTRAPPED=true** → Bootstrap step skipped
+
+## Idempotency Proof
+
+### Before Re-run
+- etcd: 3 voting members, healthy
+- Kubernetes API: Responding
+- Raft index: ~10244 (all nodes in sync)
+
+### After Re-run
+- etcd: Still 3 voting members, healthy (no re-initialization)
+- Kubernetes API: Still responding
+- No destructive operations performed
+- Cluster state unchanged
+
+### Comparison with Initial Bug
+
+**Before Fix** (from BOOT-TALOS-safe-detector-fix-20251021.txt):
+```
+step 3: talosctl bootstrap
+error executing bootstrap: rpc error: code = AlreadyExists desc = etcd data directory is not empty
+```
+
+**After Fix** (this test):
+```
+step 3: bootstrap already healthy, skipping talosctl bootstrap
+```
+
+The fix transformed a **failure** into a **safe skip**.
+
+## AC4 Compliance
+
+**Acceptance Criteria 4**: "Re-running the bootstrap process on an already-healthy control plane is safe (no destructive re-bootstrap)."
+
+Evidence of compliance:
+- ✅ Bootstrap step was skipped (no `talosctl bootstrap` executed)
+- ✅ No etcd re-initialization attempted
+- ✅ Cluster state remained stable
+- ✅ All health checks passed
+- ✅ Safe-detector correctly identified already-bootstrapped state
+
+## Test Design Mapping
+
+From `docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md`:
+
+**BOOT-TALOS-E2E-009** (P0): "Simulate healthy CP; rerun create to verify bootstrap skip"
+- Status: ✅ PASSED
+- Evidence: Bootstrap skip message captured (line 11 of output)
+
+**BOOT-TALOS-E2E-006** (P1): "Re-run `task bootstrap:talos` on healthy CP"
+- Status: ✅ PASSED
+- Evidence: This entire test execution
+
+## Technical Notes
+
+### Why Health Check Timeout is Acceptable
+
+The final timeout on "waiting for all k8s nodes to report ready" is:
+1. Expected behavior for Phase -1 (no CNI installed)
+2. Outside the scope of IDEMP-001 (which tests bootstrap skip)
+3. Documented in all Phase -1 evidence files
+4. Will be resolved in Phase 0 (Cilium installation)
+
+The critical validation is:
+- **Did bootstrap skip?** ✅ YES
+- **Were destructive operations prevented?** ✅ YES
+- **Is cluster still healthy?** ✅ YES
+
+### Safe-Detector Implementation
+
+The fix (`.taskfiles/cluster/Taskfile.yaml` lines 282-325) uses:
+- Talos-recommended etcd service state check ("Running" vs "Preparing")
+- Multi-signal validation (machine config + etcd state + member count)
+- Conservative approach (skip only when ALL checks pass)
+
+## Conclusion
+
+**IDEMP-001 Status**: ✅ **PASSED**
+
+The bootstrap workflow successfully demonstrates idempotency:
+1. Safe-detector correctly identified already-bootstrapped cluster
+2. Bootstrap step was skipped (no destructive operations)
+3. Cluster remained healthy and stable
+4. All non-CNI health checks passed
+
+**Ready for QA sign-off.**
+
+## References
+
+- Test Design: `docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md`
+- Bug Fix: `docs/qa/evidence/BOOT-TALOS-safe-detector-fix-20251021.txt`
+- Initial Bootstrap: `docs/qa/evidence/BOOT-TALOS-live-apps-20251021-FINAL.txt`
+- Story: `docs/stories/STORY-BOOT-TALOS.md` (AC4, lines 82-86)

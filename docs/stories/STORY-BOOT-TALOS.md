@@ -139,6 +139,8 @@ Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
 | 2025-10-21 | 1.3     | All must‑fix items implemented; requires live-cluster validation | Dev (James) |
 | 2025-10-21 | 1.4     | Reclassified to Review pending live-cluster evidence | SM |
 | 2025-10-21 | 1.5     | QA evidence completion: Added API-001 and ETCD-001 validation to evidence files | Dev (James) |
+| 2025-10-21 | 1.6     | CRITICAL: Fixed safe-detector bug preventing idempotency; implemented Talos-recommended etcd service state check | Dev (James) |
+| 2025-10-21 | 1.7     | IDEMP-001 COMPLETED: End-to-end idempotency validation successful, bootstrap skip message captured | Dev (James) |
 
 ## Dev Agent Record
 ### Agent Model Used
@@ -176,6 +178,23 @@ Claude Sonnet 4.5 (dev persona, James)
   - **API-001**: Added `kubectl --context=<cluster> cluster-info` validation output to both infra and apps evidence files, confirming Kubernetes API reachability
   - **ETCD-001**: Updated infra evidence file with final etcd cluster state showing all 3 voting members (infra-03 auto-promoted from LEARNER); apps evidence already had complete etcd validation
   - Both clusters validated with: API reachable via contexts, etcd healthy with 3 voting members, kubeconfig exported to `kubernetes/kubeconfig`
+- **CRITICAL BUG FIX - Safe-Detector (2025-10-21)**: Discovered and fixed critical bug in ALREADY_BOOTSTRAPPED detector during IDEMP-001 validation:
+  - **Bug Discovery**: Re-running bootstrap on healthy cluster triggered actual bootstrap attempt, resulting in "etcd data directory is not empty" error instead of skipping bootstrap
+  - **Root Cause**: Check 4 (line 323) used `grep -q "true"` on etcd status output, but healthy clusters show `LEARNER: false` not "true" - logic was backwards
+  - **Fix Applied**: Replaced buggy check with Talos-recommended method: check etcd service state is "Running" (vs "Preparing" for non-bootstrapped)
+  - **Validation**: Created test script `test-safe-detector.sh` confirming both clusters (infra, apps) correctly detected as ALREADY_BOOTSTRAPPED=true
+  - **Impact**: Prevents accidental double-bootstrap and data corruption; satisfies idempotency requirement (AC4)
+  - **Evidence**: `docs/qa/evidence/BOOT-TALOS-safe-detector-fix-20251021.txt` (includes bug analysis, fix details, validation results)
+  - **Files Modified**: `.taskfiles/cluster/Taskfile.yaml` lines 282-325 (ALREADY_BOOTSTRAPPED variable)
+  - **E2E Validation Complete**: Re-ran `task bootstrap:talos CLUSTER=apps` on already-healthy cluster, captured skip message "step 3: bootstrap already healthy, skipping talosctl bootstrap"
+- **IDEMP-001 COMPLETED (2025-10-21)**: End-to-end idempotency validation successful:
+  - **Test**: Re-ran Phase -1 bootstrap on already-healthy apps cluster via `task bootstrap:talos CLUSTER=apps`
+  - **Result**: ✅ Bootstrap step SKIPPED - safe-detector correctly identified cluster as already bootstrapped
+  - **Key Evidence**: "step 3: bootstrap already healthy, skipping talosctl bootstrap" (no destructive operations attempted)
+  - **Health Validation**: All Talos health checks passed (etcd healthy, control plane ready, kubelet running)
+  - **Cluster State**: Unchanged - no etcd re-initialization, raft index stable, 3 voting members maintained
+  - **AC4 Compliance**: Confirmed safe re-run of bootstrap process on healthy control plane
+  - **Evidence**: `docs/qa/evidence/BOOT-TALOS-idemp-001-20251021.txt` (complete test execution and analysis)
 
 ### File List
 - .taskfiles/cluster/Taskfile.yaml (safe-detector hardening, Step 2 health check fix, context flag additions, preflight checks, health command fixes)

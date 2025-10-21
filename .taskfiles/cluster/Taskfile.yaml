@@ -286,9 +286,8 @@ tasks:
           # 1. Bootstrap node is defined
           # 2. talosctl is available
           # 3. Talos machine config is applied
-          # 4. etcd is running and responsive
-          # 5. etcd has at least one healthy member
-          # 6. etcd cluster shows initialized state
+          # 4. etcd service is Running (Talos-recommended check)
+          # 5. etcd has at least one member
 
           if [ -z "{{.BOOTSTRAP_NODE}}" ]; then
             echo false
@@ -306,8 +305,11 @@ tasks:
             exit 0
           fi
 
-          # Check 2: etcd status must be available
-          if ! talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null 2>&1; then
+          # Check 2: etcd service must be Running (Talos-recommended method)
+          # When etcd is not bootstrapped, service state is "Preparing"
+          # When etcd is bootstrapped and healthy, service state is "Running"
+          ETCD_STATE=$(talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} service etcd 2>/dev/null | awk '/^STATE/ {print $2}')
+          if [ "$ETCD_STATE" != "Running" ]; then
             echo false
             exit 0
           fi
@@ -315,12 +317,6 @@ tasks:
           # Check 3: etcd must have at least one member
           MEMBER_COUNT=$(talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd members 2>/dev/null | grep -c "{{.BOOTSTRAP_NODE}}" || echo "0")
           if [ "$MEMBER_COUNT" -lt 1 ]; then
-            echo false
-            exit 0
-          fi
-
-          # Check 4: etcd health check
-          if ! talosctl --context "{{.CLUSTER}}" --nodes {{.BOOTSTRAP_NODE}} etcd status 2>/dev/null | grep -q "true"; then
             echo false
             exit 0
           fi
