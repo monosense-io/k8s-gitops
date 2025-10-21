@@ -5,7 +5,7 @@ Sequence: 22/22 | Prev: STORY-OBS-FLUENT-BIT.md
 Status: Draft
 Owner: Platform Engineering
 Date: 2025-10-21
-Links: kubernetes/infrastructure/networking/spegel; kubernetes/bases/spegel; docs/architecture.md §12
+Links: kubernetes/workloads/platform/registry/spegel; kubernetes/bases/spegel; kubernetes/clusters/infra/spegel.yaml; docs/architecture.md §12
 
 ## Story
 Deploy Spegel as a node‑local OCI registry mirror via Flux to reduce image pull latency and external bandwidth, with per‑node caching and metrics.
