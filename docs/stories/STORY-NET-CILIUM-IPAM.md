@@ -1,6 +1,6 @@
 # 09 — STORY-NET-CILIUM-IPAM — LB IP Pools via GitOps
 
-Sequence: 09/22 | Prev: STORY-GITOPS-SELF-MGMT-FLUX.md | Next: STORY-NET-CILIUM-GATEWAY.md
+Sequence: 09/26 | Prev: STORY-GITOPS-SELF-MGMT-FLUX.md | Next: STORY-NET-CILIUM-GATEWAY.md
 
 Status: Draft
 Owner: Platform Engineering

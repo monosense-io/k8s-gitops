@@ -1,6 +1,6 @@
 # 23 — STORY-BACKUP-VOLSYNC-APPS — VolSync + Snapshot Controller on apps (MinIO target)
 
-Sequence: 23/23 | Prev: STORY-NET-SPEGEL-REGISTRY-MIRROR.md
+Sequence: 23/26 | Prev: STORY-NET-SPEGEL-REGISTRY-MIRROR.md | Next: STORY-STO-APPS-OPENEBS-BASE.md
 
 Status: Draft
 Owner: Platform Engineering
@@ -44,4 +44,3 @@ Deploy VolSync and the external snapshot-controller on the apps cluster to enabl
 
 ## Definition of Done
 - ACs met; Dev Notes include MinIO endpoint config, bucket path, and sample object listings.
-

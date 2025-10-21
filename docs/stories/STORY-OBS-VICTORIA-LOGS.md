@@ -1,6 +1,6 @@
 # 20 — STORY-OBS-VICTORIA-LOGS — VictoriaLogs (infra) + vmauth
 
-Sequence: 20/22 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-FLUENT-BIT.md
+Sequence: 20/26 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-FLUENT-BIT.md
 
 Status: Draft
 Owner: Platform Engineering

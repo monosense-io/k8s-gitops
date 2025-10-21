@@ -1,6 +1,6 @@
 # 02 — STORY-BOOT-CRDS — Phase 0 CRD Bootstrap (infra + apps)
 
-Sequence: 02/22 | Prev: STORY-BOOT-TALOS.md | Next: STORY-BOOT-CORE.md
+Sequence: 02/26 | Prev: STORY-BOOT-TALOS.md | Next: STORY-BOOT-CORE.md
 
 Status: Done
 Owner: Scrum Master → Platform Engineering

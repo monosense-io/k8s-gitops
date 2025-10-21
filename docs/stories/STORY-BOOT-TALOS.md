@@ -1,6 +1,6 @@
 # 01 — STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Sequence: 01/22 | Next: STORY-BOOT-CRDS.md
+Sequence: 01/26 | Next: STORY-BOOT-CRDS.md
 
 Status: Done
 Owner: Product → Platform Engineering

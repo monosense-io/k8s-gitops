@@ -1,6 +1,6 @@
 # 10 — STORY-NET-CILIUM-GATEWAY — Gateway API with Cilium
 
-Sequence: 10/22 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-NET-CILIUM-BGP.md
+Sequence: 10/26 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-NET-CILIUM-BGP.md
 
 Status: Draft
 Owner: Platform Engineering

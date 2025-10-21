@@ -1,6 +1,6 @@
 # 14 — STORY-STO-OPENEBS-BASE — OpenEBS LocalPV (infra)
 
-Sequence: 14/22 | Prev: STORY-BOOT-AUTOMATION-ALIGN.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
+Sequence: 14/26 | Prev: STORY-BOOT-AUTOMATION-ALIGN.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
 
 Status: Draft
 Owner: Platform Engineering

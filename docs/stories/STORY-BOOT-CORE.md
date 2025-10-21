@@ -1,6 +1,6 @@
 # 03 — STORY-BOOT-CORE — Phase 1 Core Bootstrap (infra + apps)
 
-Sequence: 03/22 | Prev: STORY-BOOT-CRDS.md | Next: STORY-NET-CILIUM-CORE-GITOPS.md
+Sequence: 03/26 | Prev: STORY-BOOT-CRDS.md | Next: STORY-NET-CILIUM-CORE-GITOPS.md
 
 Status: Approved
 Owner: Scrum Master → Platform Engineering
