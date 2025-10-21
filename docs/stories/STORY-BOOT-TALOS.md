@@ -1,0 +1,174 @@
+# STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
+
+Status: Approved
+Owner: Product → Platform Engineering
+Date: 2025-10-21
+Links: docs/architecture.md §6 (Bootstrap Architecture); .taskfiles/cluster/Taskfile.yaml; .taskfiles/bootstrap/Taskfile.yaml; talos/**; docs/epics/EPIC-greenfield-multi-cluster-gitops.md; docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md; docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md; docs/runbooks/bootstrapping-from-zero.md
+
+ID: STORY-BOOT-TALOS
+
+## Story
+As a Platform Engineer, I want a fully automated, idempotent Talos bring‑up for a fresh cluster (control planes first, kubeconfig export, then handoff), so that creating a new infra or apps cluster requires no ad‑hoc kubectl/helmfile and relies only on canonical Taskfile entrypoints.
+
+## Why / Outcome
+- Eliminates manual steps and drift during first cluster creation.
+- Provides a repeatable entrypoint that flows into CRDs and core bootstrap.
+- Establishes clear handoff to Flux/GitOps for day‑2.
+
+## Scope
+Clusters: infra, apps (each has its own Talos node definitions under `talos/<cluster>/*.yaml`).
+Steps (canonical):
+- Phase −1: `task bootstrap:talos CLUSTER=<cluster>` (alias to `:cluster:layer:1-talos`).
+- Phase 0: `task :bootstrap:phase:0 CLUSTER=<cluster>` (prereqs/namespaces/secrets).
+- Phase 1: `task :bootstrap:phase:1 CLUSTER=<cluster>` (CRDs only).
+- Phase 2: `task :bootstrap:phase:2 CLUSTER=<cluster>` (core stack).
+- Phase 3: `task :bootstrap:phase:3 CLUSTER=<cluster>` (validation + status).
+
+Environment Note: Hardware‑constrained clusters are currently control‑plane‑only (no workers). This is already reflected in `talos/**`; no additional changes required in this story.
+
+## How to Execute (Quickstart)
+- Infra (end‑to‑end): `task cluster:create-infra`
+- Apps (end‑to‑end): `task cluster:create-apps`
+- Or stepwise per cluster:
+  - `task bootstrap:talos CLUSTER=<infra|apps>` → `task :bootstrap:phase:{0,1,2,3} CLUSTER=<infra|apps>` → `task bootstrap:status CLUSTER=<infra|apps>`
+Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
+
+## Non‑Goals
+- Worker node provisioning (future optional extension).
+- Day‑2 configuration (managed by Flux after handoff).
+
+## Acceptance Criteria
+1) Fresh cluster creation uses only tasks:
+   - `task cluster:create-<cluster>` completes end‑to‑end, OR
+   - `task bootstrap:talos` → `task bootstrap:phase:{0,1,2,3}` completes for <cluster>.
+2) Kubeconfig is exported to `kubernetes/kubeconfig` and contexts `infra` and `apps` are usable:
+   - `kubectl --context=<cluster> get nodes` shows all control planes Ready.
+3) Health gate passes: `task cluster:health CLUSTER=<cluster>` reports Talos/K8s/CRDs/Flux healthy.
+4) Idempotency:
+   - Re‑running `task cluster:create-<cluster>` or `task bootstrap:talos` short‑circuits without error.
+   - Re‑running Phase 0/1 (CRDs/prereqs) is safe and produces no unintended changes.
+5) Role‑aware node ordering (optional, future):
+   - If `talos/<cluster>/controlplane/*.yaml` exists, apply those first (bootstrap first CP, then remaining CPs).
+   - If `talos/<cluster>/worker/*.yaml` exists, apply workers only after Kubernetes API is responding.
+   - If these folders do not exist, fallback to `talos/<cluster>/*.yaml` as today.
+6) Safe detector for bootstrap/idempotency:
+   - `:cluster:layer:1-talos` detects an already bootstrapped control plane (`talosctl --nodes <first> get machineconfig` OK and `talosctl --nodes <first> etcd status` OK) and skips `talosctl bootstrap`.
+   - Dry‑run mode prints the planned node order and actions without making changes.
+7) Dev Notes include timestamps, critical outputs, and any deviations.
+
+### Tasks ↔ Acceptance Criteria Mapping
+- AC1 (tasks only) → T0, T1, T2, T3, T4, T5
+- AC2 (kubeconfig/nodes Ready) → T1, T2, Validation Steps
+- AC3 (health) → T5, Validation Steps
+- AC4 (idempotency) → T0b (detector), re‑run of T1/T3 (documented in Dev Notes)
+- AC5 (role‑aware optional) → Appendix notes; future extension
+- AC6 (safe detector) → T0b confirms requirement; implement later
+- AC7 (Dev Notes) → Dev Notes section below
+
+## Dependencies / Inputs
+- Valid Talos node patch files in `talos/<cluster>/*.yaml`.
+- `talos/machineconfig.yaml.j2` template present and compatible with patches.
+- Tools: `talosctl`, `kubectl`, `flux`, `helmfile`, `minijinja-cli`, `op`, `jq`, `yq`.
+- Network egress to required registries.
+
+## Tasks / Subtasks (canonical commands only)
+- T0 — Preflight
+  - `task cluster:preflight CLUSTER=<cluster>`
+- T0b — Safe detector readiness (no code changes yet)
+  - Confirm story requires detector behavior in `:cluster:layer:1-talos` as per AC6 (skip bootstrap when already healthy; print plan in dry‑run).
+- T1 — Talos bootstrap (control plane, etcd init, kubeconfig)
+  - `task bootstrap:talos CLUSTER=<cluster>`
+- T2 — Kubernetes readiness and node health
+  - `task :cluster:layer:2-kubernetes CLUSTER=<cluster> CONTEXT=<cluster>`
+- T3 — CRDs (Phase 0/1)
+  - `task :bootstrap:phase:0 CLUSTER=<cluster> CONTEXT=<cluster>`
+  - `task :bootstrap:phase:1 CLUSTER=<cluster> CONTEXT=<cluster>`
+- T4 — Core bootstrap (Phase 2)
+  - `task :bootstrap:phase:2 CLUSTER=<cluster> CONTEXT=<cluster>`
+- T5 — Validation (Phase 3)
+  - `task :bootstrap:phase:3 CLUSTER=<cluster> CONTEXT=<cluster>`
+  - `task bootstrap:status CLUSTER=<cluster> CONTEXT=<cluster>`
+
+## Validation Steps (CLI excerpts)
+- `talosctl --nodes <first-cp-ip> health --wait-timeout 2m --server=false`
+- `kubectl --context=<cluster> get nodes`
+- `flux --context=<cluster> get kustomizations -A`
+
+## Dev Notes
+- Source tree relevant to this story:
+  - Talos: `talos/<cluster>/*.yaml`, `talos/machineconfig.yaml.j2`
+  - Tasks: `.taskfiles/cluster/Taskfile.yaml` (layer:1‑talos, layer:2‑kubernetes), `.taskfiles/bootstrap/Taskfile.yaml` (phase:0..3)
+  - Bootstrap helmfiles: `bootstrap/helmfile.d/00-crds.yaml`, `bootstrap/helmfile.d/01-core.yaml.gotmpl`
+- Environments: hardware‑constrained; control‑plane‑only noted in `talos/**` (no worker steps in this story).
+- Handover criteria (authoritative): flux‑operator Ready; flux‑instance Ready; GitRepository connected; all initial Kustomizations Ready; `kustomize build` + `kubeconform` clean for the cluster root.
+- Operator path: use `task` entrypoints only; raw commands are reference in other stories/appendices.
+ - QA artifacts: see risk profile `docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md` and test design `docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md`.
+
+### Testing
+- Primary reference: `docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md` (T‑001…T‑008 across infra/apps).
+- Capture evidence: key `talosctl`, `kubectl`, and `flux` outputs stored and linked in Dev Notes.
+
+### Rollback / Recovery (pointer)
+- See runbook: `docs/runbooks/bootstrapping-from-zero.md` for re‑running phases and safe re‑apply guidance.
+
+## Risks / Mitigations
+- Mis‑labeled node roles → adopt optional subfolders `talos/<cluster>/{controlplane,worker}/` for role clarity (future change).
+- Kube API slow to respond → layered waits with bounded retries in `layer:2-kubernetes`.
+- Image pull failures → document mirrors / retry policy in runbook.
+- Secret bootstrap issues (1Password Connect token not available/valid) → verify Secret presence before Phase 2; fix and re‑run.
+
+### Appendix: Implementation Notes (for Dev/Architect)
+- Role discovery order:
+  - Prefer `talos/<cluster>/controlplane/*.yaml` → then remaining CPs from `talos/<cluster>/*.yaml` not in that list.
+  - After `layer:2-kubernetes`, if `talos/<cluster>/worker/*.yaml` exists, iterate and apply with `MACHINE_TYPE=worker`.
+- Safe detector conditions (skip bootstrap):
+  - `talosctl --nodes <first-cp> get machineconfig` succeeds AND `talosctl --nodes <first-cp> etcd status` shows a healthy member list.
+  - In dry‑run (`DRY_RUN=true`), echo planned nodes/actions and exit 0.
+
+## Definition of Done
+- All Acceptance Criteria met for both infra and apps.
+- QA gate for STORY-BOOT-TALOS is PASS or waivers documented.
+
+## Change Log
+| Date       | Version | Description                       | Author |
+|------------|---------|-----------------------------------|--------|
+| 2025-10-21 | 1.0     | Initial draft                     | PO     |
+| 2025-10-21 | 1.1     | PO correct‑course (sections, ACs) | PO     |
+
+## Dev Agent Record
+### Agent Model Used
+Codex GPT-5 (dev persona)
+
+### Debug Log References
+- .ai/debug-log.md (2025-10-21 dry-run validations for infra/apps clusters)
+
+### Completion Notes List
+- Implemented safe-detector aware bootstrap flow in `.taskfiles/cluster/Taskfile.yaml` to skip `talosctl bootstrap` when control plane is already healthy while preserving kubeconfig generation.
+- Added explicit dry-run path (via `DRY_RUN=true`) that prints succinct node ordering/actions without executing Talos commands and wired `task cluster:dry-run` to reuse it.
+- Introduced role-aware node ordering, with optional worker node application after control-plane readiness, consolidated Talos health checks, a retry-based etcd readiness gate, and silent dry-run output for clean operator logs.
+
+### File List
+- .taskfiles/cluster/Taskfile.yaml
+- .ai/debug-log.md
+
+## QA Results
+- Risk Profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
+  - Totals — Critical: 0, High: 4, Medium: 4, Low: 2
+  - Highest: TECH-001 (Safe‑detector absent could double‑bootstrap etcd/CP), Score 6
+  - Must‑fix before production: TECH‑001 (safe‑detector), SEC‑001 (1Password Secret preflight), TECH‑002 (CRD/controller version align), OPS‑001 (CP‑only resource pressure)
+- Test Design: docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md
+  - Scenarios: 10 total • Unit 0 • Integration 3 • E2E 7
+  - Priority: P0 5 • P1 4 • P2 1
+  - Mapping covers AC1–AC7; safe‑detector behavior validated by BOOT‑TALOS‑E2E‑009/010
+- Gate Recommendation: CONCERNS until must‑fix items above are addressed; then re‑assess.
+
+## Architect Handoff
+- Architecture (docs/architecture.md)
+  - Add a Bootstrap flow diagram keyed to tasks: Phase −1 `task bootstrap:talos` → Phase 0/1/2/3 `task :bootstrap:phase:{0..3}`.
+  - Document role-aware Talos convention: prefer `talos/<cluster>/{controlplane,worker}/`; ordering and worker-after-API rule.
+  - Specify handoff criteria (must be green before GitOps day‑2): GitRepository Ready; `flux get kustomizations -A` Ready; kubeconform clean.
+  - Note Spegel disabled at bootstrap due to Talos read‑only FS; re‑enable later via Flux if desired.
+- PRD (docs/prd.md)
+  - NFRs: idempotent tasks; time‑to‑ready SLOs (Talos ≤7m, CRDs ≤2m, Core ≤6m, total ≤20m/cluster baseline); observability CRDs present before dependents; single canonical operator path (“tasks only”).
+  - Acceptance: CI must run `task bootstrap:dry-run CLUSTER=infra` (non‑blocking initially), with path to gating later.
+  - Ops runbooks: reference docs/runbooks/bootstrapping-from-zero.md.

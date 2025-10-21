@@ -7,8 +7,8 @@ kind: Kustomization
 resources:
   # Flux Kustomization resources for networking components
   # - cilium/ks.yaml  # Day 2 - needs Gateway API CRDs
-  # - coredns/ks.yaml  # Day 2 - already deployed via Helmfile
-  # - spegel/ks.yaml  # Day 2 - Talos incompatibility
+  # (coredns/ks.yaml removed; CoreDNS managed by Helmfile)
+  # (spegel/ks.yaml removed; Talos incompatibility)
   # Component directories (contain actual manifests)
   # - cilium  # Day 2 - Gateway API features
   # - coredns  # Day 2 - already deployed via Helmfile

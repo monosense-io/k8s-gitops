@@ -70,75 +70,221 @@ tasks:
   layer:1-talos:
     desc: 🔧 Layer 1 - Bootstrap Talos cluster
     internal: true
+    silent: true
     cmds:
-      - echo "=============================================="
-      - 'echo "🔧 Layer 1: Bootstrapping Talos Cluster"'
-      - echo "=============================================="
-      - 'echo "  Cluster: {{.CLUSTER}}"'
-      - 'echo "  Bootstrap node: {{.BOOTSTRAP_NODE}}"'
-      - 'echo "  Additional nodes: {{.ADDITIONAL_NODES}}"'
-      - echo ""
-
-      # Step 1: Bootstrap first control plane (etcd init)
-      - 'echo "📦 Step 1/6: Bootstrapping first control plane..."'
-      - task: :talos:apply-node
-        vars:
-          NODE: "{{.BOOTSTRAP_NODE}}"
-          CLUSTER: "{{.CLUSTER}}"
-          MACHINE_TYPE: controlplane
-
-      # Step 2: Wait for Talos API
-      - echo ""
-      - 'echo "⏳ Step 2/6: Waiting for Talos API to be ready..."'
-      - sleep 15
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} health --wait-timeout 2m --server=false
-
-      # Step 3: Bootstrap etcd
-      - echo ""
-      - 'echo "🔧 Step 3/6: Bootstrapping etcd on first node..."'
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} bootstrap
-      - sleep 10
-
-      # Step 4: Apply config to remaining nodes
-      - echo ""
-      - 'echo "📦 Step 4/6: Configuring additional control plane nodes..."'
       - |
+        set -e
+        CLUSTER="{{.CLUSTER}}"
+        BOOTSTRAP_NODE="{{.BOOTSTRAP_NODE}}"
+        ADDITIONAL_CP="{{.ADDITIONAL_CONTROLPLANES}}"
+        WORKER_NODES="{{.WORKER_NODES}}"
+        DRY_RUN="{{.EFFECTIVE_DRY_RUN}}"
+        SAFE_DETECTED="{{.ALREADY_BOOTSTRAPPED}}"
+        CONTROLPLANE_CSV="{{.CONTROLPLANE_NODES_CSV}}"
+        ALL_NODES_CSV="{{.ALL_NODES_CSV}}"
+
+        format_nodes() {
+          if [ -n "$1" ]; then
+            printf '%s' "$1"
+          else
+            printf 'none'
+          fi
+        }
+
+        if [ "$DRY_RUN" = "true" ]; then
+          printf 'Layer 1 dry-run (cluster=%s)\n' "$CLUSTER"
+        else
+          printf 'Layer 1 Talos bootstrap (cluster=%s)\n' "$CLUSTER"
+        fi
+        printf '  bootstrap: %s\n' "$(format_nodes "$BOOTSTRAP_NODE")"
+        printf '  control-planes: %s\n' "$(format_nodes "$ADDITIONAL_CP")"
+        printf '  workers: %s\n' "$(format_nodes "$WORKER_NODES")"
+
+        if [ "$DRY_RUN" = "true" ]; then
+          if [ "$SAFE_DETECTED" = "true" ]; then
+            printf '  bootstrap action: skip (already healthy)\n'
+          else
+            printf '  bootstrap action: run talosctl bootstrap\n'
+          fi
+          printf '  actions: apply control planes %s\n' "${CONTROLPLANE_CSV:-none}"
+          if [ -n "$WORKER_NODES" ]; then
+            printf '           apply workers %s (after API ready)\n' "$WORKER_NODES"
+          fi
+          printf 'Dry-run complete.\n'
+          exit 0
+        fi
+
+        if [ -z "$BOOTSTRAP_NODE" ]; then
+          echo "❌ No bootstrap node definition found for cluster '$CLUSTER'."
+          exit 1
+        fi
+
+        printf '  step 1: apply bootstrap control plane (%s)\n' "$BOOTSTRAP_NODE"
+        task --silent :talos:apply-node NODE="$BOOTSTRAP_NODE" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
+
+        printf '  step 2: wait for Talos API...'
+        sleep 15
+        if talosctl --nodes "$BOOTSTRAP_NODE" health --wait-timeout 2m --server=false; then
+          echo " ok"
+        else
+          echo " failed"
+          exit 1
+        fi
+
+        if [ "$SAFE_DETECTED" = "true" ]; then
+          printf '  step 3: bootstrap already healthy, skipping talosctl bootstrap\n'
+        else
+          printf '  step 3: talosctl bootstrap\n'
+          talosctl --nodes "$BOOTSTRAP_NODE" bootstrap
+          sleep 10
+        fi
+
+        printf '  step 4: apply remaining control planes'
         NODE_COUNT=0
-        for node in {{.ADDITIONAL_NODES}}; do
+        for node in $ADDITIONAL_CP; do
           if [ -n "$node" ]; then
             NODE_COUNT=$((NODE_COUNT + 1))
-            echo "  → Applying config to node $NODE_COUNT: $node"
-            task :talos:apply-node NODE=$node CLUSTER={{.CLUSTER}} MACHINE_TYPE=controlplane
+            printf '\n    • %s' "$node"
+            task --silent :talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=controlplane
             sleep 5
           fi
         done
+        if [ "$NODE_COUNT" -eq 0 ]; then
+          printf ' (none)'
+        fi
+        printf '\n'
 
-      # Step 5: Wait for etcd cluster
-      - echo ""
-      - 'echo "⏳ Step 5/6: Waiting for etcd cluster formation..."'
-      - sleep 20
-      - talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status
+        printf '  step 5: wait for etcd status'
+        START_TIME=$(date +%s)
+        ATTEMPTS=0
+        MAX_ATTEMPTS=20
+        WAIT_SECONDS=15
+        until talosctl --nodes "$BOOTSTRAP_NODE" etcd status >/dev/null 2>&1; do
+          ATTEMPTS=$((ATTEMPTS + 1))
+          if [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; then
+            ELAPSED=$(( $(date +%s) - START_TIME ))
+            printf ' failed after %ds\n' "$ELAPSED"
+            exit 1
+          fi
+          printf '.'
+          sleep "$WAIT_SECONDS"
+        done
+        ELAPSED=$(( $(date +%s) - START_TIME ))
+        printf ' ok (%ds)\n' "$ELAPSED"
 
-      # Step 6: Wait for all nodes healthy
-      - echo ""
-      - 'echo "⏳ Step 6/6: Waiting for all Talos nodes to be healthy..."'
-      - talosctl --nodes {{.ALL_NODES}} health --wait-timeout 5m
+        if [ -n "$CONTROLPLANE_CSV" ]; then
+          printf '  step 6: wait for control planes healthy...'
+          if talosctl --nodes "$CONTROLPLANE_CSV" health --wait-timeout 5m; then
+            echo " ok"
+          else
+            echo " failed"
+            exit 1
+          fi
+        fi
 
-      # Step 7: Generate kubeconfig
-      - echo ""
-      - echo "📝 Generating kubeconfig..."
-      - task: :talos:generate-kubeconfig
+        if [ -n "$WORKER_NODES" ]; then
+          printf '  step 7: apply workers'
+          WORKER_COUNT=0
+          for node in $WORKER_NODES; do
+            if [ -n "$node" ]; then
+              WORKER_COUNT=$((WORKER_COUNT + 1))
+              printf '\n    • %s' "$node"
+              task --silent :talos:apply-node NODE="$node" CLUSTER="$CLUSTER" MACHINE_TYPE=worker
+              sleep 5
+            fi
+          done
+          if [ -n "$ALL_NODES_CSV" ]; then
+            printf '\n  step 8: wait for all nodes healthy...'
+            if talosctl --nodes "$ALL_NODES_CSV" health --wait-timeout 5m; then
+              echo " ok"
+            else
+              echo " failed"
+              exit 1
+            fi
+          fi
+        else
+          printf '  workers: none\n'
+        fi
 
-      - echo ""
-      - 'echo "✅ Layer 1 Complete: Talos cluster is running"'
+        printf '  kubeconfig: generating\n'
+        task --silent :talos:generate-kubeconfig
+
+        printf 'Layer 1 complete.\n'
     vars:
       CLUSTER: '{{.CLUSTER}}'
+      EFFECTIVE_DRY_RUN: '{{ lower (default (env "DRY_RUN") .DRY_RUN) }}'
       BOOTSTRAP_NODE:
-        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//'
-      ADDITIONAL_NODES:
-        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | tail -n +2 | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ' '
-      ALL_NODES:
-        sh: find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | xargs -n1 basename | sed 's/.yaml//' | tr '\n' ','
+        sh: |
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane" ]; then
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane"
+          else
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}"
+          fi
+          FILE=$(find "$SOURCE" -maxdepth 1 -name '*.yaml' -type f | sort | head -1)
+          if [ -n "$FILE" ]; then
+            basename "$FILE" .yaml
+          fi
+      ADDITIONAL_CONTROLPLANES:
+        sh: |
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane" ]; then
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane"
+          else
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}"
+          fi
+          find "$SOURCE" -maxdepth 1 -name '*.yaml' -type f | sort | tail -n +2 | \
+            awk -F/ '{sub(/\.yaml$/, "", $NF); printf "%s ", $NF}' | sed 's/[[:space:]]*$//'
+      WORKER_NODES:
+        sh: |
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/worker" ]; then
+            find "{{.TALOS_DIR}}/{{.CLUSTER}}/worker" -maxdepth 1 -name '*.yaml' -type f | sort | \
+              awk -F/ '{sub(/\.yaml$/, "", $NF); printf "%s ", $NF}' | sed 's/[[:space:]]*$//'
+          fi
+      CONTROLPLANE_NODES_CSV:
+        sh: |
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane" ]; then
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane"
+          else
+            SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}"
+          fi
+          find "$SOURCE" -maxdepth 1 -name '*.yaml' -type f | sort | \
+            awk -F/ '{sub(/\.yaml$/, "", $NF); printf "%s,", $NF}' | sed 's/,$//'
+      ALL_NODES_CSV:
+        sh: |
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane" ]; then
+            CP_SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}/controlplane"
+          else
+            CP_SOURCE="{{.TALOS_DIR}}/{{.CLUSTER}}"
+          fi
+          CP=$(find "$CP_SOURCE" -maxdepth 1 -name '*.yaml' -type f | sort | \
+            awk -F/ '{sub(/\.yaml$/, "", $NF); printf "%s,", $NF}' | sed 's/,$//')
+          if [ -d "{{.TALOS_DIR}}/{{.CLUSTER}}/worker" ]; then
+            WORK=$(find "{{.TALOS_DIR}}/{{.CLUSTER}}/worker" -maxdepth 1 -name '*.yaml' -type f | sort | \
+              awk -F/ '{sub(/\.yaml$/, "", $NF); printf "%s,", $NF}' | sed 's/,$//')
+          else
+            WORK=""
+          fi
+          if [ -n "$CP" ] && [ -n "$WORK" ]; then
+            echo "$CP,$WORK"
+          else
+            echo "$CP$WORK"
+          fi
+      ALREADY_BOOTSTRAPPED:
+        sh: |
+          if [ -z "{{.BOOTSTRAP_NODE}}" ]; then
+            echo false
+            exit 0
+          fi
+          if ! command -v talosctl >/dev/null 2>&1; then
+            echo false
+            exit 0
+          fi
+          if talosctl --nodes {{.BOOTSTRAP_NODE}} get machineconfig &>/dev/null; then
+            if talosctl --nodes {{.BOOTSTRAP_NODE}} etcd status &>/dev/null; then
+              echo true
+              exit 0
+            fi
+          fi
+          echo false
 
   layer:2-kubernetes:
     desc: ⏳ Layer 2 - Wait for Kubernetes to be ready
@@ -618,16 +764,17 @@ tasks:
 
   dry-run:
     desc: 🔍 Show what cluster creation would do
+    silent: true
     cmds:
       - echo "=== Cluster Creation Dry-Run for {{.CLUSTER}} ==="
       - echo ""
-      - 'echo "Layer 1: Talos Cluster Bootstrap"'
-      - echo "  Bootstrap node:"
-      - find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | head -1 | xargs basename | sed 's/.yaml//' | sed 's/^/    - /'
-      - echo "  Additional nodes:"
-      - find {{.TALOS_DIR}}/{{.CLUSTER}} -name '*.yaml' -type f | sort | tail -n +2 | xargs -n1 basename | sed 's/.yaml//' | sed 's/^/    - /'
+      - task: layer:1-talos
+        vars:
+          CLUSTER: "{{.CLUSTER}}"
+          DRY_RUN: "true"
       - echo ""
       - 'echo "Layer 2: Kubernetes Waiting"'
+      - echo ""
       - echo "  - Wait for API server"
       - echo "  - Wait for nodes Ready"
       - echo "  - Verify etcd health"

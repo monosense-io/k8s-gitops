@@ -1,0 +1,12 @@
+{
+  "sprint_date": "2025-10-21",
+  "commit": "8c3e5deb02b97db686cc4adc62b4e55a95319936",
+  "version": {
+    "architecture": "v4.0",
+    "prd": "v4"
+  },
+  "files": [
+    {"name": "architecture.v4.md", "size": 74556, "sha256": "e51f1fc2f695eb6edfc339727dd317edb94d21faf2c52b4f926ae4f042fdbaac"},
+    {"name": "prd.v4.md", "size": 9195, "sha256": "e72fee018368f48dcb80345961f95d7b1021bee12a0cb3a35e6d2a0a4b319ef0"}
+  ]
+}

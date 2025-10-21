@@ -18,12 +18,12 @@ subjects:
   # Victoria Metrics Agent
   - kind: ServiceAccount
     name: vmagent
-    namespace: monitoring
+    namespace: observability
 
   # Victoria Metrics Alert
   - kind: ServiceAccount
     name: vmalert
-    namespace: monitoring
+    namespace: observability
 
   # Add additional monitoring tools as needed:
   # - Grafana (if using k8s data source)

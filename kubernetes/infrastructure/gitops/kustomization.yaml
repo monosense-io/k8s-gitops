@@ -4,9 +4,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: flux-system
 resources:
-  # Flux Kustomization resources for GitOps components
-  - flux-operator/ks.yaml
-  - flux-instance/ks.yaml
   # Component directories (contain actual manifests)
+  # Note: Flux is bootstrapped via Helmfile; these are kept for reference only
   - flux-operator
   - flux-instance

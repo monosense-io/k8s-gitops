@@ -9,6 +9,17 @@ tasks:
   # High-Level Orchestration Tasks
   # ============================================================================
 
+  talos:
+    desc: "⚙️ Phase -1 - Bootstrap Talos (control plane + kubeconfig) [CLUSTER=required]"
+    cmds:
+      - task: :cluster:layer:1-talos
+        vars: {CLUSTER: "{{.CLUSTER}}", CONTEXT: "{{.CONTEXT}}"}
+    vars:
+      CLUSTER: '{{.CLUSTER | default ""}}'
+      CONTEXT: '{{.CONTEXT | default .CLUSTER}}'
+    requires:
+      vars: [CLUSTER]
+
   infra:
     desc: 🚀 Bootstrap infra cluster (complete 3-phase automated)
     cmds:
@@ -20,6 +31,22 @@ tasks:
     cmds:
       - task: bootstrap
         vars: {CLUSTER: apps, CONTEXT: apps}
+
+  infra-crds:
+    desc: 🔧 Install CRDs only on infra cluster (victoria-metrics-operator CRDs, prometheus-operator CRDs, etc.)
+    cmds:
+      - task: phase:1
+        vars: {CLUSTER: infra, CONTEXT: infra, DRY_RUN: "{{.DRY_RUN}}"}
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
+
+  apps-crds:
+    desc: 🔧 Install CRDs only on apps cluster (victoria-metrics-operator CRDs, prometheus-operator CRDs, etc.)
+    cmds:
+      - task: phase:1
+        vars: {CLUSTER: apps, CONTEXT: apps, DRY_RUN: "{{.DRY_RUN}}"}
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "false"}}'
 
   bootstrap:
     desc: Complete automated bootstrap (all phases)

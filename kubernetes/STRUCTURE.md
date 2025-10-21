@@ -7,7 +7,6 @@ kubernetes/
 │   ├── cert-manager/
 │   ├── coredns/
 │   ├── fluent-bit/
-│   ├── flux/
 │   ├── openebs/
 │   ├── rook-ceph-cluster/
 │   ├── rook-ceph-operator/
@@ -16,8 +15,7 @@ kubernetes/
 │   └── victoria-metrics-stack/
 │
 ├── infrastructure/            # Platform capabilities promoted to clusters
-│   ├── gitops/
-│   │   └── flux/
+│   ├── gitops/                # (legacy) unused; Flux is bootstrapped via Helmfile
 │   ├── networking/
 │   │   ├── cilium/            # Cilium w/ BGP, Gateway API (Envoy), ClusterMesh
 │   │   ├── coredns/
@@ -52,12 +50,11 @@ kubernetes/
 
 - **bases/** contains the minimal building blocks. Nothing is cluster-aware.
 - **infrastructure/** composes the bases into functional stacks (networking, security, etc.).
-- **storage/** bundles Rook-Ceph and OpenEBS so every cluster gets NVMe-backed block and hostpath classes.
+- **storage/** contains Rook-Ceph and OpenEBS; clusters reconcile storage via their cluster-level Kustomizations (no local ks.yaml aggregators).
 - **workloads/** is where platform services and tenant apps live. `platform/databases` exposes CloudNativePG and Dragonfly (annotated with `service.cilium.io/global: "true"`) for cross-cluster access, while `platform/observability` ships the VictoriaMetrics + VictoriaLogs stack and Fluent Bit only to the infra cluster.
 - **clusters/** contains every Flux reconciliation surface. Each cluster renders variables through
   `postBuild.substitute` to apply CIDRs, BGP ASN, ClusterMesh secrets, and domain-specific values.
-- **Flux controllers** are managed via the `gitops/flux` HelmRelease once bootstrapped with
-  `task bootstrap:<cluster>`.
+- **Flux controllers** are bootstrapped via Helmfile (not self-managed by this repo). The legacy `infrastructure/gitops/` tree is kept for reference only.
 
 ### Cilium Enhancements
 

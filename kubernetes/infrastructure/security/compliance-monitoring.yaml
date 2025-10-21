@@ -7,7 +7,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: compliance-monitoring
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: compliance-monitoring
     app.kubernetes.io/component: regulatory-compliance
@@ -948,7 +948,7 @@ data:
         name: "Cilium Hubble Network Flows"
         description: "Network flow logs and security events"
         collection_method: "streaming"
-        endpoint: "hubble-relay.monitoring.svc.cluster.local:8080"
+        endpoint: "hubble-relay.observability.svc.cluster.local:8080"
         retention_days: 365
         integrity_checks:
           - "sequence_number_validation"
@@ -964,7 +964,7 @@ data:
         name: "Falco Runtime Security Events"
         description: "Container runtime security events and alerts"
         collection_method: "syslog"
-        endpoint: "falco-events.monitoring.svc.cluster.local:6060"
+        endpoint: "falco-events.observability.svc.cluster.local:6060"
         retention_days: 730
         integrity_checks:
           - "event_sequence_validation"

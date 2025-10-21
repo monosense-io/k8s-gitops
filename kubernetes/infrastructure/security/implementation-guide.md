@@ -6,7 +6,7 @@ This comprehensive security observability enhancement strategy provides advanced
 
 ## Architecture Components
 
-### 1. Enhanced Security Monitoring Architecture
+### 1. Enhanced Security Observability Architecture
 
 **Location**: `/Users/monosense/iac/k8s-gitops/kubernetes/infrastructure/security/security-observability-architecture.yaml`
 
@@ -117,8 +117,8 @@ This comprehensive security observability enhancement strategy provides advanced
    kubectl apply -f kubernetes/infrastructure/security/advanced-security-metrics.yaml
 
    # Verify metrics collection
-   kubectl get prometheusrules -n monitoring
-   kubectl get configmaps -n monitoring | grep security
+   kubectl get prometheusrules -n observability
+   kubectl get configmaps -n observability | grep security
    ```
 
 2. **Enhance Cilium Configuration**
@@ -148,9 +148,9 @@ This comprehensive security observability enhancement strategy provides advanced
 
 1. **Deploy Falco for Runtime Security**
    ```bash
-   # Add Falco to your monitoring stack
+   # Add Falco to your observability stack
    helm repo add falcosecurity https://falcosecurity.github.io/charts
-   helm install falco falcosecurity/falco -n monitoring
+   helm install falco falcosecurity/falco -n observability
 
    # Apply custom Falco rules
    kubectl apply -f kubernetes/infrastructure/security/threat-detection-strategy.yaml
@@ -162,7 +162,7 @@ This comprehensive security observability enhancement strategy provides advanced
    kubectl create secret generic threat-intelligence-keys \
      --from-literal=VIRUSTOTAL_API_KEY=your_key \
      --from-literal=OTX_API_KEY=your_key \
-     -n monitoring
+     -n observability
    ```
 
 3. **Implement Network Security Monitoring**
@@ -180,7 +180,7 @@ This comprehensive security observability enhancement strategy provides advanced
    # Configure compliance scanning schedules
    kubectl create configmap compliance-config \
      --from-file=compliance-automation.yaml \
-     -n monitoring
+     -n observability
    ```
 
 2. **Implement Audit Trail Management**

@@ -4,9 +4,8 @@ kind: Kustomization
 namespace: flux-system
 resources:
   - cert-manager.yaml
-  - cilium.yaml
   - coredns.yaml
   # - dragonfly-operator.yaml  # TODO: Move to infra-specific when ready to deploy
   - external-secrets.yaml
   # - spegel.yaml  # TODO: Investigate if needed, currently failing with access denied
-  - victoria-metrics.yaml
+  # - victoria-metrics.yaml  # removed; charts are referenced directly by URL in HelmReleases

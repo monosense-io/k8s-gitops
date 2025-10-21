@@ -7,7 +7,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: threat-detection-rules
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: threat-detection
     app.kubernetes.io/component: real-time-detection
@@ -356,7 +356,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: attack-pattern-recognition
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: attack-pattern-recognition
     app.kubernetes.io/component: correlation
@@ -665,7 +665,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: zero-day-monitoring
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: zero-day-monitoring
     app.kubernetes.io/component: vulnerability-monitoring

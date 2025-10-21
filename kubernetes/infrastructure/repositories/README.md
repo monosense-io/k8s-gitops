@@ -6,7 +6,7 @@ Centralized Helm chart source management for all infrastructure and workload dep
 
 ```
 repositories/
-├── ks.yaml                    # Flux Kustomization (flux-repositories)
+├── [removed] ks.yaml          # Removed to avoid duplication; clusters reconcile this path directly
 ├── kustomization.yaml         # Root kustomization
 ├── oci/                       # OCI registry sources (6 charts)
 │   ├── cert-manager.yaml

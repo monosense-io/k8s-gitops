@@ -4,4 +4,5 @@ kind: Kustomization
 
 resources:
   - ocirepository.yaml
-  # Note: Cilium HelmRelease included via cilium/ks.yaml patchesJson6902
+  # Note: Cilium core (DaemonSet/Operator) is installed via bootstrap Helmfile
+  # GitOps manages only day-2 features under networking/cilium/ (via its ks.yaml)

@@ -7,7 +7,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: security-forensics-capabilities
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: security-forensics
     app.kubernetes.io/component: forensics

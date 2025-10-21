@@ -7,7 +7,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: security-observability-architecture
-  namespace: monitoring
+  namespace: observability
   labels:
     app.kubernetes.io/name: security-observability
     app.kubernetes.io/component: architecture
@@ -23,7 +23,7 @@ data:
     kind: ConfigMap
     metadata:
       name: security-event-collector
-      namespace: monitoring
+      namespace: observability
     data:
       # Fluent Bit configuration for security event collection
       fluent-bit-security.conf: |
@@ -101,7 +101,7 @@ data:
         [OUTPUT]
             Name                 http
             Match                *
-            Host                 victoria-logs.monitoring.svc.cluster.local
+            Host                 victoria-logs.observability.svc.cluster.local
             Port                 9428
             URI                  /insert/jsonline?_stream_fields=security_event_type,cluster_name,severity
             Format               json_lines
@@ -122,7 +122,7 @@ data:
     kind: ConfigMap
     metadata:
       name: threat-detection-engine
-      namespace: monitoring
+      namespace: observability
     data:
       # Falco rules for advanced threat detection
       falco_rules.yaml: |
@@ -250,7 +250,7 @@ data:
     kind: ConfigMap
     metadata:
       name: incident-response-automation
-      namespace: monitoring
+      namespace: observability
     data:
       # Automated Response Playbooks
       response-playbooks.yaml: |
@@ -345,7 +345,7 @@ data:
     kind: ConfigMap
     metadata:
       name: compliance-monitoring
-      namespace: monitoring
+      namespace: observability
     data:
       # Compliance Frameworks Configuration
       compliance-frameworks.yaml: |
@@ -446,7 +446,7 @@ data:
     kind: ConfigMap
     metadata:
       name: forensic-capabilities
-      namespace: monitoring
+      namespace: observability
     data:
       # Forensic Investigation Framework
       forensic-framework.yaml: |
@@ -540,7 +540,7 @@ data:
     kind: ConfigMap
     metadata:
       name: security-metrics
-      namespace: monitoring
+      namespace: observability
     data:
       # Security Performance Metrics
       security_kpis.yaml: |
