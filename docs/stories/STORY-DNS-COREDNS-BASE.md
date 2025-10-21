@@ -1,6 +1,6 @@
 # 07 — STORY-DNS-COREDNS-BASE — CoreDNS via GitOps
 
-Sequence: 07/13 | Prev: STORY-SEC-CERT-MANAGER-ISSUERS.md | Next: STORY-GITOPS-SELF-MGMT-FLUX.md
+Sequence: 07/21 | Prev: STORY-SEC-CERT-MANAGER-ISSUERS.md | Next: STORY-GITOPS-SELF-MGMT-FLUX.md
 
 Status: Draft
 Owner: Platform Engineering

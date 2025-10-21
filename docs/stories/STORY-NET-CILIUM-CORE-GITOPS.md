@@ -1,6 +1,6 @@
 # 04 — STORY-NET-CILIUM-CORE-GITOPS — Put Cilium Core under GitOps Control
 
-Sequence: 04/13 | Prev: STORY-BOOT-CORE.md | Next: STORY-SEC-EXTERNAL-SECRETS-BASE.md
+Sequence: 04/21 | Prev: STORY-BOOT-CORE.md | Next: STORY-SEC-EXTERNAL-SECRETS-BASE.md
 
 Status: Draft
 Owner: Platform Engineering
