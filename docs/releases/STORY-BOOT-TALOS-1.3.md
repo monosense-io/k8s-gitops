@@ -6,6 +6,10 @@ Summary
 - Locked CRD/controller versions and documented alignment across bootstrap helmfiles.
 - Added CP‑only cluster resource guardrails and troubleshooting guidance to runbook.
 
+Validation Status
+- Live cluster validation: PENDING for both infra and apps.
+- Current evidence: DRY‑RUN ONLY (see links below). Do not tag final release until live evidence is attached and QA gate flips to PASS.
+
 Operator Impact
 - Bootstrap remains idempotent; dry‑run path available via `DRY_RUN=true`.
 - Failure before core applies if `onepassword-connect-token` secret is missing (clear instructions provided).
@@ -15,7 +19,17 @@ Validation
 - Dry‑run evidence: 
   - docs/qa/evidence/BOOT-TALOS-dry-run-infra-20251021.txt
   - docs/qa/evidence/BOOT-TALOS-dry-run-apps-20251021.txt
-- QA Gate: PASS — docs/qa/gates/EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS-boot-talos.yml
+- QA Gate: CONCERNS — docs/qa/gates/EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS-boot-talos.yml
+
+How To Produce Live Evidence (both clusters)
+1) End‑to‑end create or stepwise:
+   - `task cluster:create-<cluster>`
+   - or `task bootstrap:talos CLUSTER=<cluster>` → `task :bootstrap:phase:{0,1,2,3} CLUSTER=<cluster>`
+2) Verify readiness:
+   - `kubectl --context=<cluster> get nodes` (control planes Ready)
+   - `task cluster:health CLUSTER=<cluster>`
+3) Re‑run to assert idempotency (short‑circuit messages, no errors)
+4) Save key excerpts to `docs/qa/evidence/BOOT-TALOS-live-<cluster>-YYYYMMDD.txt`
 
 References
 - Story: docs/stories/STORY-BOOT-TALOS.md

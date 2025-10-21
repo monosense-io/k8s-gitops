@@ -1,6 +1,6 @@
 # STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Status: Ready for Merge
+Status: Review
 Owner: Product → Platform Engineering
 Date: 2025-10-21
 Links: docs/architecture.md §6 (Bootstrap Architecture); .taskfiles/cluster/Taskfile.yaml; .taskfiles/bootstrap/Taskfile.yaml; talos/**; docs/epics/EPIC-greenfield-multi-cluster-gitops.md; docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md; docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md; docs/runbooks/bootstrapping-from-zero.md
@@ -135,7 +135,8 @@ Refer to runbook: `docs/runbooks/bootstrapping-from-zero.md` for operator notes.
 | 2025-10-21 | 1.0     | Initial draft                     | PO     |
 | 2025-10-21 | 1.1     | PO correct‑course (sections, ACs) | PO     |
 | 2025-10-21 | 1.2     | Applied QA fixes (SEC-001, TECH-001, TECH-002, OPS-001) | Dev (James) |
-| 2025-10-21 | 1.3     | All must‑fix items implemented; ready for merge | Dev (James) |
+| 2025-10-21 | 1.3     | All must‑fix items implemented; requires live-cluster validation | Dev (James) |
+| 2025-10-21 | 1.4     | Reclassified to Review pending live-cluster evidence | SM |
 
 ## Dev Agent Record
 ### Agent Model Used
@@ -169,14 +170,14 @@ Claude Sonnet 4.5 (dev persona, James)
 
 ## QA Results
 - Risk Profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
-  - Totals — Critical: 0, High: 0, Medium: 4, Low: 2
-  - Highest (post‑fix): Medium items monitored (observability CRD growth, future worker scale‑out)
-  - Must‑fix: None outstanding; all prior must‑fix items addressed and verified
+  - Totals — Critical: 0, High: 2, Medium: 3, Low: 2
+  - Highest: EVID-LIVE-001 (no live-cluster execution evidence), DRYRUN-L2-001 (no end-to-end runtime logs)
+  - Must‑fix before PASS: Provide live-cluster evidence for infra and apps (see below)
 - Test Design: docs/qa/assessments/STORY-BOOT-TALOS-test-design-20251021.md
   - Scenarios: 10 total • Unit 0 • Integration 3 • E2E 7
   - Priority: P0 5 • P1 4 • P2 1
-  - Mapping covers AC1–AC7; AC6 validated via multi‑signal safe‑detector checks
-- Gate Recommendation: PASS. Evidence: `docs/qa/evidence/BOOT-TALOS-dry-run-infra-20251021.txt`, `docs/qa/evidence/BOOT-TALOS-dry-run-apps-20251021.txt`; code references: `.taskfiles/cluster/Taskfile.yaml` (safe‑detector), `.taskfiles/bootstrap/Taskfile.yaml` (1Password preflight), `bootstrap/helmfile.d/00-crds.yaml` + `01-core.yaml.gotmpl` (version alignment), `docs/runbooks/bootstrapping-from-zero.md` (CP‑only guardrails).
+  - Mapping covers AC1–AC7; AC6 safe‑detector validated in code review; runtime validation pending
+- Gate Recommendation: CONCERNS until live-cluster evidence is attached. Current evidence is dry-run only: `docs/qa/evidence/BOOT-TALOS-dry-run-infra-20251021.txt`, `docs/qa/evidence/BOOT-TALOS-dry-run-apps-20251021.txt`.
 
 ### Review Date: 2025-10-21
 
@@ -218,9 +219,20 @@ None.
 
 ### Gate Status
 
-Gate: PASS → docs/qa/gates/EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS-boot-talos.yml
+Gate: CONCERNS → docs/qa/gates/EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS-boot-talos.yml
 Risk profile: docs/qa/assessments/STORY-BOOT-TALOS-risk-20251021.md
-NFR assessment: Security PASS (preflight enforced); Reliability/Performance/Maintainability PASS
+NFR assessment: Security PASS; Reliability CONCERNS pending runtime evidence; Performance/Maintainability PASS
+
+### Evidence To Collect (both clusters: infra, apps)
+- Phase −1 to 3 logs via Taskfile:
+  - `task cluster:create-<cluster>` OR stepwise `task bootstrap:talos` → `task :bootstrap:phase:{0,1,2,3}`
+- Kubeconfig and node readiness:
+  - `kubectl --context=<cluster> get nodes` shows control planes Ready
+- Health gate:
+  - `task cluster:health CLUSTER=<cluster>` outputs
+- Idempotency:
+  - Re-run bootstrap tasks; confirm short-circuit/skip behavior and no errors
+- Save key excerpts under `docs/qa/evidence/BOOT-TALOS-live-<cluster>-YYYYMMDD.txt`
 
 ### Recommended Status
 

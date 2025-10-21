@@ -249,6 +249,43 @@ tasks:
           echo "    ❌ Only found $CRD_COUNT VictoriaMetrics CRDs (expected 14+)"
           exit 1
         fi
+      - |
+        echo "  → Waiting for critical CRDs to be Established..."
+        set -e
+        wait_crd() {
+          local crd="$1"
+          if kubectl --context={{.CONTEXT}} get crd "$crd" &>/dev/null; then
+            kubectl --context={{.CONTEXT}} wait --for=condition=Established "crd/${crd}" --timeout=120s
+            echo "    ✓ $crd Established"
+          else
+            echo "    ✗ $crd not found"; exit 1
+          fi
+        }
+        # monitoring.coreos.com
+        wait_crd prometheusrules.monitoring.coreos.com
+        wait_crd servicemonitors.monitoring.coreos.com
+        wait_crd podmonitors.monitoring.coreos.com
+        # external-secrets.io
+        wait_crd externalsecrets.external-secrets.io
+        wait_crd secretstores.external-secrets.io
+        wait_crd clustersecretstores.external-secrets.io
+        # cert-manager.io
+        wait_crd issuers.cert-manager.io
+        wait_crd clusterissuers.cert-manager.io
+        wait_crd certificates.cert-manager.io
+        # gateway.networking.k8s.io
+        wait_crd gateways.gateway.networking.k8s.io
+        wait_crd gatewayclasses.gateway.networking.k8s.io
+        wait_crd httproutes.gateway.networking.k8s.io
+      - |
+        echo "  → API discovery sanity..."
+        for grp in monitoring.coreos.com operator.victoriametrics.com external-secrets.io cert-manager.io gateway.networking.k8s.io; do
+          if kubectl --context={{.CONTEXT}} api-resources --api-group "$grp" | tail -n +2 | wc -l | grep -q '^[1-9]'; then
+            echo "    ✓ API group present: $grp"
+          else
+            echo "    ✗ API group missing: $grp"; exit 1
+          fi
+        done
     vars:
       CONTEXT: '{{.CONTEXT}}'
 

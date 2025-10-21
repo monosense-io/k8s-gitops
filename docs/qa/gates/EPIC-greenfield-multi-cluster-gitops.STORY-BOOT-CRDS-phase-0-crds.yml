@@ -1,0 +1,52 @@
+# <!-- Powered by BMAD™ Core -->
+schema: 1
+story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-CRDS'
+story_title: 'STORY-BOOT-CRDS — Phase 0 CRD Bootstrap (infra + apps)'
+gate: 'CONCERNS'
+status_reason: 'Awaiting live cluster evidence: Established waits, namespace Active checks, and kubeconform dry-runs for infra and apps.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-10-21T04:43:10Z'
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 2, medium: 3, low: 1 }
+  recommendations:
+    must_fix: [ 'EVID-001', 'DRYRUN-001' ]
+    monitor: [ 'NS-001', 'GA-001', 'ALIGN-001' ]
+
+quality_score: 78
+expires: null
+
+evidence:
+  tests_reviewed: 8
+  risks_identified: 6
+  trace:
+    ac_covered: [2, 3, 5]
+    ac_gaps: [1, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No sensitive material; aligns with External Secrets/1Password pattern.'
+  performance:
+    status: PASS
+    notes: 'CRD-only phase; negligible runtime impact.'
+  reliability:
+    status: CONCERNS
+    notes: 'No runtime evidence yet of Established waits across both clusters.'
+  maintainability:
+    status: PASS
+    notes: 'Taskfile automation and helper script improve repeatability.'
+
+recommendations:
+  immediate:
+    - action: 'Execute Phase 0/1 and attach validate:crds outputs for infra and apps.'
+      refs: ['.taskfiles/bootstrap/Taskfile.yaml', 'scripts/validate-crd-waitset.sh']
+    - action: 'Attach kubeconform outputs for kubernetes/clusters/{infra,apps} (no missing-type errors).'
+      refs: ['kubernetes/clusters/infra', 'kubernetes/clusters/apps']
+  future:
+    - action: 'CI job to run validate-crd-waitset against ephemeral clusters.'
+      refs: ['scripts/validate-crd-waitset.sh']
+

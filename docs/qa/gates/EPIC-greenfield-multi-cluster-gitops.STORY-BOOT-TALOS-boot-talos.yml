@@ -2,18 +2,18 @@
 schema: 1
 story: 'EPIC-greenfield-multi-cluster-gitops.STORY-BOOT-TALOS'
 story_title: 'STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)'
-gate: 'PASS'
-status_reason: 'All must-fix items addressed: safe-detector hardened, 1Password secret preflight enforced, CRD/controller versions aligned, and CP-only resource guardrails documented. Dry-run evidence captured for infra/apps.'
+gate: 'CONCERNS'
+status_reason: 'Pending live-cluster validation: need execution evidence (Talos bootstrap, Kubernetes readiness, CRDs/core phases) for infra and apps; only dry-run evidence is present.'
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-21T04:04:30Z'
+updated: '$DATE'
 waiver: { active: false }
 
 top_issues: []
 
 risk_summary:
-  totals: { critical: 0, high: 0, medium: 4, low: 2 }
+  totals: { critical: 0, high: 2, medium: 3, low: 2 }
   recommendations:
-    must_fix: []
+    must_fix: ['EVID-LIVE-001', 'DRYRUN-L2-001']
     monitor: ['TECH-003 (future worker scale-out)', 'OPS-002 (observability CRDs growth)']
 
 # Optional extended fields
@@ -35,14 +35,20 @@ nfr_validation:
     status: PASS
     notes: 'No performance blockers in bootstrap path observed.'
   reliability:
-    status: PASS
-    notes: 'Idempotent task reruns documented; dry-run path available.'
+    status: CONCERNS
+    notes: 'Idempotency and detector robustness look good on paper, but live bootstrap/re-run evidence is missing.'
   maintainability:
     status: PASS
     notes: 'Story structure, mapping, and runbooks are clear.'
 
 recommendations:
-  immediate: []
+  immediate:
+    - action: 'Execute Talos bring-up end-to-end on infra and apps, attach logs of T0–T5 from Taskfile.'
+      refs: ['.taskfiles/cluster/Taskfile.yaml']
+    - action: 'Capture kubeconfig export + kubectl get nodes (Ready) for both contexts.'
+      refs: ['kubernetes/kubeconfig']
+    - action: 'Attach bootstrap status outputs (CRDs/Core/Flux checks).'
+      refs: ['.taskfiles/bootstrap/Taskfile.yaml']
   future:
     - action: 'Monitor CP-only resource pressure; scale workers when thresholds exceeded.'
       refs: ['docs/runbooks/bootstrapping-from-zero.md']
