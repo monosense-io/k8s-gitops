@@ -1,6 +1,8 @@
 # 25 — STORY-STO-APPS-ROOK-CEPH-OPERATOR — Rook-Ceph Operator (apps)
 
 Sequence: 25/26 | Prev: STORY-STO-APPS-OPENEBS-BASE.md | Next: STORY-STO-APPS-ROOK-CEPH-CLUSTER.md
+Sprint: 6 | Lane: Storage
+Global Sequence: 35/41
 
 Status: Draft
 Owner: Platform Engineering
@@ -24,4 +26,3 @@ Deploy the Rook-Ceph operator on the apps cluster to manage a local Ceph cluster
 ## Validation Steps
 - flux -n flux-system --context=apps reconcile kustomization rook-ceph-operator --with-source
 - kubectl --context=apps -n rook-ceph get deploy rook-ceph-operator
-

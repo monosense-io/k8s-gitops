@@ -1,6 +1,8 @@
 # XX — STORY-NET-CLUSTERMESH-DNS — Public DNS for Cilium ClusterMesh API Servers
 
 Sequence: 34/38 | Prev: STORY-SEC-NP-BASELINE.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
+Sprint: 6 | Lane: Networking & DNS
+Global Sequence: 33/41
 
 Status: Draft
 Owner: Platform Engineering

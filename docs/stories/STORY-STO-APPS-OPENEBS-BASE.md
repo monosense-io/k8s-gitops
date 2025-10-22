@@ -1,6 +1,8 @@
 # 24 — STORY-STO-APPS-OPENEBS-BASE — OpenEBS LocalPV (apps)
 
 Sequence: 24/26 | Prev: STORY-BACKUP-VOLSYNC-APPS.md | Next: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md
+Sprint: 6 | Lane: Storage
+Global Sequence: 34/41
 
 Status: Draft
 Owner: Platform Engineering
@@ -25,4 +27,3 @@ Deploy OpenEBS LocalPV on the apps cluster to provide node-local storage for wor
 - flux -n flux-system --context=apps reconcile kustomization openebs --with-source
 - kubectl --context=apps -n openebs-system get ds openebs-localpv-provisioner
 - kubectl --context=apps get sc | grep ${OPENEBS_STORAGE_CLASS}
-

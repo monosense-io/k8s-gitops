@@ -1,6 +1,8 @@
 # XX — STORY-APP-HARBOR — Harbor (Anchor App) on Infra
 
 Sequence: 35/38 | Prev: STORY-OBS-FLUENT-BIT-IMPLEMENT.md | Next: STORY-CICD-GITHUB-ARC.md
+Sprint: 7 | Lane: Registry
+Global Sequence: 39/41
 
 Status: Draft
 Owner: Platform Engineering

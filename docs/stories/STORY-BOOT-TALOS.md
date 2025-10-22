@@ -1,6 +1,8 @@
 # 01 — STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
 Sequence: 01/26 | Next: STORY-BOOT-CRDS.md
+Sprint: 1 | Lane: Bootstrap & Platform
+Global Sequence: 1/41
 
 Status: Done
 Owner: Product → Platform Engineering

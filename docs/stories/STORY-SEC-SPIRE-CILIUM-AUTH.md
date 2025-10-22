@@ -1,6 +1,8 @@
 # XX — STORY-SEC-SPIRE-CILIUM-AUTH — SPIRE + Cilium mTLS Authentication Baseline
 
 Sequence: 32/38 | Prev: STORY-SEC-CERT-MANAGER-ISSUERS.md | Next: STORY-SEC-NP-BASELINE.md
+Sprint: 5 | Lane: Security & Identity
+Global Sequence: 30/41
 
 Status: Draft
 Owner: Platform Engineering

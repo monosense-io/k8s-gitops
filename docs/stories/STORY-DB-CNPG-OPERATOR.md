@@ -1,6 +1,8 @@
 # 17 — STORY-DB-CNPG-OPERATOR — CloudNativePG Operator
 
 Sequence: 17/26 | Prev: STORY-STO-ROOK-CEPH-CLUSTER.md | Next: STORY-DB-CNPG-SHARED-CLUSTER.md
+Sprint: 5 | Lane: Databases
+Global Sequence: 26/41
 
 Status: Draft
 Owner: Platform Engineering

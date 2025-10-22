@@ -1,6 +1,8 @@
 # 02 — STORY-BOOT-CRDS — Phase 0 CRD Bootstrap (infra + apps)
 
 Sequence: 02/26 | Prev: STORY-BOOT-TALOS.md | Next: STORY-BOOT-CORE.md
+Sprint: 1 | Lane: Bootstrap & Platform
+Global Sequence: 2/41
 
 Status: Done
 Owner: Scrum Master → Platform Engineering

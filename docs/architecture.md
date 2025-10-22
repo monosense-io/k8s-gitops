@@ -37,6 +37,7 @@
 20. [🔗 Cilium ClusterMesh + SPIRE](#20-cilium-clustermesh--spire)
 21. [🛡️ Security & Network Policy](#21-security--network-policy-baseline)
 22. [🔄 Multi-Cluster Mesh Options](#22-multi-cluster-mesh-options---decision-matrix)
+23. [🌐 DNS, ExternalDNS, and Cloudflare Tunnel](#23-dns-externaldns-and-cloudflare-tunnel)
 
 ---
 
@@ -1812,3 +1813,87 @@ spec:
         namespace: flux-system
   values: { ... }
 ```
+
+---
+
+## 23. 🌐 DNS, ExternalDNS, and Cloudflare Tunnel
+
+Public and private DNS automation with two ExternalDNS controllers (Cloudflare and RFC2136/BIND), integrated with Cloudflare Tunnel for zero‑origin‑exposure ingress.
+
+### Objectives
+- Automate DNS for public apps under `SECRET_DOMAIN` (Cloudflare managed).
+- Provide LAN‑only DNS for internal names (BIND via RFC2136) without leaking private records to public zones.
+- Terminate edge via Cloudflare Tunnel (cloudflared) to avoid exposing load balancers to the Internet.
+
+### Target Pattern (Summary)
+- Run two ExternalDNS instances with disjoint domain filters and TXT registries:
+  - `external-dns-cloudflare` → provider `cloudflare`, `--domain-filter=${SECRET_DOMAIN}`, `--registry=txt`, `--txt-owner-id=k8s-public`, `--txt-prefix=k8s.`; sources: `gateway-httproute`.
+  - `external-dns-rfc2136` → provider `rfc2136` to a local BIND server (zone like `home.arpa` or `monosense.lan`), `--domain-filter=<private-zone>`, `--registry=txt`, `--txt-owner-id=k8s-private`.
+- Deploy `cloudflared` in the cluster (2 replicas) with a named tunnel. Use QUIC transport, readiness on `/ready`, and a ServiceMonitor for metrics.
+- Create a single public CNAME anchor (for example `external.${SECRET_DOMAIN}`) that points to your tunnel domain `<TUNNEL-UUID>.cfargotunnel.com` and is proxied.
+- Publish individual app hostnames as CNAMEs to that anchor (e.g., `app.${SECRET_DOMAIN} → external.${SECRET_DOMAIN}`) using ExternalDNS from Gateway API routes. This decouples per‑app DNS from tunnel lifecycle.
+
+### Cloudflare (Public DNS)
+- Use API Token auth with least privilege: `Zone:Read` and `Zone:DNS:Edit` for the specific zone; store via External Secrets at `${CERTMANAGER_CLOUDFLARE_SECRET_PATH}` or an `external-dns-cloudflare` secret.
+- Set `--cloudflare-proxied` to route through Cloudflare (orange‑cloud) and enable WAF/CDN on public records.
+- Use TXT registry with a unique owner ID to avoid contention with any other writers. Prefer `--txt-prefix=k8s.` so TXT records are namespaced and easy to identify.
+- Use Gateway API source (`--source=gateway-httproute`) and annotate the parent Gateway (or HTTPRoute) with:
+  - `external-dns.alpha.kubernetes.io/hostname: app.${SECRET_DOMAIN}` for the desired FQDN.
+  - `external-dns.alpha.kubernetes.io/target: external.${SECRET_DOMAIN}` so the record becomes a CNAME to the tunnel anchor rather than a raw A/AAAA.
+
+Example (Gateway RBAC sketch for ExternalDNS):
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns-cloudflare
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["gateways", "httproutes"]
+    verbs: ["get", "list", "watch"]
+```
+
+### Cloudflared (Cloudflare Tunnel)
+- Use a named tunnel with token or credentials JSON stored in External Secrets; do not bake secrets into manifests.
+- Recommended runtime settings: `TUNNEL_TRANSPORT_PROTOCOL=quic`, enable post‑quantum where available, disable auto‑update in production (managed by GitOps), enable metrics and readiness on a dedicated port, and run ≥2 replicas.
+- Keep tunnel config minimal: map `*.${SECRET_DOMAIN}` to the cluster’s external Gateway service (for example `https://envoy-external.networking.svc.cluster.local`) and set `originServerName: external.${SECRET_DOMAIN}` for TLS consistency.
+- Create the one‑time anchor record `external.${SECRET_DOMAIN}` → `<TUNNEL-UUID>.cfargotunnel.com` with Cloudflare’s DNS (can be created via `cloudflared tunnel route dns` or the API). ExternalDNS will then publish per‑app CNAMEs pointing at this anchor.
+
+Sketch (cloudflared config):
+```yaml
+ingress:
+  - hostname: "*.${SECRET_DOMAIN}"
+    service: https://envoy-external.networking.svc.cluster.local
+    originRequest:
+      http2Origin: true
+      originServerName: external.${SECRET_DOMAIN}
+  - service: http_status:404
+```
+
+### BIND (Private DNS via RFC2136)
+- Run a BIND server for a private zone (e.g., `monosense.lan` or `home.arpa`).
+- Enable TSIG‑authenticated dynamic updates for the zone and grant access to ExternalDNS only (e.g., `hmac-sha256` key, `allow-update { key externaldns-key; };`).
+- Configure ExternalDNS RFC2136 provider with:
+  - `--provider=rfc2136`, `--rfc2136-host=<bind-ip>`, `--rfc2136-port=53`, `--rfc2136-zone=<private-zone>`
+  - `--rfc2136-tsig-secret=<base64>`, `--rfc2136-tsig-keyname=externaldns-key`, `--rfc2136-tsig-axfr`, `--rfc2136-tsig-secret-alg=hmac-sha256`
+  - `--domain-filter=<private-zone>`, `--registry=txt`, `--txt-owner-id=k8s-private`
+
+### Failure Domains and Safety
+- Separate controller instances and TXT owner IDs per zone to prevent record ownership conflicts.
+- Per‑controller domain filters ensure no cross‑writes (Cloudflare vs. BIND).
+- Proxied CNAME pattern isolates tunnel lifecycle from app DNS and supports apex flattening where needed.
+
+### Observability
+- Add Prometheus rules for `external_dns_controller_last_sync_timestamp_seconds` to detect stale syncs.
+- Scrape cloudflared metrics and alert on tunnel disconnects or degraded readiness.
+
+### Implementation Notes (Repo Alignment)
+- Follow the `app-template` HelmRelease pattern used elsewhere in this repo.
+- Place manifests under `kubernetes/apps/networking/` as:
+  - `cloudflared/` (Deployment + config + ExternalSecret + ServiceMonitor)
+  - `external-dns/cloudflare/` (ExternalDNS for public zone)
+  - `external-dns/rfc2136/` (ExternalDNS for private zone)
+- Use External Secrets for API tokens and TSIG material.

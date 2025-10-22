@@ -1,6 +1,8 @@
 # 23 — STORY-BACKUP-VOLSYNC-APPS — VolSync + Snapshot Controller on apps (MinIO target)
 
 Sequence: 23/26 | Prev: STORY-NET-SPEGEL-REGISTRY-MIRROR.md | Next: STORY-STO-APPS-OPENEBS-BASE.md
+Sprint: 7 | Lane: Backup & DR
+Global Sequence: 41/41
 
 Status: Draft
 Owner: Platform Engineering

@@ -1,6 +1,8 @@
 # 27 — STORY-IDP-KEYCLOAK-OPERATOR — Keycloak via Operator (Infra)
 
 Sequence: 27/27 | Prev: STORY-OBS-VM-STACK.md | Next: —
+Sprint: 5 | Lane: Identity
+Global Sequence: 31/41
 
 Status: Draft
 Owner: Platform Engineering

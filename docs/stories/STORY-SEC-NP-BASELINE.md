@@ -1,6 +1,8 @@
 # XX — STORY-SEC-NP-BASELINE — Default‑Deny + DNS/API + FQDN Baseline
 
 Sequence: 33/38 | Prev: STORY-SEC-SPIRE-CILIUM-AUTH.md | Next: STORY-NET-CLUSTERMESH-DNS.md
+Sprint: 5 | Lane: Security
+Global Sequence: 29/41
 
 Status: Draft
 Owner: Platform Engineering

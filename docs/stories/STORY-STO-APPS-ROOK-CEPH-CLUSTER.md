@@ -1,6 +1,8 @@
 # 26 — STORY-STO-APPS-ROOK-CEPH-CLUSTER — Ceph Cluster (apps)
 
 Sequence: 26/26 | Prev: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md
+Sprint: 6 | Lane: Storage
+Global Sequence: 36/41
 
 Status: Draft
 Owner: Platform Engineering
@@ -25,4 +27,3 @@ Deploy a local Rook-Ceph cluster on apps nodes (apps-01..03) with device-by-id N
 ## Validation Steps
 - kubectl --context=apps -n rook-ceph exec -it deploy/rook-ceph-tools -- ceph -s
 - kubectl --context=apps get sc | grep ${CEPH_BLOCK_STORAGE_CLASS}
-

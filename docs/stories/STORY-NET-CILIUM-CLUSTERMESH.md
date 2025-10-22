@@ -1,6 +1,8 @@
 # 12 — STORY-NET-CILIUM-CLUSTERMESH — Cross-Cluster Connectivity
 
 Sequence: 12/26 | Prev: STORY-NET-CILIUM-BGP.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
+Sprint: 6 | Lane: Networking
+Global Sequence: 32/41
 
 Status: Draft
 Owner: Platform Engineering

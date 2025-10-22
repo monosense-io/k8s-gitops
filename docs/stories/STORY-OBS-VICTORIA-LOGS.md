@@ -1,6 +1,8 @@
 # 20 — STORY-OBS-VICTORIA-LOGS — VictoriaLogs (infra) + vmauth
 
 Sequence: 20/26 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-FLUENT-BIT.md
+Sprint: 3 | Lane: Observability
+Global Sequence: 18/41
 
 Status: Draft
 Owner: Platform Engineering

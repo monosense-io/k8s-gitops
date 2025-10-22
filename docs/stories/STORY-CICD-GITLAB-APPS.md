@@ -1,6 +1,8 @@
 # 28 — STORY-CICD-GITLAB-APPS — GitLab + Runners (DIND) on Apps Cluster
 
 Sequence: 28/28 | Prev: STORY-IDP-KEYCLOAK-OPERATOR.md | Next: —
+Sprint: 7 | Lane: CI/CD
+Global Sequence: 38/41
 
 Status: Draft
 Owner: Platform Engineering

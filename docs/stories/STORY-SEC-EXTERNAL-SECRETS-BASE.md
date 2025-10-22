@@ -1,6 +1,8 @@
 # 05 — STORY-SEC-EXTERNAL-SECRETS-BASE — External Secrets Operator Base
 
 Sequence: 05/26 | Prev: STORY-NET-CILIUM-CORE-GITOPS.md | Next: STORY-SEC-CERT-MANAGER-ISSUERS.md
+Sprint: 1 | Lane: Bootstrap & Platform
+Global Sequence: 5/41
 
 Status: Draft
 Owner: Platform Engineering

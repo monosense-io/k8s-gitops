@@ -1,6 +1,8 @@
 # 16 — STORY-STO-ROOK-CEPH-CLUSTER — Ceph Cluster (infra)
 
 Sequence: 16/26 | Prev: STORY-STO-ROOK-CEPH-OPERATOR.md | Next: STORY-DB-CNPG-OPERATOR.md
+Sprint: 3 | Lane: Storage
+Global Sequence: 15/41
 
 Status: Draft
 Owner: Platform Engineering

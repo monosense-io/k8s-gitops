@@ -1,6 +1,8 @@
 # 29 — STORY-OBS-VM-STACK-IMPLEMENT — Implement Global Metrics Stack
 
 Sequence: 29/30 | Prev: STORY-OBS-VM-STACK.md | Next: STORY-OBS-VICTORIA-LOGS-IMPLEMENT.md
+Sprint: 4 | Lane: Observability
+Global Sequence: 20/41
 
 Status: Draft
 Owner: Platform Engineering

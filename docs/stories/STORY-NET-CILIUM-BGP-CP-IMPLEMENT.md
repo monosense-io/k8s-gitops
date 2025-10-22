@@ -1,6 +1,8 @@
 # 38 — STORY-NET-CILIUM-BGP-CP-IMPLEMENT — Implement Cilium BGP Control Plane (v1.18)
 
 Sequence: 38/38 | Prev: STORY-TENANCY-BASELINE.md | Next: (tbd)
+Sprint: 4 | Lane: Networking
+Global Sequence: 24/41
 
 Status: Draft
 Owner: Platform Engineering
@@ -45,4 +47,3 @@ Replace the legacy `CiliumBGPPeeringPolicy` with Cilium’s BGP Control Plane CR
 
 ## Definition of Done
 - ACs met on both clusters; legacy policy removed; evidence captured in Dev Notes.
-

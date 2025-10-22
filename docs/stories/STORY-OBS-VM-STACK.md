@@ -1,6 +1,8 @@
 # 19 — STORY-OBS-VM-STACK — VictoriaMetrics K8s Stack (operator, Grafana, vmalert)
 
 Sequence: 19/26 | Prev: STORY-DB-CNPG-SHARED-CLUSTER.md | Next: STORY-OBS-VICTORIA-LOGS.md
+Sprint: 3 | Lane: Observability
+Global Sequence: 17/41
 
 Status: Draft
 Owner: Platform Engineering
