@@ -14,15 +14,17 @@ As a platform team, we want Cilium (CNI + operator) to be managed declaratively 
 1) GitOps resources exist and are wired:
    - `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml` references `OCIRepository cilium-charts`.
    - `kubernetes/infrastructure/networking/cilium/core/ks.yaml` is included by `kubernetes/infrastructure/kustomization.yaml`.
-2) Per‑cluster settings are substituted from `cluster-settings` (`CLUSTER`, `CLUSTER_ID`, `POD_CIDR_STRING`, etc.).
+2) Per‑cluster settings are substituted from `cluster-settings` (`CLUSTER`, `CLUSTER_ID`, `POD_CIDR_STRING`, etc.). Chart version pinned to Cilium 1.18.2 across clusters.
 3) After initial bootstrap, uninstalling the imperatively installed Cilium release and reconciling Flux recreates Cilium and the operator (proves Git is canonical).
 4) Health checks: Flux Kustomization shows Ready; `kubectl -n kube-system get ds/dep` for Cilium and operator report ready across nodes.
 
-## Tasks / Subtasks
-- [ ] Create HelmRelease (`core/helmrelease.yaml`) using `chartRef: cilium-charts` and cluster‑scoped values.
-- [ ] Create Kustomization (`core/ks.yaml`) with health checks on DaemonSet and operator Deployment.
-- [ ] Add `networking/cilium/core/ks.yaml` to `kubernetes/infrastructure/kustomization.yaml` before day‑2 features.
-- [ ] Validate on infra and apps: Flux reconciles and Cilium stays healthy.
+## Tasks / Subtasks — Implementation Plan (Story Only)
+- [ ] Author HelmRelease (`kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`) pinned to `1.18.2` with:
+  - `kubeProxyReplacement: "true"`, `gatewayAPI.enabled: true`, `bgpControlPlane.enabled: true`, `prometheus.serviceMonitor.enabled: true`.
+  - Per‑cluster `ipv4NativeRoutingCIDR`, `cluster.id/name` from cluster-settings.
+- [ ] Author Kustomization (`kubernetes/infrastructure/networking/cilium/core/ks.yaml`) with health checks on `DaemonSet/cilium` and `Deployment/cilium-operator`.
+- [ ] Ensure infra‑level `kubernetes/infrastructure/kustomization.yaml` includes `networking/cilium/core/ks.yaml` before IPAM/Gateway/BGP/ClusterMesh Kustomizations.
+- [ ] Validate (later) on infra and apps that Flux reconciles and Cilium stays healthy.
 
 ## Validation Steps
 - flux --context=<ctx> reconcile kustomization cilium-core -n flux-system --with-source
@@ -31,4 +33,11 @@ As a platform team, we want Cilium (CNI + operator) to be managed declaratively 
 
 ## Dev Notes
 - Initial bootstrap of Cilium is still required to allow Flux controllers to start; see `.taskfiles/bootstrap/Taskfile.yaml` `core:gitops`.
-- `kubernetes/infrastructure/cilium/ocirepository.yaml` semver aligned to 1.18.x for parity with bootstrap values.
+- `kubernetes/infrastructure/cilium/ocirepository.yaml` semver aligned to 1.18.2 for parity with bootstrap values.
+
+---
+
+## Design — Core (Story‑Only)
+
+- Install: Bootstrap Cilium, then hand over to Flux HelmRelease. Keep immutable OS defaults; leverage eBPF and kube‑proxy replacement.
+- Feature flags: kube‑proxy replacement (strict), Hubble, Gateway API, BGP Control Plane, LB IPAM; enable per cluster as needed.

@@ -49,8 +49,11 @@ spec:
       type: wireguard
       nodeEncryption: false
 
+    # Enable BGP Control Plane for day-2 BGP CRs
+    bgpControlPlane:
+      enabled: true
+
     hubble:
       enabled: true
       relay: { enabled: true, replicas: 1 }
       ui: { enabled: false }
-

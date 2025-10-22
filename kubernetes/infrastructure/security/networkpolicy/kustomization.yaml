@@ -1,0 +1,13 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# This is a stub baseline aggregator. To apply to a namespace, use a per-namespace
+# Kustomization that sets `namespace: <ns>` and references components below.
+resources: []
+# Example (in a per-namespace overlay):
+# resources:
+#   - ../../../components/networkpolicy/deny-all
+#   - ../../../components/networkpolicy/allow-dns
+#   - ../../../components/networkpolicy/allow-internal
+

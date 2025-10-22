@@ -191,6 +191,12 @@ cilium clustermesh status --context apps
 
 ---
 
+> DEPRECATION NOTICE
+>
+> The manifests under `kubernetes/infrastructure/cilium/` are retained for historical reference only.
+> Cilium is now managed via GitOps under `kubernetes/infrastructure/networking/cilium/core/`.
+> Do not modify these files for live configuration.
+
 ## Observability
 
 ### Metrics

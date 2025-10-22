@@ -8,9 +8,12 @@ namespace: cnpg-system
 resources:
   - gitlab-pooler.yaml
   - harbor-pooler.yaml
-  - mattermost-pooler.yaml
   - keycloak-pooler.yaml
   - synergyflow-pooler.yaml
+  - gitlab-pooler-pdb.yaml
+  - harbor-pooler-pdb.yaml
+  - keycloak-pooler-pdb.yaml
+  - synergyflow-pooler-pdb.yaml
 
 labels:
   - pairs:

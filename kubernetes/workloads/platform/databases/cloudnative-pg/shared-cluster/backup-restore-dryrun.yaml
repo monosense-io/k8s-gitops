@@ -1,0 +1,83 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cnpg-backup-restore-dryrun
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: shared-postgres
+    app.kubernetes.io/component: backup-restore-dryrun
+    app.kubernetes.io/part-of: cloudnative-pg
+spec:
+  # Weekly on Sundays at 03:30 UTC
+  schedule: "30 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: cnpg-backup-restore-dryrun
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: restore-dryrun
+              image: ghcr.io/cloudnative-pg/barman-cloud:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -euo pipefail
+                  echo "Starting barman cloud checks at $(date -u)"
+                  test -n "${AWS_ACCESS_KEY_ID:-}" || { echo "ERROR: AWS_ACCESS_KEY_ID not set"; exit 1; }
+                  test -n "${AWS_SECRET_ACCESS_KEY:-}" || { echo "ERROR: AWS_SECRET_ACCESS_KEY not set"; exit 1; }
+                  test -n "${CNPG_MINIO_ENDPOINT_URL:-}" || { echo "ERROR: CNPG_MINIO_ENDPOINT_URL not set"; exit 1; }
+                  test -n "${CNPG_BACKUP_BUCKET:-}" || { echo "ERROR: CNPG_BACKUP_BUCKET not set"; exit 1; }
+
+                  BASE_URI="s3://${CNPG_BACKUP_BUCKET}/shared-postgres"
+
+                  echo "Listing backups..."
+                  barman-cloud-backup-list --endpoint-url "$CNPG_MINIO_ENDPOINT_URL" "$BASE_URI"
+
+                  echo "Checking WAL archive..."
+                  barman-cloud-check-wal-archive --endpoint-url "$CNPG_MINIO_ENDPOINT_URL" "$BASE_URI"
+
+                  echo "Simulating restore target directory"
+                  mkdir -p /tmp/restore-test
+                  echo "(Advisory) To execute a limited restore test, run barman-cloud-restore to /tmp/restore-test in a non-prod environment."
+
+                  echo "Barman cloud checks completed at $(date -u)"
+              env:
+                - name: AWS_DEFAULT_REGION
+                  value: "us-east-1"
+                - name: CNPG_BACKUP_BUCKET
+                  value: "${CNPG_BACKUP_BUCKET}"
+                - name: CNPG_MINIO_ENDPOINT_URL
+                  value: "${CNPG_MINIO_ENDPOINT_URL}"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-minio-credentials
+                      key: access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: cnpg-minio-credentials
+                      key: secret-key
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 65534
+                readOnlyRootFilesystem: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL

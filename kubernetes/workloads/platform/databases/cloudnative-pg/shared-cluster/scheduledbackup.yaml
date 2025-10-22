@@ -5,8 +5,8 @@ metadata:
   name: shared-postgres-daily-backup
   namespace: cnpg-system
 spec:
-  # Schedule: Daily at 2 AM UTC
-  schedule: "0 2 * * *"
+  # Schedule: Daily at 02:00:00 UTC (CNPG uses six-field cron: seconds first)
+  schedule: "0 0 2 * * *"
 
   # Backup window
   immediate: false

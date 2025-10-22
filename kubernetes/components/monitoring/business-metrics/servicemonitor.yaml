@@ -98,9 +98,5 @@ spec:
           replacement: harbor
         - sourceLabels: [database]
           targetLabel: business_application
-          regex: 'mattermost.*'
-          replacement: mattermost
-        - sourceLabels: [database]
-          targetLabel: business_application
           regex: 'keycloak.*'
           replacement: keycloak

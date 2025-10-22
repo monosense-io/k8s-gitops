@@ -21,6 +21,8 @@ spec:
 
   # Superuser Access
   enableSuperuserAccess: true
+  # TODO(Should-Fix): After adopting per-app Database CRs and verifying roles/permissions,
+  # set enableSuperuserAccess: false and retain the secret for break-glass only.
   superuserSecret:
     name: cnpg-superuser
 
@@ -201,6 +203,7 @@ spec:
     barmanObjectStore:
       destinationPath: "s3://${CNPG_BACKUP_BUCKET}/shared-postgres"
       endpointURL: "${CNPG_MINIO_ENDPOINT_URL}"
+      sse: AES256
       s3Credentials:
         accessKeyId:
           name: cnpg-minio-credentials
@@ -250,18 +253,6 @@ spec:
         passwordSecret:
           name: harbor-db-credentials
 
-      # Mattermost Application User
-      - name: mattermost_app
-        ensure: present
-        login: true
-        superuser: false
-        createdb: false
-        createrole: false
-        inherit: true
-        replication: false
-        connectionLimit: 40
-        passwordSecret:
-          name: mattermost-db-credentials
 
       # Keycloak Application User
       - name: keycloak_app

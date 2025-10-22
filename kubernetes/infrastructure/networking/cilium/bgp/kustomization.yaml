@@ -3,4 +3,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - peering-policy.yaml
+  - cplane/bgp-peer-config.yaml
+  - cplane/bgp-cluster-config.yaml
+  - cplane/bgp-advertisements.yaml

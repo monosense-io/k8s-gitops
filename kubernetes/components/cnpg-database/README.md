@@ -121,4 +121,3 @@ See `kubernetes/workloads/platform/databases/cloudnative-pg/poolers/` for pooler
 See existing applications:
 - GitLab: `kubernetes/workloads/platform/databases/cloudnative-pg/shared-cluster/`
 - Harbor: Create using this component
-- Mattermost: Create using this component

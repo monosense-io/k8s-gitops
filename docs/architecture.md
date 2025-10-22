@@ -4,7 +4,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Implementing-blue)
 ![Owner](https://img.shields.io/badge/Owner-Platform_Engineering-orange)
-![Last Updated](https://img.shields.io/badge/Updated-2025--10--20-green)
+![Last Updated](https://img.shields.io/badge/Updated-2025--10--21-green)
 ![Version](https://img.shields.io/badge/Version-4.0-purple)
 
 **Modern cloud-native platform built on Talos Linux • GitOps-powered • Multi-cluster**
@@ -119,7 +119,7 @@ graph TB
 
 | Cluster | Storage Solution | Use Case | Performance |
 | :--- | :--- | :--- | :--- |
-| **🏭 infra** | 🗄️ Rook-Ceph + OpenEBS LocalPV | Block/file storage, databases | High throughput NVMe |
+| **🏭 infra** | 🗄️ Rook-Ceph + OpenEBS LocalPV | Block/file storage, databases (Postgres, Dragonfly) | High throughput NVMe |
 | **🎯 apps** | 🗄️ Dedicated Rook-Ceph + OpenEBS LocalPV (default) | Application storage, local workloads | Multi‑GB/s NVMe local |
 
 **Why Dedicated Storage for Apps Cluster?**
@@ -542,14 +542,16 @@ data:
   CNPG_INSTANCES: "3"
   CNPG_SHARED_CLUSTER_NAME: "shared-postgres"
   CNPG_BACKUP_BUCKET: "monosense-cnpg"
-  CNPG_BACKUP_SCHEDULE: "0 2 * * *"
+  # NOTE: CNPG ScheduledBackup uses a six-field cron expression (seconds first).
+  # Example below runs at 02:00:00 UTC daily.
+  CNPG_BACKUP_SCHEDULE: "0 0 2 * * *"
   CNPG_MINIO_ENDPOINT_URL: "http://10.25.11.3:9000"
   CNPG_MINIO_SECRET_PATH: "kubernetes/infra/cloudnative-pg/minio"
   CNPG_SUPERUSER_SECRET_PATH: "kubernetes/infra/cloudnative-pg/superuser"
 
-  # Dragonfly Configuration
+  # Dragonfly Configuration (infra)
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
-  DRAGONFLY_DATA_SIZE: "30Gi"
+  DRAGONFLY_DATA_SIZE: "30Gi"           # default for shared cache; tune per-tenant if split
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"
 ```
 
@@ -619,7 +621,8 @@ data:
   OBSERVABILITY_LOG_TENANT: "apps"
   OBSERVABILITY_GRAFANA_SECRET_PATH: "kubernetes/apps/grafana-admin"
 
-  # Dragonfly Configuration
+  # Dragonfly Configuration (apps)
+  # Clients only; no operator on apps. Kept for potential future per-tenant instances.
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
   DRAGONFLY_DATA_SIZE: "50Gi"
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/apps/dragonfly/auth"
@@ -1200,6 +1203,8 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 | **📋 Fluent Bit** | `0.53.0` | `observability` | Helm (repo) | Log shipping to VictoriaLogs |
 | **📦 Harbor Registry** | `1.18.0` | `harbor` | Helm (repo) | Container registry; app v2.14.0 |
 | **🚀 Actions Runner** | `0.12.0` | `actions-runner-system` | Helm (OCI) | GitHub ARC controller |
+| **🐉 Dragonfly Operator** | `1.3.0` | `dragonfly-operator-system` | Helm (OCI) | Manages Dragonfly CRs and Services |
+| **🐉 Dragonfly Cluster** | `v1.17.0` (image) | `dragonfly-system` | Kustomize (CR) | Shared Redis‑compatible cache; cross‑cluster via Cilium Global Service |
 
 ### 🎯 Application Cluster - Workloads & Services
 
@@ -1721,12 +1726,54 @@ spec:
 | **📝 Remote Write** | `victoria-metrics-global-vminsert.observability.svc.cluster.local:8480` | Metrics forwarding endpoint |
 | **🔍 Query** | `victoria-metrics-global-vmselect.observability.svc.cluster.local:8481` | Query and visualization endpoint |
 
+#### B.4.1 Observability Model (Appendix)
+
+- Metrics (Prometheus-compatible)
+  - Infra runs the global VictoriaMetrics vmcluster (vmselect/vminsert/vmstorage) with vmauth and vmalert.
+  - Apps runs vmagent that scrapes local targets (kube-state-metrics, node-exporter, Cilium) and remote-writes to infra.
+  - Cluster settings provide endpoints and storage classes: `${GLOBAL_VM_INSERT_ENDPOINT}`, `${GLOBAL_VM_SELECT_ENDPOINT}`, `${GLOBAL_ALERTMANAGER_ENDPOINT}`, `${OBSERVABILITY_BLOCK_SC}`.
+- Logs
+  - Infra runs VictoriaLogs (vmstorage/vmselect/vminsert) with vmauth; ServiceMonitor enabled.
+  - Fluent Bit DaemonSet on each cluster ships container/system logs over HTTP JSON to vmauth `/insert` with header `X-Scope-OrgID=${OBSERVABILITY_LOG_TENANT}`.
+  - Cluster settings provide endpoint host/port/path/TLS toggle and tenant: `${OBSERVABILITY_LOG_ENDPOINT_HOST}`, `${OBSERVABILITY_LOG_ENDPOINT_PORT}`, `${OBSERVABILITY_LOG_ENDPOINT_PATH}`, `${OBSERVABILITY_LOG_ENDPOINT_TLS}`, `${OBSERVABILITY_LOG_TENANT}`.
+- Access & RBAC
+  - Grafana admin credentials from `${OBSERVABILITY_GRAFANA_SECRET_PATH}`; dashboards loaded via sidecar.
+  - NetworkPolicies in `kubernetes/components/networkpolicy/monitoring` allow vm* internal flows and scrapes.
+  - PDBs in `kubernetes/components/pdb/victoria-metrics-pdb` protect vmselect/vminsert/vmstorage.
+
 ### B.5 🚀 Workload Notes
 
 | Workload | 🔧 Components | 🛡️ Security & Management |
 | :--- | :--- | :--- |
 | **🦊 GitLab (apps)** | CNPG pooler, Dragonfly, External Secrets | Reconciled by Flux |
-| **🔑 Keycloak (identity)** | Policy enforcement, egress control | Cilium policies; observability egress only; SPIFFE/mTLS in-cluster |
+| **🔑 Keycloak (identity)** | Operator‑managed SSO; external CNPG | Cilium policies; observability egress only; SPIFFE/mTLS in‑cluster |
+
+### B.9 🐉 DragonflyDB (Operator & Cluster) — Quick Guide
+
+| Topic | 🔧 Details | ✅ Verification |
+| :--- | :--- | :--- |
+| **📍 Operator Delivery** | Flux HelmRelease + OCIRepository `ghcr.io/dragonflydb/dragonfly-operator/helm`; `install/upgrade.crds: CreateReplace`; replicas `2` + PDB | `kubectl -n dragonfly-operator-system get deploy,crd` |
+| **🗄️ Cluster CR** | `kubernetes/workloads/platform/databases/dragonfly/dragonfly.yaml`; 3 replicas; PVC on `${DRAGONFLY_STORAGE_CLASS}` with `${DRAGONFLY_DATA_SIZE}`; `--dir=/data`; auth from ExternalSecret | `kubectl -n dragonfly-system get dragonflies.dragonflydb.io,pods,pvc,svc` |
+| **🌐 Cross‑Cluster Access** | `Service` annotated `service.cilium.io/global: "true"` (and `shared: "true"`) for DNS/routing via ClusterMesh | From apps: resolve `dragonfly.dragonfly-system.svc.cluster.local` and TCP connect 6379 |
+| **🛡️ Network Policy** | Deny‑by‑default; allow from `gitlab-system`, `harbor`, selected app namespaces; allow `observability` to scrape metrics | Flows visible in Hubble; app smoke tests pass |
+| **📊 Observability** | ServiceMonitor enabled; PrometheusRule includes availability, memory/disk thresholds, replication lag, command rate | `dragonfly_*` metrics present; sample alert firing |
+| **🔁 Replication & Persistence** | Prefer master‑only snapshots (if supported by chosen tag) to reduce replica IO; validate behavior on primary restart | Snapshot logs on primary only; replicas stay responsive |
+| **🏷️ Tenancy** | Start with shared CR; consider per‑tenant CRs (e.g., `dragonfly-gitlab`) for isolation and tailored resources | Draft CR examples; do not flip consumers in this story |
+
+Implementation reference: STORY-DB-DRAGONFLY-OPERATOR-CLUSTER.md
+
+
+### B.8 🔑 Keycloak (Operator) — Quick Guide
+
+| Configuration | 🔧 Details | ✅ Verification |
+| :--- | :--- | :--- |
+| **📍 Operator** | Install via OLM `Subscription` (prefer) or apply official bundle manifests | `kubectl -n keycloak-system get deploy,crd` |
+| **🗄️ Database** | External CNPG via `keycloak-pooler` (session mode), secret `keycloak-db-credentials` | Keycloak Ready; tables created |
+| **🌐 Exposure** | Use Ingress (CR‑managed) or Gateway API HTTPRoute; TLS via cert‑manager secret `sso-tls` | `/.well-known/openid-configuration` reachable over HTTPS |
+| **📈 Monitoring** | Service/ServiceMonitor for Prometheus; add Grafana dashboard | `up{job="keycloak"}` present; HTTP 2xx rates |
+| **⬆️ Upgrades** | OLM channel with Manual approval in prod | CSV transitions Succeeded |
+
+References: Keycloak Operator install/upgrade and basic deployment docs. citeturn0search5turn0search6
 
 ### B.6 📋 Historical RCA (Highlights)
 

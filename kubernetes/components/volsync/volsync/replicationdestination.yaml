@@ -8,12 +8,12 @@ spec:
     manual: restore-once
   restic:
     repository: "${APP}-restic-secret"
-    copyMethod: "${VOLSYNC_COPYMETHOD:=Direct}"
-    # For Direct mode, cache PVC is optional. If provided, uncomment below and set a storageClass:
-    # cacheStorageClassName: "${VOLSYNC_CACHE_STORAGECLASS:=openebs-hostpath}"
-    # cacheAccessModes: ["${VOLSYNC_CACHE_ACCESSMODES:=ReadWriteOnce}"]
-    # cacheCapacity: "${VOLSYNC_CACHE_CAPACITY:=2Gi}"
-    storageClassName: "${VOLSYNC_STORAGECLASS:=ceph-block}"
+    copyMethod: "${VOLSYNC_COPYMETHOD:=Snapshot}"
+    volumeSnapshotClassName: "${VOLSYNC_SNAPSHOTCLASS:=csi-ceph-block}"
+    cacheStorageClassName: "${VOLSYNC_CACHE_STORAGECLASS:=openebs-hostpath}"
+    cacheAccessModes: ["${VOLSYNC_CACHE_ACCESSMODES:=ReadWriteOnce}"]
+    cacheCapacity: "${VOLSYNC_CACHE_CAPACITY:=2Gi}"
+    storageClassName: "${VOLSYNC_STORAGECLASS:=${CEPH_BLOCK_STORAGE_CLASS}}"
     accessModes: ["${VOLSYNC_ACCESSMODES:=ReadWriteOnce}"]
     capacity: "${VOLSYNC_CAPACITY:=5Gi}"
     moverSecurityContext:
@@ -21,4 +21,5 @@ spec:
       runAsGroup: ${VOLSYNC_PGID:=568}
       fsGroup: ${VOLSYNC_PGID:=568}
     enableFileDeletion: true
+    cleanupCachePVC: true
     cleanupTempPVC: true

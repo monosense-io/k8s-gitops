@@ -6,3 +6,4 @@ resources:
   - ../../../../bases/rook-ceph-cluster
   - prometheusrule.yaml
   - toolbox.yaml
+  - volumesnapshotclass.yaml

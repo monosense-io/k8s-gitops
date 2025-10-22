@@ -1,3 +1,8 @@
+## DEPRECATED: This folder contains historical bootstrap-era HelmRelease examples.
+## Do not modify or apply these manifests. The authoritative GitOps-managed
+## Cilium HelmRelease lives at:
+##   kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml
+## Keep this file only for reference. Remove once all docs point to the new path.
 ---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease

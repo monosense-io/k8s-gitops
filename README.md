@@ -48,7 +48,7 @@ This is a mono repository for my home infrastructure and Kubernetes cluster. I t
 
 This repository is transitioning to a **multi-cluster architecture** with two separate 3-node Talos clusters:
 - **Infra Cluster** - Platform services (storage, databases, observability, security)
-- **Apps Cluster** - Application workloads (GitLab, Harbor, Mattermost)
+- **Apps Cluster** - Application workloads (GitLab, Harbor)
 
 **Planning Documentation:**
 - **[Multi-Cluster Overview](./docs/MULTI-CLUSTER-OVERVIEW.md)** - Start here for complete architecture overview

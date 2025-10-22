@@ -1,0 +1,17 @@
+---
+# yaml-language-server: $schema=https://cilium.io/schemas/v2/CiliumBGPAdvertisement.json
+apiVersion: cilium.io/v2
+kind: CiliumBGPAdvertisement
+metadata:
+  name: cilium-bgp-advertisements
+  namespace: kube-system
+  labels:
+    advertise: "bgp"
+spec:
+  advertisements:
+    # Advertise LoadBalancer IPs only (no PodCIDRs by default)
+    - advertisementType: Service
+      service:
+        addresses:
+          - LoadBalancerIP
+

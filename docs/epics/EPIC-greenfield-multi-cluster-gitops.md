@@ -95,6 +95,22 @@ Sprint 10 — DR & Hardening
 - STORY‑CI‑PIPELINE: kubeconform + kustomize + flux build; remove SOPS checks.
 - STORY‑APP‑ANCHOR: Anchor app (Harbor) via HelmRelease + health checks; rollback runbook.
 
+### 8.1 Additional Stories (Expanded Backlog & Sequencing)
+
+32 — STORY-SEC-SPIRE-CILIUM-AUTH — SPIRE + Cilium mTLS authentication baseline (identity + mTLS enforcement)
+
+33 — STORY-SEC-NP-BASELINE — Enforce default‑deny, DNS/API egress, FQDN allowlists, and identity‑based exemplars
+
+34 — STORY-NET-CLUSTERMESH-DNS — Provision DNS for clustermesh‑apiserver LB IPs and validate via FQDN
+
+35 — STORY-APP-HARBOR — Harbor (anchor app) with external CNPG/Dragonfly/S3 and Gateway exposure
+
+36 — STORY-CICD-GITHUB-ARC — Actions Runner Controller + RunnerScaleSets on apps
+
+37 — STORY-TENANCY-BASELINE — Team namespace + RBAC + quotas + baseline policies template
+
+38 — STORY-NET-CILIUM-BGP-CP-IMPLEMENT — Implement Cilium BGP Control Plane CRs and remove legacy PeeringPolicy
+
 ## 9. Dependencies
 - DNS and certificates; registry; secret store credentials; chat endpoint for alerting.
 
