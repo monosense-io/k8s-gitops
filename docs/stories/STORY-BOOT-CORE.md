@@ -1,8 +1,8 @@
-# 03 — STORY-BOOT-CORE — Phase 1 Core Bootstrap (infra + apps)
+# 40 — STORY-BOOT-CORE — Phase 1 Core Bootstrap (infra + apps)
 
-Sequence: 03/26 | Prev: STORY-BOOT-CRDS.md | Next: STORY-NET-CILIUM-CORE-GITOPS.md
-Sprint: 1 | Lane: Bootstrap & Platform
-Global Sequence: 3/41
+Sequence: 40/41 | Prev: STORY-GITOPS-SELF-MGMT-FLUX.md | Next: STORY-BOOT-AUTOMATION-ALIGN.md
+Sprint: 7 | Lane: Bootstrap & Platform
+Global Sequence: 40/41
 
 Status: Approved
 Owner: Scrum Master → Platform Engineering
@@ -40,21 +40,35 @@ Non‑Goals
 [Source: docs/architecture.md §6 (Phases), §9 (Networking day‑2), §8 (Secrets), §12 (CI/Policy)]
 
 ## Acceptance Criteria
-1) Phase separation respected: Phase 0 installs CRDs; Phase 1 performs a one‑time imperative install of Cilium via Helm CLI, installs Flux, and then all components are reconciled via GitOps. No non‑GitOps controllers remain unmanaged after handover.
-2) On both clusters, the following are Ready:
+
+1) **Phase separation respected** (Tasks: T0.3, T6): Phase 0 installs CRDs; Phase 1 performs a one‑time imperative install of Cilium via Helm CLI, installs Flux, and then all components are reconciled via GitOps. No non‑GitOps controllers remain unmanaged after handover.
+
+2) **Component deployment and configuration** (Tasks: T1, T2, T3, T4): On both clusters, the following are Ready:
    - Control plane nodes (selector `node-role.kubernetes.io/control-plane`) are Ready (CNI operational).
    - Cilium DaemonSet and Operator (Ready/Available across all nodes).
    - CoreDNS Deployment replicas match `cluster-settings.yaml` (infra: 2; apps: 2) and are Available.
+   - CoreDNS Service clusterIP matches `cluster-settings.yaml` (infra: 10.245.0.10; apps: 10.247.0.10).
+   - Spegel DaemonSet Ready (if enabled in bootstrap).
    - External Secrets controller Deployment Available in `external-secrets` namespace.
+   - External Secrets ClusterSecretStore `onepassword` Ready and validated via smoke test.
    - cert‑manager controller & webhook Deployments Available in `cert-manager` namespace.
-3) Flux is operational on both clusters:
+
+3) **Flux operational** (Tasks: T5.1, T5.2, T5.3, T5.4): Flux is operational on both clusters:
    - flux‑operator controllers running and Ready.
    - flux‑instance reports Ready; `flux get sources git flux-system` and `flux get kustomizations -A` return Ready for initial objects.
-4) Handover criteria met (architecture §6): GitRepository connected; initial Kustomizations reconcile successfully; subsequent changes are applied by Flux.
-5) All commands, outputs (key excerpts), and any deviations captured in Dev Notes.
 
-6) All P0 test scenarios from docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md pass on both clusters (infra, apps); execution artifacts captured in Dev Notes. QA gate moves from CONCERNS to PASS or waivers are documented.
-7) Cilium core is under GitOps control post‑bootstrap: `kubernetes/infrastructure/kustomization.yaml` includes `networking/cilium/core/ks.yaml`; a reconcile after uninstalling the Helm‑CLI release results in Flux re‑creating the Cilium resources.
+4) **Handover criteria met** (Tasks: T5.5): Architecture §6 requirements satisfied:
+   - GitRepository connected; initial Kustomizations reconcile successfully.
+   - Subsequent changes are applied by Flux (validated via dummy change test).
+
+5) **Artifacts and documentation** (Tasks: T8): All commands, outputs (key excerpts), and any deviations captured in Dev Notes.
+
+6) **P0 test execution** (Tasks: T7): All P0 test scenarios from docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md pass on both clusters (infra, apps); execution artifacts captured in Dev Notes. QA gate moves from CONCERNS to PASS or waivers are documented.
+
+7) **Cilium GitOps transition** (Tasks: T6): Cilium core is under GitOps control post‑bootstrap:
+   - `kubernetes/infrastructure/kustomization.yaml` includes `networking/cilium/core/ks.yaml`.
+   - Flux HelmRelease for Cilium exists and is Ready.
+   - (Optional/Advanced) A reconcile after uninstalling the Helm‑CLI release results in Flux re‑creating the Cilium resources.
 
 [Source: docs/architecture.md §6 (Handover Criteria), §5 (Health/dependsOn), §4 (Repo Layout)]
 
@@ -69,26 +83,161 @@ Non‑Goals
 [Source: docs/epics/EPIC-greenfield-multi-cluster-gitops.md §8; docs/architecture.md §6]
 
 ## Tasks / Subtasks (Taskfile is canonical)
-- [ ] T0 — Preflight (AC: —)
-  - [ ] `task :bootstrap:phase:0 CLUSTER=infra` and `task :bootstrap:phase:0 CLUSTER=apps`
-- [ ] T1 — Deploy core (Phase 2) (AC: 2)
-  - [ ] `task :bootstrap:phase:2 CLUSTER=infra` and `task :bootstrap:phase:2 CLUSTER=apps` (uses `core:gitops` → Cilium via Helm CLI → Flux install → Flux reconcile)
-- [ ] T2 — Validate (Phase 3) (AC: 2)
-  - [ ] `task :bootstrap:phase:3 CLUSTER=infra` and `task :bootstrap:phase:3 CLUSTER=apps`
-  - [ ] `task bootstrap:status CLUSTER=infra` and `task bootstrap:status CLUSTER=apps`
-- [ ] T3 — Flux handover checks (AC: 3, 4)
-  - [ ] `flux --context=<ctx> get sources git flux-system -n flux-system`
-  - [ ] `flux --context=<ctx> get kustomizations -A`
-- [ ] T4 — Record artifacts (AC: 5)
-  - [ ] Capture key `kubectl`/`flux` outputs in Dev Notes; note any deviations.
 
-- [ ] T5 — Execute P0 tests (AC: 6)
-  - [ ] Run all P0 scenarios from docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md for infra and apps.
-  - [ ] Archive command outputs/logs and link them in Dev Notes.
+### T0 — Preflight Validation (AC: 1 partial, Prerequisites)
+- [ ] T0.1 — Verify Phase 0 CRDs established on both clusters
+  - [ ] `kubectl --context=infra get crds | grep -E "(cilium|cert-manager|external-secrets|postgresql.cnpg.io)" | wc -l`  # expect > 0
+  - [ ] `kubectl --context=apps get crds | grep -E "(cilium|cert-manager|external-secrets|postgresql.cnpg.io)" | wc -l`
+- [ ] T0.2 — Verify KUBECONFIG contexts accessible
+  - [ ] `kubectl --context=infra cluster-info`
+  - [ ] `kubectl --context=apps cluster-info`
+- [ ] T0.3 — Validate helmfile 01-core produces ZERO CRDs (AC1 phase guard)
+  - [ ] `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e infra template | yq ea 'select(.kind == "CustomResourceDefinition")' | wc -l`  # expect 0
+  - [ ] `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e apps template | yq ea 'select(.kind == "CustomResourceDefinition")' | wc -l`  # expect 0
+- [ ] T0.4 — Validate cluster-settings.yaml syntax
+  - [ ] `yq eval kubernetes/clusters/infra/cluster-settings.yaml > /dev/null`
+  - [ ] `yq eval kubernetes/clusters/apps/cluster-settings.yaml > /dev/null`
 
-- [ ] T6 — Negative tests (optional) (AC: —)
-  - [ ] Simulate missing `onepassword-connect` Secret (lab only) to observe External Secrets failure, then restore and confirm recovery.
-  - [ ] Verify CRD guard detects any accidental CRDs emitted by 01-core template (local dry-run).
+### T1 — Bootstrap Prerequisites (AC: 2 partial)
+- [ ] T1.1 — Apply bootstrap resources to infra cluster
+  - [ ] `kubectl --context=infra apply -f bootstrap/prerequisites/resources.yaml`
+- [ ] T1.2 — Apply bootstrap resources to apps cluster
+  - [ ] `kubectl --context=apps apply -f bootstrap/prerequisites/resources.yaml`
+- [ ] T1.3 — Verify onepassword-connect Secret exists
+  - [ ] `kubectl --context=infra -n external-secrets get secret onepassword-connect-token`
+  - [ ] `kubectl --context=apps -n external-secrets get secret onepassword-connect-token`
+- [ ] T1.4 — Verify required namespaces created
+  - [ ] `kubectl --context=infra get ns flux-system external-secrets cert-manager`
+  - [ ] `kubectl --context=apps get ns flux-system external-secrets cert-manager`
+
+### T2 — Deploy Core Components (AC: 2)
+- [ ] T2.1 — Deploy Phase 2 on infra cluster
+  - [ ] `task :bootstrap:phase:2 CLUSTER=infra`  # Executes: Cilium via Helm CLI → Flux install → Flux reconcile
+- [ ] T2.2 — Deploy Phase 2 on apps cluster
+  - [ ] `task :bootstrap:phase:2 CLUSTER=apps`
+- [ ] T2.3 — Wait for initial deployments to stabilize (5 minutes)
+
+### T3 — Validate Component Deployment (AC: 2)
+- [ ] T3.1 — Validate infra cluster components
+  - [ ] Control plane nodes: `kubectl --context=infra get nodes -l node-role.kubernetes.io/control-plane`
+  - [ ] Cilium DaemonSet: `kubectl --context=infra -n kube-system rollout status ds/cilium --timeout=5m`
+  - [ ] Cilium Operator: `kubectl --context=infra -n kube-system rollout status deploy/cilium-operator --timeout=5m`
+  - [ ] CoreDNS rollout: `kubectl --context=infra -n kube-system rollout status deploy/coredns --timeout=5m`
+  - [ ] CoreDNS replicas: `kubectl --context=infra -n kube-system get deploy coredns -o jsonpath='{.spec.replicas}'`  # expect 2
+  - [ ] CoreDNS clusterIP: `kubectl --context=infra -n kube-system get svc coredns -o jsonpath='{.spec.clusterIP}'`  # expect 10.245.0.10
+  - [ ] Spegel (if enabled): `kubectl --context=infra -n kube-system rollout status ds/spegel --timeout=5m || echo "Spegel not deployed"`
+  - [ ] cert-manager: `kubectl --context=infra -n cert-manager rollout status deploy/cert-manager --timeout=5m`
+  - [ ] cert-manager webhook: `kubectl --context=infra -n cert-manager rollout status deploy/cert-manager-webhook --timeout=5m`
+  - [ ] External Secrets: `kubectl --context=infra -n external-secrets rollout status deploy/external-secrets --timeout=5m`
+- [ ] T3.2 — Validate apps cluster components (same checks with apps context)
+  - [ ] Control plane nodes: `kubectl --context=apps get nodes -l node-role.kubernetes.io/control-plane`
+  - [ ] Cilium DaemonSet: `kubectl --context=apps -n kube-system rollout status ds/cilium --timeout=5m`
+  - [ ] Cilium Operator: `kubectl --context=apps -n kube-system rollout status deploy/cilium-operator --timeout=5m`
+  - [ ] CoreDNS rollout: `kubectl --context=apps -n kube-system rollout status deploy/coredns --timeout=5m`
+  - [ ] CoreDNS replicas: `kubectl --context=apps -n kube-system get deploy coredns -o jsonpath='{.spec.replicas}'`  # expect 2
+  - [ ] CoreDNS clusterIP: `kubectl --context=apps -n kube-system get svc coredns -o jsonpath='{.spec.clusterIP}'`  # expect 10.247.0.10
+  - [ ] Spegel (if enabled): `kubectl --context=apps -n kube-system rollout status ds/spegel --timeout=5m || echo "Spegel not deployed"`
+  - [ ] cert-manager: `kubectl --context=apps -n cert-manager rollout status deploy/cert-manager --timeout=5m`
+  - [ ] cert-manager webhook: `kubectl --context=apps -n cert-manager rollout status deploy/cert-manager-webhook --timeout=5m`
+  - [ ] External Secrets: `kubectl --context=apps -n external-secrets rollout status deploy/external-secrets --timeout=5m`
+- [ ] T3.3 — Run bootstrap status check
+  - [ ] `task bootstrap:status CLUSTER=infra`
+  - [ ] `task bootstrap:status CLUSTER=apps`
+
+### T4 — External Secrets Smoke Test (AC: 2 partial)
+- [ ] T4.1 — Verify ClusterSecretStore Ready on infra
+  - [ ] `kubectl --context=infra -n external-secrets get clustersecretstore onepassword -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'`  # expect True
+- [ ] T4.2 — Verify ClusterSecretStore Ready on apps
+  - [ ] `kubectl --context=apps -n external-secrets get clustersecretstore onepassword -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'`  # expect True
+- [ ] T4.3 — Create test ExternalSecret on infra (smoke test)
+  - [ ] Create test ExternalSecret pointing to valid 1Password path
+  - [ ] Verify Secret gets created and populated
+  - [ ] Delete test resources after validation
+- [ ] T4.4 — Create test ExternalSecret on apps (smoke test)
+
+### T5 — Flux Handover Validation (AC: 3, 4)
+- [ ] T5.1 — Verify Flux operator Ready on both clusters
+  - [ ] `kubectl --context=infra -n flux-system get pods -l app=flux-operator`
+  - [ ] `kubectl --context=apps -n flux-system get pods -l app=flux-operator`
+- [ ] T5.2 — Verify flux-instance Ready on both clusters
+  - [ ] `kubectl --context=infra -n flux-system get fluxinstance flux-system`
+  - [ ] `kubectl --context=apps -n flux-system get fluxinstance flux-system`
+- [ ] T5.3 — Verify GitRepository source connected
+  - [ ] `flux --context=infra get sources git flux-system -n flux-system`
+  - [ ] `flux --context=apps get sources git flux-system -n flux-system`
+- [ ] T5.4 — Verify initial Kustomizations reconciling
+  - [ ] `flux --context=infra get kustomizations -A`
+  - [ ] `flux --context=apps get kustomizations -A`
+- [ ] T5.5 — Test Flux change detection (AC4 validation)
+  - [ ] Make dummy change to `kubernetes/clusters/<cluster>/` (e.g., add comment)
+  - [ ] Commit and push change
+  - [ ] Verify Flux picks up and applies change within 1 minute
+  - [ ] Revert change
+
+### T6 — Cilium GitOps Transition Validation (AC: 7)
+- [ ] T6.1 — Verify Cilium core included in infrastructure kustomization
+  - [ ] `grep "networking/cilium/core/ks.yaml" kubernetes/infrastructure/kustomization.yaml`
+- [ ] T6.2 — Verify Flux HelmRelease for Cilium exists and is Ready
+  - [ ] `kubectl --context=infra get helmrelease -A | grep cilium`
+  - [ ] `kubectl --context=apps get helmrelease -A | grep cilium`
+  - [ ] `flux --context=infra get helmreleases -A | grep cilium`
+  - [ ] `flux --context=apps get helmreleases -A | grep cilium`
+- [ ] T6.3 — [ADVANCED/OPTIONAL] Simulate GitOps takeover (lab environment only)
+  - [ ] CAUTION: This validates Flux can recreate Cilium but causes brief network disruption
+  - [ ] Identify Helm CLI release: `helm --kube-context=infra list -A | grep cilium`
+  - [ ] Uninstall Helm CLI release: `helm --kube-context=infra uninstall cilium -n kube-system`
+  - [ ] Trigger Flux reconcile: `flux --context=infra reconcile kustomization cluster-infra-infrastructure --with-source`
+  - [ ] Verify Flux recreates Cilium: `kubectl --context=infra -n kube-system rollout status ds/cilium --timeout=5m`
+  - [ ] Repeat for apps cluster if desired
+
+### T7 — Execute P0 Test Scenarios (AC: 6)
+- [ ] T7.1 — Execute P0 Unit tests on infra cluster
+  - [ ] BOOT.CORE-UNIT-001: Phase guard validation
+  - [ ] BOOT.CORE-UNIT-002: CRD absence check
+  - [ ] Document results: PASS/FAIL
+- [ ] T7.2 — Execute P0 Unit tests on apps cluster
+  - [ ] Same scenarios as T7.1, apps context
+- [ ] T7.3 — Execute P0 Integration tests on infra cluster
+  - [ ] BOOT.CORE-INT-003: Component dependency chain
+  - [ ] Document results: PASS/FAIL
+- [ ] T7.4 — Execute P0 Integration tests on apps cluster
+- [ ] T7.5 — Execute P0 E2E tests on infra cluster
+  - [ ] BOOT.CORE-E2E-001: Full bootstrap workflow
+  - [ ] BOOT.CORE-E2E-002: Flux handover
+  - [ ] BOOT.CORE-E2E-003: GitOps reconciliation
+  - [ ] BOOT.CORE-E2E-004: External Secrets integration
+  - [ ] BOOT.CORE-E2E-005: Multi-component health
+  - [ ] Document results: PASS/FAIL
+- [ ] T7.6 — Execute P0 E2E tests on apps cluster
+- [ ] T7.7 — Capture all test artifacts and results
+  - [ ] Link outputs in Dev Notes
+  - [ ] Update QA Results section with PASS/CONCERNS/FAIL gate decision
+
+### T8 — Record Artifacts and Dev Notes (AC: 5)
+- [ ] T8.1 — Capture all command outputs in Dev Notes
+  - [ ] Include key excerpts from T0-T7
+  - [ ] Document execution timestamps
+- [ ] T8.2 — Document any deviations from expected behavior
+  - [ ] Configuration mismatches
+  - [ ] Failed validations and resolutions
+  - [ ] Workarounds applied
+- [ ] T8.3 — Update Dev Agent Record sections
+  - [ ] Agent Model Used
+  - [ ] Debug Log References
+  - [ ] Completion Notes List
+  - [ ] File List
+- [ ] T8.4 — Update QA Results section
+  - [ ] Test execution summary
+  - [ ] Gate decision: PASS/CONCERNS/FAIL
+  - [ ] Risk mitigation status
+
+### T9 — Negative Testing (Optional) (AC: —)
+- [ ] T9.1 — Simulate missing `onepassword-connect` Secret (lab only)
+  - [ ] Observe External Secrets failure
+  - [ ] Restore Secret and confirm recovery
+- [ ] T9.2 — Verify CRD guard detects accidental CRDs
+  - [ ] Local dry-run of helmfile template
+  - [ ] Confirm zero CRDs emitted
 
 ### Appendix: Underlying raw commands (reference only)
 - `kubectl --context=<ctx> apply -f bootstrap/prerequisites/resources.yaml`
@@ -97,28 +246,70 @@ Non‑Goals
 [Source: docs/architecture.md §6; bootstrap/helmfile.d/README.md]
 
 ## Validation Steps (CLI)
-- Phase separation (AC: 1)
-  - `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e <ctx> template | yq ea 'select(.kind == "CustomResourceDefinition")' | wc -l`  # Expect 0
-- Cilium
+
+### Phase 0 Prerequisites (AC: 1)
+- Verify Phase 0 CRDs present:
+  - `kubectl --context=infra get crds | grep -E "(cilium|cert-manager|external-secrets|postgresql.cnpg.io)" | wc -l`  # Expect > 0
+  - `kubectl --context=apps get crds | grep -E "(cilium|cert-manager|external-secrets|postgresql.cnpg.io)" | wc -l`
+- Phase separation guard (AC: 1):
+  - `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e infra template | yq ea 'select(.kind == "CustomResourceDefinition")' | wc -l`  # Expect 0
+  - `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e apps template | yq ea 'select(.kind == "CustomResourceDefinition")' | wc -l`  # Expect 0
+
+### Component Rollout Status (AC: 2)
+- Cilium:
   - `kubectl --context=<ctx> -n kube-system rollout status ds/cilium --timeout=5m`
   - `kubectl --context=<ctx> -n kube-system rollout status deploy/cilium-operator --timeout=5m`
-- CoreDNS
+- CoreDNS (with cluster-specific validation):
   - `kubectl --context=<ctx> -n kube-system rollout status deploy/coredns --timeout=5m`
-- External Secrets
-  - `kubectl --context=<ctx> -n external-secrets rollout status deploy/external-secrets --timeout=5m`
-- cert‑manager
+  - **NEW:** `kubectl --context=infra -n kube-system get deploy coredns -o jsonpath='{.spec.replicas}'`  # Expect 2
+  - **NEW:** `kubectl --context=apps -n kube-system get deploy coredns -o jsonpath='{.spec.replicas}'`  # Expect 2
+  - **NEW:** `kubectl --context=infra -n kube-system get svc coredns -o jsonpath='{.spec.clusterIP}'`  # Expect 10.245.0.10
+  - **NEW:** `kubectl --context=apps -n kube-system get svc coredns -o jsonpath='{.spec.clusterIP}'`  # Expect 10.247.0.10
+- Spegel (if enabled):
+  - **NEW:** `kubectl --context=<ctx> -n kube-system rollout status ds/spegel --timeout=5m || echo "Spegel not deployed"`
+- cert‑manager:
   - `kubectl --context=<ctx> -n cert-manager rollout status deploy/cert-manager --timeout=5m`
   - `kubectl --context=<ctx> -n cert-manager rollout status deploy/cert-manager-webhook --timeout=5m`
-- Flux
+- External Secrets:
+  - `kubectl --context=<ctx> -n external-secrets rollout status deploy/external-secrets --timeout=5m`
+  - **NEW:** `kubectl --context=<ctx> -n external-secrets get clustersecretstore onepassword -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'`  # Expect True
+
+### Flux Handover (AC: 3, 4)
+- Flux operator and instance:
   - `kubectl --context=<ctx> -n flux-system get pods`
+  - `kubectl --context=<ctx> -n flux-system get fluxinstance flux-system`
+- GitRepository source:
   - `flux --context=<ctx> get sources git flux-system -n flux-system`
+- Kustomizations:
   - `flux --context=<ctx> get kustomizations -A`
 
-- P0 Test Execution (AC: 6)
-  - Follow docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md (IDs: BOOT.CORE-UNIT-001/002; INT-003; E2E-001..005) on both clusters and capture results.
-  - Optional negative: BOOT.CORE-E2E-007/008 per design doc (lab only).
+### Cilium GitOps Transition (AC: 7)
+- **NEW:** Verify Cilium included in infrastructure kustomization:
+  - `grep "networking/cilium/core/ks.yaml" kubernetes/infrastructure/kustomization.yaml`
+- **NEW:** Verify Flux HelmRelease for Cilium:
+  - `kubectl --context=<ctx> get helmrelease -A | grep cilium`
+  - `flux --context=<ctx> get helmreleases -A | grep cilium`
+- **NEW (OPTIONAL/ADVANCED):** GitOps takeover test:
+  - `helm --kube-context=<ctx> list -A | grep cilium`  # Identify Helm CLI release
+  - `helm --kube-context=<ctx> uninstall cilium -n kube-system`  # Remove imperative release
+  - `flux --context=<ctx> reconcile kustomization cluster-<cluster>-infrastructure --with-source`  # Trigger Flux
+  - `kubectl --context=<ctx> -n kube-system rollout status ds/cilium --timeout=5m`  # Verify recreation
 
-Success criteria: all rollouts complete; Flux source and initial Kustomizations Ready.
+### P0 Test Execution (AC: 6)
+- Follow docs/qa/assessments/STORY-BOOT-CORE-test-design-20251021.md (IDs: BOOT.CORE-UNIT-001/002; INT-003; E2E-001..005) on both clusters:
+  - Execute Unit tests (UNIT-001, UNIT-002) on infra and apps
+  - Execute Integration tests (INT-003) on infra and apps
+  - Execute E2E tests (E2E-001..005) on infra and apps
+  - Document results: PASS/FAIL for each scenario
+- Optional negative: BOOT.CORE-E2E-007/008 per design doc (lab only)
+
+### Success Criteria
+- All rollouts complete on both clusters
+- Flux source and initial Kustomizations Ready
+- CoreDNS clusterIP matches cluster-settings.yaml (10.245.0.10 infra, 10.247.0.10 apps)
+- CoreDNS replicas = 2 on both clusters
+- External Secrets ClusterSecretStore Ready
+- Cilium HelmRelease exists and Ready (GitOps control established)
 
 ## Rollback
 - Use `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e <ctx> destroy` for targeted rollback if needed.
@@ -137,6 +328,26 @@ Risks / Mitigations
 - All P0 test scenarios pass and QA gate recorded as PASS (or explicit waivers documented in QA Results).
 
 ## Dev Notes
+
+### v1.2 Refinement Summary (2025-10-22 by Winston/Architect)
+**Critical enhancements for greenfield deployment:**
+- **9-task structure** (was 6): Added T1 (Bootstrap Prerequisites), T4 (External Secrets Smoke Test), T6 (Cilium GitOps Transition)
+- **AC7 coverage**: Added T6 to validate Cilium under GitOps control (previously had ZERO task coverage)
+- **Cluster-specific validation**: Added CoreDNS clusterIP (10.245.0.10 infra, 10.247.0.10 apps), replica count verification
+- **External Secrets end-to-end validation**: Smoke test to ensure 1Password connectivity works before dependent components
+- **Explicit AC mapping**: All ACs now have task references (e.g., AC2 → T1, T2, T3, T4)
+- **Enhanced validation steps**: Added 15+ new validation commands for cluster-specific configurations
+- **Per-cluster test breakdown**: T7 now separates Unit/Integration/E2E tests for infra and apps clusters
+
+**Key additions:**
+- T0.3: Helmfile CRD guard validation
+- T1: Bootstrap prerequisites (namespaces + 1Password secret)
+- T3: CoreDNS clusterIP and replica validation
+- T4: ClusterSecretStore Ready check + ExternalSecret smoke test
+- T5.5: Flux change detection test (AC4 validation)
+- T6: Cilium GitOps transition validation (AC7)
+- T7: Granular test execution breakdown per cluster
+
 Relevant architecture extracts (summarized):
 - Phases: Phase 0 installs CRDs only via `00-crds.yaml` (with yq CRD filter). Phase 1 installs core controllers with CRDs disabled (Cilium → CoreDNS → Spegel → cert‑manager → External Secrets → Flux). [Source: docs/architecture.md §6]
 - Repo entrypoints: each cluster has `flux-system/kustomization.yaml` that reconciles `cluster-settings.yaml`, `infrastructure.yaml`, `workloads.yaml` with `prune`, `wait`, `timeout`, `healthChecks`, and `postBuild.substituteFrom` (ConfigMap `cluster-settings`). [Source: docs/architecture.md §5]
@@ -166,6 +377,7 @@ File/Path pointers for this story:
 |------------|---------|-----------------------------------------------|--------|
 | 2025-10-21 | 1.0     | Initial draft created                         | SM     |
 | 2025-10-21 | 1.1     | PO correct-course: critical/should/nice fixes | PO     |
+| 2025-10-22 | 1.2     | Architect refinement: 9-task structure with explicit AC mapping, cluster-specific validation, AC7 coverage | Winston (Architect) |
 
 ## Dev Agent Record
 ### Agent Model Used

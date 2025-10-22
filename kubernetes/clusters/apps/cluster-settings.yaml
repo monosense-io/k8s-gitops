@@ -19,6 +19,7 @@ data:
   K8S_SERVICE_HOST: "apps-k8s.monosense.io"
 
   # Cilium Configuration
+  CILIUM_VERSION: "1.18.2"
   CLUSTERMESH_IP: "10.25.11.101"
   CILIUM_GATEWAY_LB_IP: "10.25.11.121"
   CILIUM_BGP_LOCAL_ASN: "64513"

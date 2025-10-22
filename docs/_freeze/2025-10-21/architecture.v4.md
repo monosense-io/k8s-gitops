@@ -40,3 +40,15 @@ This addendum records research and the selected pattern as of 2025-10-22 without
 - TXT registry with distinct owner IDs and optional `--txt-prefix=k8s.` to prevent record contention across controllers.
 
 Implementation details are maintained in the live document at docs/architecture.md §23.
+
+## Addendum — Spegel Talos Compatibility (Recorded 2025-10-22)
+
+This addendum clarifies Spegel compatibility with Talos Linux based on production validation (buroa/k8s-gitops repository research):
+
+- **Status**: Spegel is **fully compatible** with Talos Linux (not conditional as originally noted)
+- **Integration**: Dynamic containerd registry configuration via `/etc/cri/conf.d/hosts` (no Talos machine config changes required)
+- **Bootstrap**: Included in `bootstrap/helmfile.d/01-core.yaml.gotmpl` after CoreDNS
+- **Benefits**: P2P distributed image caching (~10x faster subsequent pulls), reduced external bandwidth, improved resilience
+- **Configuration**: HostPort `29999` for local registry mirror, ServiceMonitor for observability
+
+The original note "requires Talos compatibility validation" has been updated to "✅ Enabled" with full Talos support confirmed. See docs/architecture.md §9 (Networking) for complete Spegel implementation details.

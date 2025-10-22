@@ -483,10 +483,16 @@ data:
 
   # Cilium Configuration
   CLUSTERMESH_IP: "10.25.11.100"
-  CILIUM_GATEWAY_LB_IP: "10.25.11.120"
+  CILIUM_GATEWAY_LB_IP: "10.25.11.110"
   CILIUM_BGP_LOCAL_ASN: "64512"
   CILIUM_BGP_PEER_ASN: "64501"
   CILIUM_BGP_PEER_ADDRESS: "10.25.11.1/32"
+
+  # IPAM Pool Control
+  INFRA_POOL_DISABLED: "false"
+  APPS_POOL_DISABLED: "true"
+  CILIUM_LB_POOL_START: "10.25.11.100"
+  CILIUM_LB_POOL_END: "10.25.11.119"
 
   # CoreDNS Configuration
   COREDNS_CLUSTER_IP: "10.245.0.10"
@@ -578,11 +584,17 @@ data:
   K8S_SERVICE_HOST: "apps-k8s.monosense.io"
 
   # Cilium Configuration
-  CLUSTERMESH_IP: "10.25.11.101"
+  CLUSTERMESH_IP: "10.25.11.120"
   CILIUM_GATEWAY_LB_IP: "10.25.11.121"
   CILIUM_BGP_LOCAL_ASN: "64513"
   CILIUM_BGP_PEER_ASN: "64501"
   CILIUM_BGP_PEER_ADDRESS: "10.25.11.1/32"
+
+  # IPAM Pool Control
+  INFRA_POOL_DISABLED: "true"
+  APPS_POOL_DISABLED: "false"
+  CILIUM_LB_POOL_START: "10.25.11.120"
+  CILIUM_LB_POOL_END: "10.25.11.139"
 
   # CoreDNS Configuration
   COREDNS_CLUSTER_IP: "10.247.0.10"
@@ -843,9 +855,74 @@ Located in `kubernetes/infrastructure/networking/cilium/*`:
 | **🔗 BGP Peering** | `bgp/` | `CiliumBGPPeeringPolicy` | Pod/LB IP advertisement |
 | **🌉 Gateway API** | `gateway/` | `GatewayClass` + `Gateways` | North-south traffic management |
 | **🔗 ClusterMesh** | `clustermesh/` | `ExternalSecret` | Cross-cluster connectivity |
-| **📊 IPAM** | `ipam/` | `CiliumIPAMPool` | L2/LB IP pool management |
+| **📊 IPAM** | `ipam/` | `CiliumLoadBalancerIPPool` | L2/LB IP pool management |
 
 Gateway policy note: This platform uses Cilium Gateway exclusively; Envoy Gateway is not part of this design.
+
+### 🔢 LoadBalancer IP Allocation
+
+**Network Topology:** Both clusters share the same L2 subnet (`10.25.11.0/24`) and peer with BGP router at `10.25.11.1` (ASN 64501).
+
+**IP Pool Allocation Strategy:**
+
+| Range | Cluster | Purpose | Reserved IPs | Pool Size |
+|---|---|---|---|---|
+| **10.25.11.100-119** | Infra | LoadBalancer Services | `.100` (ClusterMesh), `.110` (Gateway) | 20 IPs |
+| **10.25.11.120-139** | Apps | LoadBalancer Services | `.120` (ClusterMesh), `.121` (Gateway) | 20 IPs |
+
+**Key Design Principles:**
+- ✅ **Pool Isolation**: Pools use `disabled` flag via cluster-settings to prevent cross-cluster allocation
+- ✅ **Clean Segmentation**: No IP overlap, contiguous ranges per cluster
+- ✅ **Predictable Allocation**: ClusterMesh at start of each pool, Gateway follows
+- ✅ **Room for Growth**: ~17 IPs available per cluster for future LoadBalancer services
+- ✅ **BGP-Friendly**: Each cluster advertises only its own pool range via BGP Control Plane
+
+**Specific IP Assignments:**
+
+| Service | Infra Cluster | Apps Cluster | Purpose |
+|---|---|---|---|
+| **ClusterMesh API** | `10.25.11.100` | `10.25.11.120` | Cross-cluster service discovery |
+| **Gateway API** | `10.25.11.110` | `10.25.11.121` | North-south HTTP(S) traffic |
+| **Available Pool** | `.111-.119` | `.122-.139` | Future LoadBalancer services |
+
+**Pool Isolation Mechanism:**
+```yaml
+# Controlled via cluster-settings ConfigMap
+# Infra cluster:
+INFRA_POOL_DISABLED: "false"
+APPS_POOL_DISABLED: "true"
+
+# Apps cluster:
+INFRA_POOL_DISABLED: "true"
+APPS_POOL_DISABLED: "false"
+```
+
+This ensures that when shared infrastructure manifests deploy to both clusters, each cluster only allocates from its designated pool.
+
+### 🪞 Spegel: Cluster-Local OCI Registry Mirror
+
+**Installation**: Bootstrap Phase 1 (after CoreDNS) + Flux-managed day-2
+
+Spegel provides distributed P2P image caching across all cluster nodes, significantly improving image pull performance and reducing external registry bandwidth.
+
+| Aspect | Configuration | Notes |
+|---|---|---|
+| **📦 Deployment** | DaemonSet (kube-system namespace) | Runs on all nodes for local mirror access |
+| **🔌 Registry Endpoint** | HostPort `29999` | Local mirror accessible at `localhost:29999` on each node |
+| **⚙️ Talos Integration** | `containerdRegistryConfigPath: /etc/cri/conf.d/hosts` | Dynamic containerd registry configuration (no machine config changes required) |
+| **💾 Storage** | In-memory cache (stateless) | No persistent volumes required |
+| **📊 Observability** | ServiceMonitor + Grafana dashboard | Cache hit rate, pull performance metrics |
+| **🔄 Upstream Fallback** | Automatic | Falls back to upstream registry if image not in local cache |
+
+**How It Works**:
+1. **First Pull**: Node pulls image from upstream registry (ghcr.io, docker.io, etc.) — normal speed
+2. **Cache**: Spegel caches image locally on that node
+3. **Subsequent Pulls**: Other nodes pull from Spegel mirror (P2P) — ~10x faster, no external bandwidth
+4. **Benefits**: Faster deployments, reduced egress costs, improved resilience (works during upstream outages)
+
+**Talos Compatibility**: Fully supported via containerd's dynamic registry configuration. Spegel updates `/etc/cri/conf.d/hosts` at runtime (no Talos machine config modifications required).
+
+**Bootstrap Integration**: Included in `bootstrap/helmfile.d/01-core.yaml.gotmpl` after CoreDNS to accelerate subsequent component installations (cert-manager, Flux, etc.).
 
 ### 🚀 Key Benefits
 
@@ -856,6 +933,7 @@ Gateway policy note: This platform uses Cilium Gateway exclusively; Envoy Gatewa
 | **🔗 Multi-Cluster** | ClusterMesh integration | Seamless cross-cluster service discovery |
 | **📊 Observability** | Hubble + Prometheus integration | Full network visibility and monitoring |
 | **🎛️ Flexibility** | Gateway API + BGP support | Advanced traffic routing capabilities |
+| **🪞 Image Caching** | Spegel P2P registry mirror | Faster pulls, reduced external bandwidth, improved resilience |
 
 ## 10. 💾 Storage Architecture
 
@@ -1228,7 +1306,7 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 
 | Component | 🏷️ Version | ⚠️ Status | 📝 Notes |
 |---|---|---|---|
-| **🪞 Spegel** | `0.4.0` | 🟡 Conditional | Node image mirror; requires Talos compatibility validation |
+| **🪞 Spegel** | `0.4.0` | ✅ Enabled | Cluster-local OCI registry mirror; Talos-compatible via `/etc/cri/conf.d/hosts` (P2P image caching reduces external bandwidth) |
 <!-- Envoy Gateway removed: this platform uses Cilium Gateway exclusively -->
 
 ### 📋 Version Management Strategy

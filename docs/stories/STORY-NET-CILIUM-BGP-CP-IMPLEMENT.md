@@ -1,8 +1,8 @@
-# 38 — STORY-NET-CILIUM-BGP-CP-IMPLEMENT — Implement Cilium BGP Control Plane (v1.18)
+# 20 — STORY-NET-CILIUM-BGP-CP-IMPLEMENT — Implement Cilium BGP Control Plane (v1.18)
 
-Sequence: 38/38 | Prev: STORY-TENANCY-BASELINE.md | Next: (tbd)
+Sequence: 20/41 | Prev: STORY-NET-CILIUM-BGP.md | Next: STORY-NET-SPEGEL-REGISTRY-MIRROR.md
 Sprint: 4 | Lane: Networking
-Global Sequence: 24/41
+Global Sequence: 20/41
 
 Status: Draft
 Owner: Platform Engineering

@@ -1,8 +1,8 @@
-# 21 — STORY-OBS-FLUENT-BIT — Cluster Log Shipping
+# 15 — STORY-OBS-FLUENT-BIT — Cluster Log Shipping
 
-Sequence: 21/26 | Prev: STORY-OBS-VICTORIA-LOGS.md | Next: STORY-NET-SPEGEL-REGISTRY-MIRROR.md
+Sequence: 15/41 | Prev: STORY-OBS-VICTORIA-LOGS.md | Next: STORY-OBS-VM-STACK-IMPLEMENT.md
 Sprint: 3 | Lane: Observability
-Global Sequence: 19/41
+Global Sequence: 15/41
 
 Status: Draft
 Owner: Platform Engineering

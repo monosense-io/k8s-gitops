@@ -1,8 +1,8 @@
-# 40 — STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL — Public/Private DNS via ExternalDNS + Cloudflare Tunnel
+# 09 — STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL — Public/Private DNS via ExternalDNS + Cloudflare Tunnel
 
-Sequence: 40/40 | Prev: STORY-SEC-CERT-MANAGER-ISSUERS.md | Next: —
-Sprint: 2 | Lane: Networking & DNS
-Global Sequence: 13/41
+Sequence: 09/41 | Prev: STORY-OPS-RELOADER-ALL-CLUSTERS.md | Next: STORY-STO-OPENEBS-BASE.md
+Sprint: 2 | Lane: Networking
+Global Sequence: 9/41
 
 Status: Draft
 Owner: Platform Engineering

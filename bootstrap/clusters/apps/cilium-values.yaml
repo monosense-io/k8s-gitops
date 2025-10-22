@@ -141,7 +141,7 @@ clustermesh:
     service:
       type: LoadBalancer
       annotations:
-        io.cilium/lb-ipam-ips: "10.25.12.100"
+        io.cilium/lb-ipam-ips: "10.25.11.120"
 
     tls:
       auto:
@@ -167,22 +167,14 @@ clustermesh:
 bgpControlPlane:
   enabled: true
 
-# Enable Gateway API with Envoy LB and static IP
-gatewayAPI:
-  enabled: true
-  envoy:
-    enabled: true
-    service:
-      type: LoadBalancer
-      annotations:
-        io.cilium/lb-ipam-ips: "10.25.12.120"
-
 # ============================================================================
 # GATEWAY API
 # ============================================================================
 
 gatewayAPI:
   enabled: true
+  # Gateway service IP will be managed by Flux day-2 Gateway manifest
+  # Bootstrap only enables the controller; actual Gateway resources created via GitOps
 
 # ============================================================================
 # OPERATOR & AGENT RESOURCES
@@ -293,11 +285,12 @@ cgroup:
   hostRoot: /sys/fs/cgroup
 
 # ============================================================================
-# KUBERNETES API ENDPOINT (uses in-cluster config with kubePrism)
+# KUBERNETES API ENDPOINT (Talos kubePrism)
 # ============================================================================
-# Note: Not setting k8sServiceHost/Port allows Cilium to use the in-cluster
-# kubeconfig which automatically routes through Talos kubePrism (127.0.0.1:7445)
-# This is more reliable than external DNS endpoints for pod-to-API communication
+# Required for bootstrap: Cilium must use kubePrism since cluster service
+# IP (10.245.0.1:443) doesn't work until CNI is ready
+k8sServiceHost: 127.0.0.1
+k8sServicePort: "7445"
 
 # ============================================================================
 # DEBUGGING (disable in production)

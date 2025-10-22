@@ -1,8 +1,8 @@
-# 18 — STORY-DB-CNPG-SHARED-CLUSTER — Multi‑Tenant Postgres Cluster
+# 23 — STORY-DB-CNPG-SHARED-CLUSTER — Multi‑Tenant Postgres Cluster
 
-Sequence: 18/26 | Prev: STORY-DB-CNPG-OPERATOR.md | Next: STORY-OBS-VM-STACK.md
-Sprint: 5 | Lane: Databases
-Global Sequence: 27/41
+Sequence: 23/41 | Prev: STORY-DB-CNPG-OPERATOR.md | Next: STORY-DB-DRAGONFLY-OPERATOR-CLUSTER.md
+Sprint: 5 | Lane: Database
+Global Sequence: 23/41
 
 Status: Draft
 Owner: Platform Engineering

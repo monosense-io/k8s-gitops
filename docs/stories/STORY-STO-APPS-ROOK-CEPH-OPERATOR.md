@@ -1,8 +1,8 @@
-# 25 — STORY-STO-APPS-ROOK-CEPH-OPERATOR — Rook-Ceph Operator (apps)
+# 31 — STORY-STO-APPS-ROOK-CEPH-OPERATOR — Rook-Ceph Operator (apps)
 
-Sequence: 25/26 | Prev: STORY-STO-APPS-OPENEBS-BASE.md | Next: STORY-STO-APPS-ROOK-CEPH-CLUSTER.md
+Sequence: 31/41 | Prev: STORY-STO-APPS-OPENEBS-BASE.md | Next: STORY-STO-APPS-ROOK-CEPH-CLUSTER.md
 Sprint: 6 | Lane: Storage
-Global Sequence: 35/41
+Global Sequence: 31/41
 
 Status: Draft
 Owner: Platform Engineering

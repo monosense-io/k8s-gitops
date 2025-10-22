@@ -1,8 +1,8 @@
-# 15 — STORY-STO-ROOK-CEPH-OPERATOR — Deploy Rook-Ceph Operator (infra)
+# 11 — STORY-STO-ROOK-CEPH-OPERATOR — Deploy Rook-Ceph Operator (infra)
 
-Sequence: 15/26 | Prev: STORY-STO-OPENEBS-BASE.md | Next: STORY-STO-ROOK-CEPH-CLUSTER.md
+Sequence: 11/41 | Prev: STORY-STO-OPENEBS-BASE.md | Next: STORY-STO-ROOK-CEPH-CLUSTER.md
 Sprint: 3 | Lane: Storage
-Global Sequence: 14/41
+Global Sequence: 11/41
 
 Status: Draft
 Owner: Platform Engineering

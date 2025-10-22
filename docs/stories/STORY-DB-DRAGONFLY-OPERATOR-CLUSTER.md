@@ -1,8 +1,8 @@
-# 31 — STORY-DB-DRAGONFLY-OPERATOR-CLUSTER — DragonflyDB Operator & Shared Cluster
+# 24 — STORY-DB-DRAGONFLY-OPERATOR-CLUSTER — DragonflyDB Operator & Shared Cluster
 
-Sequence: 31/31 | Prev: STORY-STO-ROOK-CEPH-OPERATOR.md | Next: (tbd)
-Sprint: 5 | Lane: Databases
-Global Sequence: 28/41
+Sequence: 24/41 | Prev: STORY-DB-CNPG-SHARED-CLUSTER.md | Next: STORY-SEC-NP-BASELINE.md
+Sprint: 5 | Lane: Database
+Global Sequence: 24/41
 
 Status: Approved
 Owner: Platform Engineering

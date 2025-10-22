@@ -1,8 +1,8 @@
-# 14 — STORY-STO-OPENEBS-BASE — OpenEBS LocalPV (infra)
+# 10 — STORY-STO-OPENEBS-BASE — OpenEBS LocalPV (infra)
 
-Sequence: 14/26 | Prev: STORY-BOOT-AUTOMATION-ALIGN.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
+Sequence: 10/41 | Prev: STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL.md | Next: STORY-STO-ROOK-CEPH-OPERATOR.md
 Sprint: 3 | Lane: Storage
-Global Sequence: 16/41
+Global Sequence: 10/41
 
 Status: Draft
 Owner: Platform Engineering

@@ -1,6 +1,6 @@
 # 01 — STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Sequence: 01/26 | Next: STORY-BOOT-CRDS.md
+Sequence: 01/41 | Prev: — | Next: STORY-NET-CILIUM-CORE-GITOPS.md
 Sprint: 1 | Lane: Bootstrap & Platform
 Global Sequence: 1/41
 

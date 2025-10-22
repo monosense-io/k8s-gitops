@@ -1,19 +1,25 @@
 ---
 # LoadBalancer IP Pool for Infra Cluster
 # IP Range: 10.25.11.100-119 (20 IPs)
+# Cluster Isolation: Enabled on infra cluster, disabled on apps cluster via Flux substitution
 apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
 metadata:
   name: infra-pool
   namespace: kube-system
 spec:
+  disabled: ${INFRA_POOL_DISABLED}
   blocks:
     - start: "10.25.11.100"
       stop: "10.25.11.119"
-  serviceSelector: {}
+  serviceSelector:
+    matchLabels: {}
 ---
-# Patch for infra cluster services to use this pool
-# Apply this label to services that should get IPs from infra pool:
-# metadata:
-#   labels:
-#     io.cilium/lb-ipam-cluster: infra
+# Pool Isolation:
+# - Infra cluster: INFRA_POOL_DISABLED=false (pool active)
+# - Apps cluster: INFRA_POOL_DISABLED=true (pool disabled)
+#
+# Reserved IPs:
+#   10.25.11.100 - ClusterMesh API Server
+#   10.25.11.110 - Gateway API
+#   10.25.11.111-119 - Available for LoadBalancer services

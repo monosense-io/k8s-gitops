@@ -1,8 +1,8 @@
-# XX — STORY-TENANCY-BASELINE — Team Namespace + RBAC + Quotas Template
+# 36 — STORY-TENANCY-BASELINE — Team Namespace + RBAC + Quotas Template
 
-Sequence: 37/38 | Prev: STORY-SEC-NP-BASELINE.md | Next: STORY-NET-CILIUM-BGP-CP-IMPLEMENT.md
-Sprint: 7 | Lane: Tenancy
-Global Sequence: 40/41
+Sequence: 36/41 | Prev: STORY-APP-HARBOR.md | Next: STORY-BACKUP-VOLSYNC-APPS.md
+Sprint: 7 | Lane: Platform
+Global Sequence: 36/41
 
 Status: Draft
 Owner: Platform Engineering

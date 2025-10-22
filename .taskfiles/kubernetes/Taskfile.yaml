@@ -9,8 +9,7 @@ tasks:
     desc: Bootstrap Flux controllers and sync manifests to a cluster [CLUSTER=required]
     cmds:
       - flux install --context={{.CONTEXT}} --namespace flux-system
-      - kubectl --context={{.CONTEXT}} apply -k \
-          {{.KUBERNETES_DIR}}/clusters/{{.CLUSTER}}/flux-system
+      - kubectl --context={{.CONTEXT}} apply -k {{.KUBERNETES_DIR}}/clusters/{{.CLUSTER}}/flux-system
     vars:
       CLUSTER: '{{.CLUSTER | default ""}}'
       CONTEXT: '{{.CONTEXT | default .CLUSTER}}'

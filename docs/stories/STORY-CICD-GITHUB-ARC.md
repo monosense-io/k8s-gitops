@@ -1,8 +1,8 @@
-# XX — STORY-CICD-GITHUB-ARC — Actions Runner Controller (ARC) + Runner Scale Sets
+# 33 — STORY-CICD-GITHUB-ARC — Actions Runner Controller (ARC) + Runner Scale Sets
 
-Sequence: 36/38 | Prev: STORY-APP-HARBOR.md | Next: STORY-TENANCY-BASELINE.md
+Sequence: 33/41 | Prev: STORY-STO-APPS-ROOK-CEPH-CLUSTER.md | Next: STORY-CICD-GITLAB-APPS.md
 Sprint: 6 | Lane: CI/CD
-Global Sequence: 37/41
+Global Sequence: 33/41
 
 Status: Draft
 Owner: Platform Engineering

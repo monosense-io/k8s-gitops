@@ -1,8 +1,8 @@
-# 27 — STORY-IDP-KEYCLOAK-OPERATOR — Keycloak via Operator (Infra)
+# 26 — STORY-IDP-KEYCLOAK-OPERATOR — Keycloak via Operator (Infra)
 
-Sequence: 27/27 | Prev: STORY-OBS-VM-STACK.md | Next: —
+Sequence: 26/41 | Prev: STORY-SEC-NP-BASELINE.md | Next: STORY-NET-CILIUM-CLUSTERMESH.md
 Sprint: 5 | Lane: Identity
-Global Sequence: 31/41
+Global Sequence: 26/41
 
 Status: Draft
 Owner: Platform Engineering

@@ -1,8 +1,8 @@
-# 41 — STORY-OPS-RELOADER-ALL-CLUSTERS — Stakater Reloader on All Clusters
+# 08 — STORY-OPS-RELOADER-ALL-CLUSTERS — Stakater Reloader on All Clusters
 
-Sequence: 41/41 | Prev: STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL.md | Next: —
-Sprint: 1 | Lane: Bootstrap & Platform
-Global Sequence: 6/41
+Sequence: 08/41 | Prev: STORY-SEC-EXTERNAL-SECRETS-BASE.md | Next: STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL.md
+Sprint: 2 | Lane: Operations
+Global Sequence: 8/41
 
 Status: Draft
 Owner: Platform Engineering

@@ -1,8 +1,8 @@
-# 24 — STORY-STO-APPS-OPENEBS-BASE — OpenEBS LocalPV (apps)
+# 30 — STORY-STO-APPS-OPENEBS-BASE — OpenEBS LocalPV (apps)
 
-Sequence: 24/26 | Prev: STORY-BACKUP-VOLSYNC-APPS.md | Next: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md
+Sequence: 30/41 | Prev: STORY-SEC-SPIRE-CILIUM-AUTH.md | Next: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md
 Sprint: 6 | Lane: Storage
-Global Sequence: 34/41
+Global Sequence: 30/41
 
 Status: Draft
 Owner: Platform Engineering

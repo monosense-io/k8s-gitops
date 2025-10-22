@@ -1,8 +1,8 @@
-# 26 — STORY-STO-APPS-ROOK-CEPH-CLUSTER — Ceph Cluster (apps)
+# 32 — STORY-STO-APPS-ROOK-CEPH-CLUSTER — Ceph Cluster (apps)
 
-Sequence: 26/26 | Prev: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md
+Sequence: 32/41 | Prev: STORY-STO-APPS-ROOK-CEPH-OPERATOR.md | Next: STORY-CICD-GITHUB-ARC.md
 Sprint: 6 | Lane: Storage
-Global Sequence: 36/41
+Global Sequence: 32/41
 
 Status: Draft
 Owner: Platform Engineering

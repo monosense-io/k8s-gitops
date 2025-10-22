@@ -1,8 +1,8 @@
-# 08 — STORY-GITOPS-SELF-MGMT-FLUX — Flux Self‑Management via Operator/Instance
+# 39 — STORY-GITOPS-SELF-MGMT-FLUX — Flux Self‑Management via Operator/Instance
 
-Sequence: 08/26 | Prev: STORY-DNS-COREDNS-BASE.md | Next: STORY-NET-CILIUM-IPAM.md
-Sprint: 1 | Lane: Bootstrap & Platform
-Global Sequence: 4/41
+Sequence: 39/41 | Prev: STORY-BOOT-CRDS.md | Next: STORY-BOOT-CORE.md
+Sprint: 7 | Lane: Bootstrap & Platform
+Global Sequence: 39/41
 
 Status: Draft
 Owner: Platform Engineering

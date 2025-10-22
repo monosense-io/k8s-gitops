@@ -1,8 +1,8 @@
-# 11 — STORY-NET-CILIUM-BGP — Cilium BGP Policy via GitOps
+# 19 — STORY-NET-CILIUM-BGP — Cilium BGP Policy via GitOps
 
-Sequence: 11/26 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-NET-CILIUM-CLUSTERMESH.md
+Sequence: 19/41 | Prev: STORY-OBS-FLUENT-BIT-IMPLEMENT.md | Next: STORY-NET-CILIUM-BGP-CP-IMPLEMENT.md
 Sprint: 4 | Lane: Networking
-Global Sequence: 23/41
+Global Sequence: 19/41
 
 Status: Draft
 Owner: Platform Engineering
@@ -23,11 +23,17 @@ Publish Kubernetes Service VIPs and PodCIDRs to the upstream router using Cilium
 ## Acceptance Criteria
 1) Cilium 1.18.2 with `bgpControlPlane.enabled: true` on infra/apps; Flux reports Kustomizations Ready.
 2) Router (ASN `${CILIUM_BGP_PEER_ASN}`) sees Established eBGP sessions from cluster nodes (local ASN `${CILIUM_BGP_LOCAL_ASN}`) with hold-time 9s and ECMP active.
-3) LB Service IPs from Cilium LB IPAM are advertised and reachable from upstream; PodCIDR advertisement toggled per design (off by default).
-4) No sustained BGP flaps; `cilium bgp peers` shows Established; exported prefixes match LB pool subnets.
+3) LB Service IPs from Cilium LB IPAM are advertised and reachable from upstream:
+   - **Infra cluster:** Advertises pool `10.25.11.100-119` (including ClusterMesh .100, Gateway .110)
+   - **Apps cluster:** Advertises pool `10.25.11.120-139` (including ClusterMesh .120, Gateway .121)
+4) PodCIDR advertisement toggled per design (off by default; LB IPs only).
+5) No sustained BGP flaps; `cilium bgp peers` shows Established; exported prefixes match LB pool subnets.
 
 ## Dependencies / Inputs
 - STORY-NET-CILIUM-CORE-GITOPS (Cilium Ready).
+- **STORY-NET-CILIUM-IPAM (CRITICAL):** IPAM pools must be deployed with correct ranges before BGP advertises them:
+  - Infra pool: `10.25.11.100-119`
+  - Apps pool: `10.25.11.120-139`
 - Cluster settings include `CILIUM_BGP_LOCAL_ASN`, `CILIUM_BGP_PEER_ASN`, `CILIUM_BGP_PEER_ADDRESS` (router address). Values come from `cluster-settings` ConfigMap per cluster; do not hardcode.
 
 ## Tasks / Subtasks — Implementation Plan (Story Only)
@@ -45,9 +51,77 @@ Publish Kubernetes Service VIPs and PodCIDRs to the upstream router using Cilium
 - [ ] Smoke test (when implemented later): Create `kubernetes/components/testing/lb-echo.yaml` (Service `type=LoadBalancer`), verify LB IP in pool and reachability from upstream.
 
 ## Validation Steps
-- flux -n flux-system --context=<ctx> reconcile ks cilium-bgp-policy --with-source
-- kubectl --context=<ctx> -n kube-system get cm,ds,deploy | grep cilium
-- On router: show bgp summary; show routes for PodCIDRs and LB IP pools
+
+**Flux Reconciliation:**
+```bash
+flux -n flux-system --context=infra reconcile ks cilium-bgp-policy --with-source
+flux -n flux-system --context=apps reconcile ks cilium-bgp-policy --with-source
+```
+
+**BGP Session Status:**
+```bash
+# Check BGP peering from Cilium
+cilium bgp peers --context=infra
+cilium bgp peers --context=apps
+# Expected: Established sessions with ${CILIUM_BGP_PEER_ADDRESS}
+
+# Check BGP routes being advertised
+cilium bgp routes advertised ipv4 unicast --context=infra
+cilium bgp routes advertised ipv4 unicast --context=apps
+```
+
+**Router-Side Verification:**
+```bash
+# On BGP router (10.25.11.1)
+show bgp summary
+# Expected: Established sessions from infra nodes (ASN 64512) and apps nodes (ASN 64513)
+
+show ip route bgp
+# Expected routes:
+# - 10.25.11.100-119 via infra cluster nodes (ECMP)
+# - 10.25.11.120-139 via apps cluster nodes (ECMP)
+
+show ip bgp 10.25.11.100
+show ip bgp 10.25.11.110
+show ip bgp 10.25.11.120
+show ip bgp 10.25.11.121
+# Verify specific IPs are advertised from correct cluster
+```
+
+**IP Pool Advertisement Validation:**
+```bash
+# Verify only LB IPs are advertised (not PodCIDRs)
+# Infra cluster check
+kubectl --context=infra get ciliumloadbalancerippool infra-pool -o yaml | grep -A5 blocks
+# Should show: 10.25.11.100-119
+
+# Apps cluster check
+kubectl --context=apps get ciliumloadbalancerippool apps-pool -o yaml | grep -A5 blocks
+# Should show: 10.25.11.120-139
+```
+
+**Reachability Test:**
+```bash
+# From external network (outside cluster), test LB IP reachability
+ping 10.25.11.100  # Infra ClusterMesh
+ping 10.25.11.110  # Infra Gateway
+ping 10.25.11.120  # Apps ClusterMesh
+ping 10.25.11.121  # Apps Gateway
+
+# HTTP test to Gateways
+curl -v http://10.25.11.110
+curl -v http://10.25.11.121
+```
+
+**ECMP Verification:**
+```bash
+# On router: verify multiple paths exist (ECMP)
+show ip bgp 10.25.11.110 detail
+# Should show multiple next-hops (infra cluster nodes)
+
+show ip bgp 10.25.11.121 detail
+# Should show multiple next-hops (apps cluster nodes)
+```
 
 ## Definition of Done
 - ACs met on infra and apps; validation outputs recorded in Dev Notes.
@@ -124,15 +198,28 @@ Acceptance Criteria — Design Additions (for this story)
 - Explicit decision recorded: advertise LB IPs by default; PodCIDRs optional.
 
 Validation (when implemented later)
-- Router: `show bgp summary` (Established), routes for LB pools; ECMP active.
+- Router: `show bgp summary` (Established), routes for correct LB pool ranges per cluster:
+  - Infra advertises: `10.25.11.100-119`
+  - Apps advertises: `10.25.11.120-139`
+- ECMP active with multiple paths per LB IP.
 - Cluster: `cilium bgp peers`, `cilium bgp advertisements`; curl to a sample LB IP succeeds from upstream network.
+- Verify pool isolation: infra nodes ONLY advertise infra pool, apps nodes ONLY advertise apps pool.
 
 ---
 
 ## Notes
 - Use Cilium 1.18.2 BGP Control Plane for sessions/advertisements; legacy peering policy is deprecated for new designs.
 - All values (ASNs, router address) come from `cluster-settings`; no hardcoded values in manifests.
-- Validate with router “bgp summary/routes” and `cilium bgp peers/advertisements` once implemented in a later story.
+- **CRITICAL:** BGP advertises IPs from Cilium IPAM pools. Pool isolation (via `disabled` flags) ensures:
+  - Infra cluster advertises ONLY `10.25.11.100-119`
+  - Apps cluster advertises ONLY `10.25.11.120-139`
+  - No cross-cluster IP conflicts or routing issues
+- Validate with router "bgp summary/routes" and `cilium bgp peers/advertisements` once implemented in a later story.
+- Expected BGP routes on router:
+  - `10.25.11.100/32` → infra nodes (ClusterMesh)
+  - `10.25.11.110/32` → infra nodes (Gateway)
+  - `10.25.11.120/32` → apps nodes (ClusterMesh)
+  - `10.25.11.121/32` → apps nodes (Gateway)
 
 ## Optional Steps
 - Deploy a second upstream router (if available) and configure ECMP with multipath for redundancy.

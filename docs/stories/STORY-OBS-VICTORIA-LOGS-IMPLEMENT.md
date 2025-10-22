@@ -1,8 +1,8 @@
-# 30 — STORY-OBS-VICTORIA-LOGS-IMPLEMENT — Implement Logs Stack
+# 17 — STORY-OBS-VICTORIA-LOGS-IMPLEMENT — Implement Logs Stack
 
-Sequence: 30/30 | Prev: STORY-OBS-VM-STACK-IMPLEMENT.md | Next: STORY-OBS-FLUENT-BIT-IMPLEMENT.md
+Sequence: 17/41 | Prev: STORY-OBS-VM-STACK-IMPLEMENT.md | Next: STORY-OBS-FLUENT-BIT-IMPLEMENT.md
 Sprint: 4 | Lane: Observability
-Global Sequence: 21/41
+Global Sequence: 17/41
 
 Status: Draft
 Owner: Platform Engineering
