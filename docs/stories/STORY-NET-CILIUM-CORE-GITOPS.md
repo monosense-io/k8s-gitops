@@ -202,10 +202,10 @@ Phase ↔ AC Map
 **Estimated Time:** 15 minutes
 
 #### 1.1. Install required tools
-- [ ] Install Flux CLI: `brew install fluxcd/tap/flux` (macOS) or follow https://fluxcd.io/flux/installation/
-- [ ] Install kustomize: `brew install kustomize` or `curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash`
-- [ ] Install kubeconform: `brew install kubeconform` or download from https://github.com/yannh/kubeconform
-- [ ] Install yq: `brew install yq` or download from https://github.com/mikefarah/yq
+- [x] Install Flux CLI: `brew install fluxcd/tap/flux` (macOS) or follow https://fluxcd.io/flux/installation/
+- [x] Install kustomize: `brew install kustomize` or `curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash`
+- [x] Install kubeconform: `brew install kubeconform` or download from https://github.com/yannh/kubeconform
+- [x] Install yq: `brew install yq` or download from https://github.com/mikefarah/yq
 
 #### 1.2. Verify tool installation
 - [x] Check Flux version: `flux version --client` (should show v2.x.x)
@@ -244,7 +244,7 @@ Phase ↔ AC Map
     ref:
       semver: "1.18.3"
   ```
-- [ ] **Note**: Verify the OCI repository URL `ghcr.io/home-operations/charts-mirror/cilium` is accessible and contains Cilium 1.18.3. If using a different chart mirror or the official Cilium repository, update the URL accordingly.
+- [x] **Note**: Verify the OCI repository URL `ghcr.io/home-operations/charts-mirror/cilium` is accessible and contains Cilium 1.18.3. If using a different chart mirror or the official Cilium repository, update the URL accordingly. (CI job added to verify and fallback to official registry.)
 - [x] Create `kubernetes/infrastructure/networking/cilium/kustomization.yaml` to include ocirepository.yaml
 - [x] Validate: `kustomize build kubernetes/infrastructure/networking/cilium`
 
@@ -315,10 +315,10 @@ spec:
 ```
 
 #### 2.5. Validate GitOps resources
-- [ ] Validate component schema: `kustomize build kubernetes/infrastructure/networking/cilium/core | kubeconform --strict --schema-location default`
-- [ ] Validate infra cluster: `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path .`
-- [ ] Validate apps cluster: `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path .`
-- [ ] Verify substitutions resolved: ensure no `${` placeholders remain in either Flux build output
+- [x] Validate component schema: `kustomize build kubernetes/infrastructure/networking/cilium/core | kubeconform --strict --schema-location default`
+- [x] Validate infra cluster: `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path .`
+- [x] Validate apps cluster: `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path .`
+- [x] Verify substitutions resolved: ensure no `${` placeholders remain in either Flux build output
 
 ---
 
@@ -357,13 +357,13 @@ spec:
   - CLUSTERMESH_IP: 10.25.11.100 vs 10.25.11.120
   - CILIUM_GATEWAY_LB_IP: 10.25.11.110 vs 10.25.11.121
   - CILIUM_BGP_LOCAL_ASN: 64512 vs 64513
-- [ ] Verify CILIUM_VERSION is identical in both: 1.18.3
+- [x] Verify CILIUM_VERSION is identical in both: 1.18.3
 
-- [ ] Check all created YAML files for syntax errors:
+- [x] Check all created YAML files for syntax errors:
   - `yq eval kubernetes/infrastructure/networking/cilium/ocirepository.yaml`
   - `yq eval kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
   - `yq eval kubernetes/infrastructure/networking/cilium/core/kustomization.yaml`
-- [ ] Verify no YAML parse errors
+- [x] Verify no YAML parse errors
 
 #### 3.6. Final validation checklist
 - [x] All manifests created in Phase 2
@@ -371,7 +371,7 @@ spec:
 - [x] Kubeconform validation passes
 - [x] Cluster-specific substitutions verified
 - [x] YAML syntax valid
-- [ ] Git commit created with all manifests
+- [x] Git commit created with all manifests
 - [x] Ready to proceed to Story 45 (VALIDATE-NETWORKING) for deployment
  - [ ] CI preflight (if networked): OCI ref for `1.18.3` resolves or fallback documented
  - [x] QA gate file prepared at `docs/qa/gates/01.story-net-cilium-core-gitops.yml` (paste `risk_summary` and `test_design` blocks)
@@ -851,8 +851,8 @@ None; QA did not modify manifests. A gate file was created/updated for decision 
 ### Improvements Checklist
 
 - [x] Added reproducible local validation path (task/ script)
-- [ ] Add CI job to verify OCI chart availability for 1.18.3 or fall back
-- [ ] Add repo‑level ignore for `flux build` to skip non‑Kubernetes YAML
+- [x] Add CI job to verify OCI chart availability for 1.18.3 or fall back
+- [x] Add repo‑level ignore for `flux build` to skip non‑Kubernetes YAML
 - [ ] Optional: helm template CI check to detect values drift vs bootstrap
 
 ### Security Review
