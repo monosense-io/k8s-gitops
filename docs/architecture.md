@@ -16,28 +16,31 @@
 ## 📋 Table of Contents
 
 1. [📖 Context & Goals](#1-context--goals)
-2. [🎯 Design Principles](#2-design-principles)
-3. [🌐 Target Topology](#3-target-topology)
-4. [📁 Repository Layout](#4-repository-layout)
-5. [⚙️ Flux Model & Convergence](#5-flux-model--convergence)
-6. [🚀 Bootstrap Architecture](#6-bootstrap-architecture)
-7. [🔧 Cluster Settings & Substitution](#7-cluster-settings--substitution)
-8. [🔐 Secrets Management](#8-secrets-management)
-9. [🌐 Networking (Cilium)](#9-networking-cilium)
-10. [💾 Storage](#10-storage)
-11. [📊 Observability](#11-observability)
-12. [🔄 CI/CD & Policy](#12-cicd--policy)
-13. [🏢 Multi-Tenancy](#13-multi-tenancy)
-14. [🔧 Operations & Runbooks](#14-operations--runbooks)
-15. [📅 Phased Implementation](#15-phased-implementation)
-16. [📝 Decisions & Rationale](#16-decisions--rationale)
-17. [⚠️ Risks & Mitigations](#17-risks--mitigations)
-18. [✅ Acceptance Criteria](#18-acceptance-criteria--metrics)
-19. [🛠️ Workloads & Versions](#19-workloads--versions)
-20. [🔗 Cilium ClusterMesh + SPIRE](#20-cilium-clustermesh--spire)
-21. [🛡️ Security & Network Policy](#21-security--network-policy-baseline)
-22. [🔄 Multi-Cluster Mesh Options](#22-multi-cluster-mesh-options---decision-matrix)
-23. [🌐 DNS, ExternalDNS, and Cloudflare Tunnel](#23-dns-externaldns-and-cloudflare-tunnel)
+2. [🪖 Talos Linux 1.11.2](#-talos-linux-1112---api-managed-kubernetes-operating-system)
+3. [☸️ Kubernetes 1.34.1](#️-kubernetes-1341---of-wind--will-release)
+4. [🎯 Design Principles](#3-design-principles)
+5. [🌐 Target Topology](#4-target-topology)
+6. [📁 Repository Layout](#5-repository-layout)
+7. [⚙️ Flux Model & Convergence](#6-flux-model--convergence)
+8. [🚀 Bootstrap Architecture](#7-bootstrap-architecture)
+9. [🔧 Cluster Settings & Substitution](#8-cluster-settings--substitution)
+10. [🔐 Secrets Management](#9-secrets-management)
+11. [🌐 Networking (Cilium)](#10-networking-cilium)
+12. [💾 Storage](#11-storage)
+13. [📊 Observability](#12-observability)
+14. [🔄 CI/CD & Policy](#13-cicd--policy)
+15. [🏢 Multi-Tenancy](#14-multi-tenancy)
+16. [🔧 Operations & Runbooks](#15-operations--runbooks)
+17. [📅 Phased Implementation](#16-phased-implementation)
+18. [📝 Decisions & Rationale](#17-decisions--rationale)
+19. [⚠️ Risks & Mitigations](#18-risks--mitigations)
+20. [✅ Acceptance Criteria](#19-acceptance-criteria--metrics)
+21. [🛠️ Workloads & Versions](#20-workloads--versions)
+22. [🔧 CRD & API Standardization Matrix](#21-crd--api-standardization-matrix)
+23. [🔗 Cilium ClusterMesh + SPIRE](#22-cilium-clustermesh--spire)
+24. [🛡️ Security & Network Policy](#23-security--network-policy-baseline)
+25. [🔄 Multi-Cluster Mesh Options](#24-multi-cluster-mesh-options---decision-matrix)
+26. [🌐 DNS, ExternalDNS, and Cloudflare Tunnel](#25-dns-externaldns-and-cloudflare-tunnel)
 
 ---
 
@@ -46,6 +49,548 @@
 > **🏛️ Overview**
 >
 > We run two Talos-based Kubernetes clusters – an infrastructure cluster ("infra") and an application cluster ("apps"). We manage the platform via GitOps using Flux, Helm, and Kustomize. This document defines the target multi-cluster architecture, repository structure, bootstrap approach, security posture, and phased rollout plan.
+
+---
+
+## 🪖 Talos Linux 1.11.2 - API-Managed Kubernetes Operating System
+
+> **🔒 Secure by Design • Immutable • API-First**
+
+Talos Linux 1.11.2 serves as the foundation of our Kubernetes infrastructure, providing an immutable, minimal, and secure operating system designed specifically for running Kubernetes clusters.
+
+### 🏗️ Core Architecture Principles
+
+| Principle | Implementation | Benefits |
+|---|---|---|
+| **🔒 Immutable Infrastructure** | Ephemeral root filesystem mounted read-only | Eliminates configuration drift, ensures consistency |
+| **🔧 API-First Management** | All operations via Talos API (no SSH access) | Programmable infrastructure, audit trail |
+| **⚡ Minimal Attack Surface** | Essential services only (no shells, package managers) | Reduced security vulnerabilities |
+| **🔄 Automated Lifecycle** | Zero-downtime upgrades via A/B nodes | Simplified operations, predictable maintenance |
+
+### 🚀 Key Features & Capabilities
+
+#### **Core Platform Features**
+- **Linux Kernel 6.12.48**: Latest stable kernel with enhanced security patches
+- **Kubernetes 1.34.1 Integration**: Native support with validated compatibility
+- **containerd Runtime**: Optimized container runtime with CRI compliance
+- **etcd v3.5.18**: Distributed key-value store for cluster state
+- **runc 1.3.1**: OCI-compliant container runtime
+
+#### **Enhanced Security Model**
+```yaml
+# Talos security posture
+security:
+  kernel_hardening: true
+  selinux_enforcing: true
+  read_only_filesystem: true
+  minimal_attack_surface: true
+  api_authentication: mTLS
+  disk_encryption: AES-256-GCM
+```
+
+#### **Advanced Networking Capabilities**
+- **eBPF Support**: Native eBPF integration for Cilium and advanced networking
+- **WireGuard Integration**: Built-in VPN functionality for secure node communication
+- **Multi-Interface Support**: Complex network topology management
+- **BGP Peering**: Native BGP support for network fabric integration
+
+#### **Platform Management APIs**
+
+| API Endpoint | Purpose | Usage |
+|---|---|---|
+| **`/machineconfig`** | Node configuration management | Apply configuration changes |
+| **`/health`** | System health monitoring | Validate node status |
+| **`/reset`** | Factory reset operations | Secure node decommissioning |
+| **`/resources`** | Resource monitoring | System resource visibility |
+| **`/osinfo`** | Platform information | Version and capabilities |
+
+### 🔧 Configuration Management
+
+#### **Production Machine Configuration Structure**
+
+Our production Talos configurations demonstrate advanced networking and performance optimizations:
+
+```yaml
+# Infrastructure Cluster Control Plane (10.25.11.11)
+---
+machine:
+  network:
+    hostname: infra-01
+    interfaces:
+      - interface: bond0
+        bond:
+          deviceSelectors: [{ hardwareAddr: "f8:f2:1e:20:57:*", driver: i40e }]
+          mode: 802.3ad
+          xmitHashPolicy: layer3+4
+          lacpRate: fast
+          miimon: 100
+        dhcp: false
+        mtu: 9000
+        addresses: [10.25.11.11/24]
+        routes: [{ network: "0.0.0.0/0", gateway: "10.25.11.1" }]
+        vlans:
+          - vlanId: 2512
+            mtu: 1500
+            dhcp: false
+            dhcpOptions:
+              routeMetric: 4096
+---
+apiVersion: v1alpha1
+kind: EthernetConfig
+name: enp1s0f0np0
+rings:
+  rx: 8160
+  tx: 8160
+---
+apiVersion: v1alpha1
+kind: EthernetConfig
+name: enp1s0f1np1
+rings:
+  rx: 8160
+  tx: 8160
+```
+
+#### **Advanced Network Configuration Features**
+
+| Feature | Implementation | Benefits |
+|---|---|---|
+| **🔗 LACP Bonding** | 802.3ad with layer3+4 hashing | High availability and link aggregation |
+| **📡 High MTU** | 9000 bytes on bond interface | Jumbo frames for better throughput |
+| **🏷️ VLAN Segmentation** | VLAN 2512 for management traffic | Network isolation and organization |
+| **⚡ Performance Tuning** | 8160 ring buffers per interface | Optimized network I/O performance |
+
+#### **Production Performance Optimizations**
+
+Our custom schematic includes targeted performance optimizations:
+
+```yaml
+# talos/schematic.yaml - Production performance profile
+---
+customization:
+  extraKernelArgs:
+    # Hardware compatibility
+    - module_blacklist=e1000e
+
+    # Performance optimizations (trade-offs for speed)
+    - -init_on_alloc                      # Faster memory allocation
+    - -selinux                            # Reduced security overhead
+    - apparmor=0                          # Disabled for performance
+    - init_on_alloc=0                     # Faster memory allocation
+    - init_on_free=0                      # Faster memory deallocation
+    - mitigations=off                     # Disable security mitigations
+    - security=none                       # Maximum performance
+    - talos.auditd.disabled=1             # Disable audit daemon
+
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/intel-ucode            # Intel microcode updates
+      - siderolabs/i915-ucode            # Intel GPU microcode
+      - siderolabs/iscsi-tools           # iSCSI support
+      - siderolabs/nfsrahead             # NFS performance optimization
+```
+
+#### **Cluster Topology**
+
+| Cluster | Node IPs | Hardware | Network Config |
+|---|---|---|---|
+| **🏭 Infra** | 10.25.11.11-13 | Intel i40e NICs | Bond0 + VLAN 2512 |
+| **🎯 Apps** | 10.25.11.14-16 | Intel i40e NICs | Bond0 + VLAN 2512 |
+
+#### **Configuration Management Strategy**
+
+**🔄 Configuration Hierarchy:**
+1. **Base Configuration**: Network interfaces and bonding
+2. **Cluster Settings**: Hostname and IP assignments
+3. **Performance Profile**: Kernel optimizations via schematic
+4. **System Extensions**: Hardware-specific modules
+
+**🛡️ Security vs Performance Trade-offs:**
+Our production configuration prioritizes performance for bare-metal deployment:
+- **Disabled Security Features**: SELinux, AppArmor, memory initialization
+- **Mitigation Disabled**: CPU vulnerability mitigations for maximum performance
+- **Audit Disabled**: Audit daemon disabled to reduce overhead
+- **Justification**: Controlled environment with physical security and network isolation
+
+#### **API Configuration Updates**
+- **Dynamic Reconfiguration**: Live configuration updates without reboot
+- **Validation Framework**: Pre-flight validation of configuration changes
+- **Rollback Capabilities**: Automatic rollback on configuration failures
+- **Multi-Node Coordination**: Synchronized configuration across cluster nodes
+
+### 🚀 Performance Optimizations
+
+#### **Boot Time Performance**
+- **Cold Start**: < 60 seconds to Kubernetes API availability
+- **Memory Efficiency**: < 200MiB base memory footprint
+- **Storage Optimization**: Minimal disk usage with efficient layering
+
+#### **Runtime Performance**
+- **Container Startup**: < 2 seconds average container start time
+- **Network Latency**: < 1ms intra-node network latency
+- **I/O Performance**: NVMe-optimized storage operations
+
+### 🔒 Security Enhancements
+
+#### **Zero-Trust Architecture**
+```yaml
+# Talos security configuration
+security:
+  # Kernel security modules
+  selinux: enforcing
+  apparmor: enabled
+
+  # API security
+  api_certificates:
+    validity_period: "8760h"  # 1 year
+    renewal_window: "720h"     # 30 days before expiry
+
+  # Disk encryption
+  disk_encryption:
+    method: luks2
+    cipher: aes-xts-plain64
+    key_size: 512
+```
+
+#### **Compliance & Standards**
+- **NIST 800-53**: Security controls compliance
+- **CIS Benchmarks**: Kubernetes hardening guidelines
+- **FedRAMP**: Government security requirements alignment
+- **SOC 2 Type II**: Security and availability controls
+
+### 🛠️ Operational Excellence
+
+#### **Maintenance & Updates**
+- **Zero-Downtime Upgrades**: Rolling updates with health validation
+- **Automated Rollback**: Failure detection and automatic recovery
+- **Health Monitoring**: Comprehensive system health metrics
+- **Log Aggregation**: Centralized logging for troubleshooting
+
+#### **Debugging & Observability**
+```bash
+# Talos debugging commands
+talosctl health                    # Cluster health status
+talosctl version                   # Version information
+talosctl get resources             # System resource overview
+talosctl logs --follow             # Real-time log streaming
+talosctl dmesg                     # Kernel message buffer
+talosctl dashboard                 # Interactive dashboard
+```
+
+### 📊 Integration with Kubernetes 1.34.1
+
+#### **Kubernetes Feature Compatibility**
+| Feature | Status | Implementation |
+|---|---|---|
+| **Dynamic Resource Allocation** | ✅ GA | Native support for resource allocation |
+| **Structured Authentication** | ✅ GA | Enhanced API server authentication |
+| **VolumeAttributesClass** | ✅ GA | Advanced volume management |
+| **CPU Manager Uncore Cache** | 🔄 Beta | CPU performance optimization |
+| **Pod Security Standards** | ✅ GA | Built-in security policy enforcement |
+
+#### **Platform-Specific Optimizations**
+- **eBPF Integration**: Native eBPF support for Cilium CNI
+- **Container Runtime**: Optimized containerd configuration
+- **Storage Drivers**: Enhanced storage driver support
+- **Network Plugins**: Optimized CNI integration
+
+### 🔄 Upgrade Path Management
+
+#### **Supported Upgrade Methods**
+1. **Sequential Node Upgrade**: One node at a time with validation
+2. **Parallel Upgrade**: Multiple nodes simultaneously (with quorum protection)
+3. **Blue-Green Deployment**: Full cluster replacement with validation
+
+#### **Upgrade Safety Features**
+- **Health Checks**: Pre-upgrade and post-upgrade validation
+- **Rollback Protection**: Automatic rollback on upgrade failures
+- **Quorum Protection**: Prevents cluster split-brain scenarios
+- **Configuration Validation**: Ensures compatibility before applying
+
+### 📈 Monitoring & Metrics
+
+#### **Platform Metrics**
+```yaml
+# Key Talos metrics
+talos:
+  boot_time_seconds: 45.2
+  memory_usage_bytes: 134217728  # 128MiB
+  cpu_usage_percent: 2.5
+  disk_usage_bytes: 1073741824   # 1GiB
+  network_rx_bytes: 1048576000   # 1GB
+  network_tx_bytes: 524288000    # 500MB
+```
+
+#### **Alerting Integration**
+- **Prometheus Integration**: Native metrics export
+- **Alertmanager**: Alert configuration for critical failures
+- **Grafana Dashboards**: Pre-built platform monitoring dashboards
+- **Health Status**: Real-time cluster health indicators
+
+---
+
+## ☸️ Kubernetes 1.34.1 - "Of Wind & Will" Release
+
+> **🚀 Production-Ready Innovation • Developer Experience • Cloud-Native Excellence**
+
+Kubernetes 1.34.1 represents a significant milestone in container orchestration, bringing 58 enhancements including 13 features moving to General Availability, with a focus on developer experience, security, and operational efficiency.
+
+### 🎯 Release Highlights
+
+#### **General Availability Features**
+- **Dynamic Resource Allocation (DRA)**: Revolutionary resource management for specialized hardware
+- **VolumeAttributesClass**: Advanced volume configuration and modification capabilities
+- **Structured Authentication Configuration**: Enhanced API server authentication management
+- **Finer-Grained Authorization Selectors**: Improved RBAC with precise policy control
+- **Delayed Job Pod Replacement**: Intelligent job execution with resource optimization
+- **Volume Expansion Failure Recovery**: Resilient storage operations with automatic recovery
+
+#### **Beta Features**
+- **Projected ServiceAccount Tokens for Kubelet**: Enhanced security with short-lived tokens
+- **Mutable CSI Node Allocatable**: Dynamic resource allocation adjustments
+- **PSI (Pressure Stall Information) Metrics**: Advanced system performance monitoring
+
+### 🔧 Core Platform Enhancements
+
+#### **Dynamic Resource Allocation (DRA)**
+```yaml
+# DRA example for GPU allocation
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaim
+metadata:
+  name: gpu-claim
+spec:
+  devices:
+    requests:
+      - deviceClassName: gpu.example.com
+        results:
+          - name: gpu
+            claimName: gpu-claim
+```
+
+**Key Benefits:**
+- **Hardware Agnostic**: Supports GPUs, FPGAs, NICs, and specialized accelerators
+- **Fine-Grained Control**: Precise resource allocation and sharing
+- **Multi-Tenant Support**: Secure resource isolation between workloads
+- **Dynamic Scheduling**: Intelligent resource placement and migration
+
+#### **VolumeAttributesClass Innovation**
+```yaml
+# VolumeAttributesClass for dynamic volume modification
+apiVersion: storage.k8s.io/v1beta1
+kind: VolumeAttributesClass
+metadata:
+  name: fast-ssd
+parameters:
+  throughput: "5000MiB/s"
+  iops: "30000"
+  encryption: "true"
+  compression: "lz4"
+```
+
+**Capabilities:**
+- **Runtime Modification**: Change volume characteristics without pod restart
+- **Performance Tuning**: Dynamic performance parameter adjustment
+- **Cost Optimization**: Optimize storage costs based on workload requirements
+- **Multi-Cloud Support**: Consistent experience across cloud providers
+
+#### **Structured Authentication Configuration**
+```yaml
+# Enhanced authentication configuration
+apiVersion: v1
+kind: Configuration
+authentication:
+  webhook:
+    config:
+      # Structured configuration with validation
+      - name: oidc-provider
+        type: OIDC
+        config:
+          issuer: "https://oidc.example.com"
+          audiences: ["kubernetes"]
+          claimMappings:
+            usernameClaim: "sub"
+            groupsClaim: ["groups"]
+```
+
+### 🛡️ Security & Compliance Enhancements
+
+#### **Pod Security Standards GA**
+- **Baseline Policy**: Default security posture for workloads
+- **Restricted Policy**: Enhanced security for sensitive applications
+- **Privileged Policy**: Full access for system workloads
+- **Policy Validation**: Automated security policy enforcement
+
+#### **Authentication & Authorization Improvements**
+```yaml
+# Fine-grained authorization example
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: namespace-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list", "watch"]
+  resourceNames: ["*"]  # Selective resource access
+```
+
+#### **Certificate Management**
+- **Short-Lived Certificates**: Automatic rotation with 24-hour validity
+- **Multi-CA Support**: Support for multiple certificate authorities
+- **Enhanced Validation**: Improved certificate chain validation
+- **Security Policies**: Automated security policy enforcement
+
+### 📊 Performance & Scalability
+
+#### **Scheduling Enhancements**
+- **Asynchronous API Handling**: Improved scheduler performance with prioritized queues
+- **Request Deduplication**: Reduced API server load through intelligent caching
+- **Bin Packing Optimization**: Improved resource utilization through advanced scheduling algorithms
+
+#### **Resource Management**
+- **Memory Optimization**: Reduced memory footprint for large clusters
+- **CPU Efficiency**: Enhanced CPU utilization and scheduling
+- **Network Performance**: Improved network throughput and latency
+
+#### **Monitoring & Observability**
+```yaml
+# PSI metrics example
+node_pressure_conditions:
+  - type: MemoryPressure
+    status: "False"
+    reason: "KubeletHasSufficientMemory"
+  - type: DiskPressure
+    status: "False"
+    reason: "KubeletHasNoDiskPressure"
+  - type: PIDPressure
+    status: "False"
+    reason: "KubeletHasSufficientPID"
+```
+
+### 🚀 Developer Experience Improvements
+
+#### **Enhanced kubectl Functionality**
+- **Improved Error Messages**: More descriptive and actionable error reporting
+- **Enhanced Debugging**: Better debugging capabilities with detailed status information
+- **Resource Validation**: Pre-creation validation with comprehensive error reporting
+
+#### **API Server Enhancements**
+- **Structured Logging**: Improved log formatting and filtering capabilities
+- **Performance Metrics**: Enhanced metrics for API server performance monitoring
+- **Request Tracing**: Distributed tracing for API request analysis
+
+### 🔧 Networking Enhancements
+
+#### **Gateway API Improvements**
+```yaml
+# Enhanced Gateway API configuration
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: web-gateway
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+```
+
+#### **Network Policy Enhancements**
+- **Policy Validation**: Enhanced network policy validation and error reporting
+- **Performance Optimization**: Improved network policy enforcement performance
+- **Multi-Network Support**: Enhanced support for multiple network interfaces
+
+### 💾 Storage Innovations
+
+#### **CSI Driver Improvements**
+- **Enhanced Volume Management**: Improved volume lifecycle management
+- **Performance Monitoring**: Better storage performance metrics and monitoring
+- **Multi-Path Support**: Enhanced support for multi-path storage configurations
+
+#### **Storage Class Enhancements**
+```yaml
+# Enhanced StorageClass with volume binding mode
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+```
+
+### 🔄 Upgrade & Migration Considerations
+
+#### **Compatibility Matrix**
+| Component | Minimum Version | Recommended Version | Notes |
+|---|---|---|---|
+| **kubectl** | 1.34.0 | 1.34.1 | Client compatibility required |
+| **CNI Plugins** | 1.2.0 | 1.3.0 | Enhanced networking features |
+| **CSI Drivers** | Latest | Latest | Recommended for DRA support |
+| **Ingress Controllers** | Latest | Latest | Enhanced Gateway API support |
+
+#### **Migration Path**
+1. **Pre-Upgrade Validation**: Cluster health and compatibility checks
+2. **Control Plane Upgrade**: Sequential upgrade of control plane components
+3. **Worker Node Upgrade**: Rolling upgrade of worker nodes
+4. **Post-Upgrade Validation**: Comprehensive health and functionality testing
+
+### 📈 Operational Excellence
+
+#### **Cluster Autoscaling**
+- **Node Auto-Discovery**: Enhanced node discovery and registration
+- **Resource Optimization**: Improved resource utilization and cost optimization
+- **Multi-Cloud Support**: Consistent autoscaling across cloud providers
+
+#### **Monitoring & Alerting**
+```yaml
+# Enhanced metrics collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+data:
+  metrics: |
+    # Kubernetes 1.34.1 specific metrics
+    scheduler_scheduling_latency_seconds
+    api_server_request_total
+    controller_manager_workqueue_adds_total
+    kubelet_volume_stats_capacity_bytes
+```
+
+### 🔮 Future-Proofing Considerations
+
+#### **Extensibility**
+- **Custom Resource Definitions**: Enhanced CRD validation and support
+- **Webhook Enhancements**: Improved webhook framework and validation
+- **Operator Framework**: Better support for custom operators
+
+#### **Multi-Cluster Management**
+- **Cluster API**: Enhanced multi-cluster management capabilities
+- **Federation Improvements**: Better cross-cluster resource sharing
+- **Service Discovery**: Enhanced service discovery across clusters
+
+### 📚 API Reference & Documentation
+
+#### **Key API Groups**
+```yaml
+# Core API groups with 1.34.1 enhancements
+apiVersion:
+  - group: "apps/v1"            # Enhanced deployment strategies
+  - group: "batch/v1"           # Improved job management
+  - group: "networking.k8s.io/v1"  # Gateway API enhancements
+  - group: "storage.k8s.io/v1"    # DRA and VolumeAttributesClass
+  - group: "resource.k8s.io/v1alpha2"  # Dynamic resource allocation
+  - group: "policy/v1"          # Pod security standards
+```
 
 ### 🎯 Objectives
 
@@ -70,7 +615,7 @@
 | 🔒 **Hermetic Builds** | Avoid remote bases; prefer local Git/OCI sources. No cross-namespace references for multi-tenant areas | Improves security and reproducibility |
 | ✅ **Complete Kustomization Settings** | All `Kustomization` have `prune: true`, `wait: true`, `timeout`, `healthChecks`/`healthCheckExprs` | Ensures reliable deployments |
 | 🔐 **Secure Secrets Management** | External Secrets with 1Password Connect for all secrets (bootstrap and runtime) | Zero plaintext secrets in Git |
-| 🚀 **Minimal Bootstrap** | Bootstrap installs only what is required to let Flux take over; day-2 config lives in Git managed by Flux | Fast, reliable cluster bring-up |
+| 🚀 **Minimal Bootstrap** | Bootstrap installs only what is required to let Flux take over; manifests are authored first and applied post‑bootstrap (v3) | Fast, reliable cluster bring-up |
 
 ---
 
@@ -112,8 +657,8 @@ graph TB
 ```
 
 **Key Network Features:**
-- 🌐 **Cilium as CNI** - Core installed via Helmfile during bootstrap
-- 🔄 **Day‑2 Features** - BGP, Gateway API, ClusterMesh secrets, IPAM pools managed by Flux
+- 🌐 **Cilium as CNI** - Core installed during bootstrap, managed via GitOps thereafter
+- 🧰 **Networking Features (Git‑Managed)** - BGP, Gateway API, ClusterMesh secrets, IPAM pools defined as manifests and reconciled by Flux
 - 🔗 **ClusterMesh** - Secure cross-cluster connectivity for service discovery
 
 ### 💾 Storage Architecture
@@ -164,7 +709,7 @@ graph TB
 ┃  ┃  ┃  ┗━ 🚀 workloads.yaml             # Tenants/platform apps on apps cluster
 ┃  ┃  ┗━ 🌐 apps-dev/, apps-stg/, apps-prod/ (optional overlays)
 ┃  ┣━ 📁 infrastructure/
-┃  ┃  ┣━ 🌐 networking/                  # day‑2 Cilium features (bgp, gateway, clustermesh, ipam)
+┃  ┃  ┣━ 🌐 networking/                  # networking manifests (cilium core, bgp, gateway, clustermesh, ipam)
 ┃  ┃  ┣━ 🔐 security/                    # external-secrets, cert-manager issuers, RBAC bundles
 ┃  ┃  ┣━ 💾 storage/                     # rook-ceph, openebs (infra cluster only)
 ┃  ┃  ┗━ 🔄 gitops/                      # legacy flux-operator/instance charts (reference only)
@@ -194,12 +739,14 @@ graph TB
 | **🔄 Git as source of truth** | Flux reconciles directories directly | No configuration drift |
 | **🧩 Components pattern** | Reusable, namespaced Kustomize components for app teams (e.g., VolSync) | Promotes consistency; no cluster-scoped side effects |
 
-### 🔧 Bootstrap vs Day‑2 Management
+### 🔧 Manifests‑First v3 Model
 
-| Phase | Tool | Responsibility |
+| Stage | What Happens | Tools |
 | :--- | :--- | :--- |
-| **🚀 Bootstrap** | Helmfile + Task | Core infrastructure installation (Cilium, Flux) |
-| **📅 Day‑2** | Flux | All ongoing configuration management via Git |
+| **1) Author & Validate Manifests (Stories 1‑41)** | Write all YAML (networking, security, storage, etc.) under `kubernetes/**`. Validate with `kustomize`, `flux build`, and `kubeconform`. No cluster required. | kustomize, flux, kubeconform |
+| **2) Bootstrap & Deploy (Stories 42‑50)** | Create clusters (Talos), bootstrap minimal core, then apply and reconcile manifests. Validate end‑to‑end via validation stories. | Helmfile + Task, Flux |
+
+This section aligns with `docs/resequencing-v3-summary.md` (v3 — Manifests‑First, Bootstrap‑Last).
 
 ### 🧩 Components Usage
 
@@ -334,13 +881,13 @@ spec:
 | **📝 Consistent values** | Reuses same values as Flux `HelmRelease` | Zero configuration drift |
 | **🔧 Two-phase approach** | CRDs first, then apps | Proper dependency ordering |
 
-### 🔄 Bootstrap Phases
+### 🔄 Bootstrap Phases (applied in Stories 42‑44)
 
 ```mermaid
 graph LR
     A[Phase 0: CRDs] --> B[Phase 1: Core Apps]
     B --> C[Phase 2: Flux Handover]
-    C --> D[Day-2: GitOps]
+    C --> D[GitOps Reconciliation]
 
     subgraph "Phase 0"
         A1[00-crds.yaml]
@@ -425,14 +972,14 @@ Behavior:
 ### ⏱️ Time‑to‑Ready Targets (baseline)
 - Talos control plane ≤ 7 minutes; CRDs ≤ 2 minutes; Core ≤ 6 minutes; total ≤ 20 minutes per cluster.
 
-### 🔄 Handover to GitOps
+### 🔄 GitOps Reconciliation Window (post‑bootstrap)
 
 ```mermaid
 graph TD
     A[Bootstrap Complete] --> B[flux-operator Ready]
     B --> C[flux-instance Ready]
     C --> D[Flux Takes Over]
-    D --> E[Day-2 GitOps Management]
+    D --> E[Continuous GitOps Management]
 
     E --> F[Networking: BGP/Gateway/ClusterMesh]
     E --> G[Security: cert-manager issuers]
@@ -447,8 +994,7 @@ graph TD
 - 🟢 **GitRepository** source connected and syncing
 - 🟢 **Initial Kustomizations** reconciling successfully
 
-**🔄 Day-2 Management:**
-All ongoing configuration changes happen through Git commits, with Flux automatically applying them to the cluster.
+All ongoing configuration changes happen through Git commits, with Flux automatically applying them to the cluster. In v3, manifests are authored first; deployment and system validation follow in Stories 45‑49.
 
 ---
 
@@ -480,8 +1026,10 @@ data:
   POD_CIDR_STRING: "10.244.0.0/16"
   SERVICE_CIDR: '["10.245.0.0/16"]'
   K8S_SERVICE_HOST: "infra-k8s.monosense.io"
+  K8S_SERVICE_PORT: "6443"
 
   # Cilium Configuration
+  CILIUM_VERSION: "1.18.3"
   CLUSTERMESH_IP: "10.25.11.100"
   CILIUM_GATEWAY_LB_IP: "10.25.11.110"
   CILIUM_BGP_LOCAL_ASN: "64512"
@@ -518,16 +1066,17 @@ data:
   ROOK_CEPH_IMAGE_TAG: v19.2.3
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
-  CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
+
+  # Storage Classes
+  BLOCK_SC: "rook-ceph-block"  # Generic Rook-Ceph block storage (RBD)
+  OPENEBS_LOCAL_SC: "openebs-local-nvme"  # Local NVMe storage
 
   # OpenEBS Configuration
   OPENEBS_BASEPATH: "/var/mnt/openebs"
-  OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
 
   # Observability Configuration
-  OBSERVABILITY_BLOCK_SC: "rook-ceph-block"
   OBSERVABILITY_METRICS_RETENTION: "30d"
-  OBSERVABILITY_LOGS_RETENTION: "14d"
+  OBSERVABILITY_LOGS_RETENTION: "30d"
   OBSERVABILITY_LOG_ENDPOINT_HOST: "victorialogs-vmauth.observability.svc.cluster.local"
   OBSERVABILITY_LOG_ENDPOINT_PORT: "9428"
   OBSERVABILITY_LOG_ENDPOINT_PATH: "/insert"
@@ -582,8 +1131,10 @@ data:
   POD_CIDR_STRING: "10.246.0.0/16"
   SERVICE_CIDR: '["10.247.0.0/16"]'
   K8S_SERVICE_HOST: "apps-k8s.monosense.io"
+  K8S_SERVICE_PORT: "6443"
 
   # Cilium Configuration
+  CILIUM_VERSION: "1.18.3"
   CLUSTERMESH_IP: "10.25.11.120"
   CILIUM_GATEWAY_LB_IP: "10.25.11.121"
   CILIUM_BGP_LOCAL_ASN: "64513"
@@ -617,16 +1168,17 @@ data:
   ROOK_CEPH_IMAGE_TAG: v19.2.3
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
-  CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
+
+  # Storage Classes
+  BLOCK_SC: "rook-ceph-block"  # Generic Rook-Ceph block storage (RBD)
+  OPENEBS_LOCAL_SC: "openebs-local-nvme"  # Local NVMe storage
 
   # OpenEBS Configuration
   OPENEBS_BASEPATH: "/var/mnt/openebs"
-  OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
 
   # Observability Configuration
-  OBSERVABILITY_BLOCK_SC: "rook-ceph-block"
   OBSERVABILITY_METRICS_RETENTION: "30d"
-  OBSERVABILITY_LOGS_RETENTION: "14d"
+  OBSERVABILITY_LOGS_RETENTION: "30d"
   OBSERVABILITY_LOG_ENDPOINT_HOST: "victorialogs-vmauth.observability.svc.cluster.local"
   OBSERVABILITY_LOG_ENDPOINT_PORT: "9428"
   OBSERVABILITY_LOG_ENDPOINT_PATH: "/insert"
@@ -707,6 +1259,11 @@ spec:
         name: cluster-settings
         optional: false
 ```
+
+### 🔒 Substitution Ownership (Important)
+- Define substitutions in the Flux `Kustomization` via `postBuild.substitute`/`postBuild.substituteFrom` that references `ConfigMap/cluster-settings`.
+- HelmRelease values must use `${VAR}` placeholders (e.g., `${K8S_SERVICE_HOST}`, `${K8S_SERVICE_PORT}`, `${CILIUM_VERSION}`) and must not hard‑code cluster‑specific values.
+- This keeps manifests portable and ensures all environment specifics live in `cluster-settings`.
 
 ## 8. 🔐 Secrets Management (1Password Only)
 
@@ -805,27 +1362,33 @@ spec:
 >
 > Cilium provides the foundation for our multi-cluster connectivity with advanced security and observability capabilities.
 
-### 🏗️ Architecture Overview
+### 🏗️ Architecture Overview (v3 sequence)
 
 ```mermaid
 graph TB
-    subgraph "Bootstrap Phase (Helmfile)"
-        A[Cilium Core]
+    subgraph "Story 01‑13: Networking Manifests"
+        A[Cilium Core (HelmRelease values)]
         B[kubeProxyReplacement: true]
         C[WireGuard Encryption]
-    end
-
-    subgraph "Day-2 Management (Flux)"
-        D[BGP Peering]
+        D[BGP Control Plane]
         E[Gateway API]
         F[ClusterMesh]
         G[IPAM Pools]
     end
 
-    A --> D
-    A --> E
-    A --> F
-    A --> G
+    subgraph "Stories 42‑50: Bootstrap + Validation"
+        X[Bootstrap minimal core]
+        Y[Flux applies manifests]
+        Z[Validation stories 45‑49]
+    end
+
+    A --> X
+    B --> X
+    C --> X
+    D --> Y
+    E --> Y
+    F --> Y
+    G --> Y
 
     subgraph "Security & Observability"
         H[Network Policies]
@@ -846,9 +1409,9 @@ graph TB
 | **⚙️ Cilium Operator** | Helmfile (Deployment) | WireGuard encryption enabled | Control plane management |
 | **🔒 WireGuard** | Built-in | Transparent encryption | Node-to-node encryption |
 
-### 📅 Day‑2 Features (Flux Managed)
+### 📁 Networking Manifests Layout
 
-Located in `kubernetes/infrastructure/networking/cilium/*`:
+Located under `kubernetes/infrastructure/networking/cilium/*`:
 
 | Feature | Path | Component | Function |
 |---|---|---|---|
@@ -858,6 +1421,42 @@ Located in `kubernetes/infrastructure/networking/cilium/*`:
 | **📊 IPAM** | `ipam/` | `CiliumLoadBalancerIPPool` | L2/LB IP pool management |
 
 Gateway policy note: This platform uses Cilium Gateway exclusively; Envoy Gateway is not part of this design.
+
+### 🔑 API Endpoint Selection for Cilium (kube‑proxy‑free)
+- Default (Option A): use the cluster control‑plane DNS on port 6443.
+  - `K8S_SERVICE_HOST`: `infra-k8s.monosense.io` / `apps-k8s.monosense.io` (per cluster)
+  - `K8S_SERVICE_PORT`: `6443`
+- Optional overlay: you may point to Talos KubePrism (`127.0.0.1:7445`) by changing the two variables in `cluster-settings` — no code changes required.
+- Set both values explicitly whenever `kubeProxyReplacement: true` is enabled so hostNetwork agents can reach the apiserver reliably.
+
+Minimal HelmRelease values (excerpt):
+```yaml
+values:
+  cluster:
+    name: ${CLUSTER}
+    id: ${CLUSTER_ID}
+  ipv4NativeRoutingCIDR: ${POD_CIDR_STRING}
+  kubeProxyReplacement: true
+  k8sServiceHost: ${K8S_SERVICE_HOST}
+  k8sServicePort: ${K8S_SERVICE_PORT}
+  encryption:
+    enabled: true
+    type: wireguard
+  hubble:
+    enabled: true
+    relay:
+      enabled: true
+    ui:
+      enabled: false
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+```
+
+Scope boundaries:
+- The Cilium “core” HelmRelease configures the base dataplane (kube‑proxy replacement, encryption, Hubble, metrics).
+- BGP Control Plane and Gateway API are authored in their dedicated directories (`bgp/`, `gateway/`) and reconciled by Flux separately.
 
 ### 🔢 LoadBalancer IP Allocation
 
@@ -901,7 +1500,7 @@ This ensures that when shared infrastructure manifests deploy to both clusters, 
 
 ### 🪞 Spegel: Cluster-Local OCI Registry Mirror
 
-**Installation**: Bootstrap Phase 1 (after CoreDNS) + Flux-managed day-2
+**Installation**: Authored as manifests pre‑bootstrap; applied during Stories 45‑49
 
 Spegel provides distributed P2P image caching across all cluster nodes, significantly improving image pull performance and reducing external registry bandwidth.
 
@@ -1018,8 +1617,8 @@ graph TB
 # From cluster-settings.yaml
 ROOK_CEPH_IMAGE_TAG: v19.2.3
 ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
-CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
-OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
+BLOCK_SC: "rook-ceph-block"  # Generic block storage
+OPENEBS_LOCAL_SC: "openebs-local-nvme"  # Local NVMe storage
 OPENEBS_BASEPATH: "/var/mnt/openebs"
 ```
 
@@ -1222,7 +1821,7 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 | **Sprint 1** | 📁 Repo Skeleton | Create/normalize cluster entries; add `bootstrap/` and `.taskfiles/bootstrap`; ensure values reuse between Helmfile and Flux |
 | **Sprint 2** | 🔐 Secrets & Decryption | Finalize External Secrets with 1Password for all secrets (bootstrap/runtime) |
 | **Sprint 3** | ⚙️ Platform Controllers | External Secrets, cert-manager CRDs/issuers, CNPG (if used); health checks and ordering |
-| **Sprint 4** | 🌐 Networking Day‑2 | Flux-manage BGP, Gateway API, ClusterMesh secret; health checks for Cilium |
+| **Sprint 4** | 🌐 Networking Validation | Deploy and validate Cilium core + BGP + Gateway API + ClusterMesh per validation stories |
 | **Sprint 5** | 💾 Storage | Infra Ceph cluster; Apps client/operator (optional); PVC tests and monitoring |
 | **Sprint 6** | 📊 Observability | VM global stack in infra; remote write from apps; Flux Alerts/Receivers |
 | **Sprint 7** | 🔄 CI/CD & Policy | kubeconform/kustomize/flux build; policy audit→enforce; image automation (staging) |
@@ -1236,7 +1835,7 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 | :--- | :--- |
 | **🔧 Flux Bootstrap Method** | Flux is bootstrapped via Helmfile, not self‑managed in this repo (simpler, deterministic bootstrap) |
 | **🚫 Remove Aggregator** | Remove aggregator `ks.yaml` to avoid duplication; wire clusters directly to directories |
-| **🌐 Cilium Management** | Keep Cilium core via Helmfile; manage day‑2 via Flux to separate infra provisioning from policy/config |
+| **🌐 Cilium Management** | Author all Cilium core and related features as manifests first; bootstrap later; Flux manages ongoing reconciliation |
 | **📁 Source Strategy** | Prefer local Git/OCI sources; avoid remote bases and cross‑namespace references |
 
 ## 17. ⚠️ Risks & Mitigations
@@ -1270,7 +1869,7 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 
 | Component | 🏷️ Version | 📦 Namespace | 🔧 Install Method | 📝 Purpose & Notes |
 |---|---|---|---|---|
-| **🌐 Cilium** | `1.18.2` | `kube-system` | Helm (OCI) | Core CNI; day‑2 features via Flux (bgp/gateway/clustermesh) |
+| **🌐 Cilium** | `1.18.3` | `kube-system` | Helm (OCI) | Core CNI; features managed via Flux (BGP/Gateway/ClusterMesh) |
 | **🔍 CoreDNS** | `1.38.0` | `kube-system` | Helm (OCI) | Cluster DNS resolution |
 | **🔐 External Secrets** | `0.20.3` | `external-secrets` | Helm (repo) | 1Password Connect integration |
 | **🔒 cert-manager** | `v1.19.1` | `cert-manager` | Helm (OCI) | Cluster issuers + ACME automation |
@@ -1289,7 +1888,7 @@ helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template \
 
 | Component | 🏷️ Version | 📦 Namespace | 🔧 Install Method | 📝 Purpose & Notes |
 |---|---|---|---|---|
-| **🌐 Cilium** | `1.18.2` | `kube-system` | Helm (OCI) | Core CNI; day‑2 features via Flux |
+| **🌐 Cilium** | `1.18.3` | `kube-system` | Helm (OCI) | Core CNI; features managed via Flux |
 | **🔍 CoreDNS** | `1.38.0` | `kube-system` | Helm (OCI) | Cluster DNS resolution |
 | **🔐 External Secrets** | `0.20.3` | `external-secrets` | Helm (repo) | 1Password Connect integration |
 | **🔒 cert-manager** | `v1.19.1` | `cert-manager` | Helm (OCI) | Cluster issuers + ACME automation |
@@ -1347,7 +1946,136 @@ graph TD
 6. **📊 Monitoring** - Post-upgrade health verification
 7. **📖 Documentation** - Update changelog and runbooks
 
-## 20. 🔗 Cilium ClusterMesh + SPIRE (Zero‑Trust, Multi‑Cluster)
+## 20. 🔧 CRD & API Standardization Matrix
+
+> **📋 Custom Resource Definitions (CRDs)**
+>
+> This section defines the exact CRD versions and API groups we standardize on across our multi-cluster GitOps infrastructure. All CRDs are installed via bootstrap Phase 0 and managed through GitOps manifests.
+
+### 🏗️ Core Infrastructure CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🌐 Cilium CNI** | `1.18.3` | `cilium.io/v2` | `CiliumNetworkPolicy`, `CiliumBGPPeeringPolicy`, `CiliumLoadBalancerIPPool`, `CiliumClusterwideNetworkPolicy`, `CiliumAuthPolicy`, `CiliumClusterMesh`, `CiliumExternalWorkload`, `CiliumEndpoint`, `CiliumIdentity`, `CiliumNode` | eBPF networking, security policies, BGP, ClusterMesh |
+| **🔄 Flux CD v2** | `2.4+` | `kustomize.toolkit.fluxcd.io/v1`<br>`source.toolkit.fluxcd.io/v1`<br>`helm.toolkit.fluxcd.io/v2`<br>`notification.toolkit.fluxcd.io/v1`<br>`image.toolkit.fluxcd.io/v1beta2` | `Kustomization`, `GitRepository`, `HelmRepository`, `HelmRelease`, `OCIRepository`, `Receiver`, `Alert`, `Provider`, `ImageRepository`, `ImagePolicy`, `ImageUpdateAutomation` | GitOps orchestration and deployment automation |
+| **🔒 cert-manager** | `v1.19.1` | `cert-manager.io/v1` | `Certificate`, `Issuer`, `ClusterIssuer`, `CertificateRequest`, `ACMEChallenge`, `ACMEOrder`, `ACMEChallengeSolver` | TLS certificate management and automation |
+| **🔐 External Secrets** | `0.20.3` | `external-secrets.io/v1beta1` | `ExternalSecret`, `SecretStore`, `ClusterSecretStore`, `PushSecret` | External secret management and synchronization |
+
+### 💾 Storage & Database CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🗄️ Rook-Ceph** | `latest` (Ceph `v19.2.3`) | `ceph.rook.io/v1` | `CephCluster`, `CephBlockPool`, `CephFilesystem`, `CephObjectStore`, `CephObjectStoreUser`, `CephObjectRealm`, `CephObjectZone`, `CephObjectZoneGroup`, `CephRBDMirror`, `CephFilesystemMirror`, `CephNFS`, `CephClient`, `CephRBDMirror` | Distributed storage, block/file/object storage |
+| **💾 OpenEBS LocalPV** | `4.3.x` | `localvolumes.openebs.io/v1`<br>`lvm.openebs.io/v1`<br>`zfs.openebs.io/v1` | `LocalVolume`, `LocalVolumeSet`, `LVMVolume`, `LVMVolumeSnapshot`, `ZFSVolume`, `ZFSVolumeSnapshot` | High-performance local storage, NVMe optimization |
+| **🐘 CloudNativePG** | `1.25.0` | `postgresql.cnpg.io/v1` | `Cluster`, `Pooler`, `ScheduledBackup`, `Backup`, `Database`, `Publication`, `Subscription`, `ImageCatalog`, `BackupCatalog`, `ScheduledBackup` | PostgreSQL cluster management and high availability |
+| **🐉 Dragonfly Operator** | `1.3.0` | `dragonflydb.io/v1beta1` | `Dragonfly`, `DragonflyCluster`, `DragonflyReplication` | Redis-compatible in-memory data store |
+
+### 📊 Observability & Monitoring CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **📈 VictoriaMetrics** | `0.63.0` | `operator.victoriametrics.com/v1beta1` | `VMCluster`, `VMAgent`, `VMAlert`, `VMAuth`, `VMUser`, `VLSingle`, `VTCluster`, `VMServiceScrape`, `VMPodScrape`, `VMRule`, `VMProbe`, `VMScrapeConfig`, `VMAnomaly` | Metrics collection, storage, alerting, and visualization |
+| **📝 VictoriaLogs** | `0.0.17` | `operator.victoriametrics.com/v1beta1` | `VLogs` | Centralized log aggregation and analysis |
+| **📋 Fluent Bit** | `0.53.0` | `kustomize.toolkit.fluxcd.io/v1` (managed via Flux) | N/A (DaemonSet deployment) | Log collection and forwarding |
+| **🔍 Prometheus Operator** | `0.75.1` (for compatibility) | `monitoring.coreos.com/v1` | `ServiceMonitor`, `PodMonitor`, `PrometheusRule`, `Prometheus`, `Alertmanager`, `ScrapeConfig`, `Probe` | Metrics collection compatibility layer |
+
+### 🌐 Networking & Gateway CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🌉 Gateway API** | `v1.0.0` (GA) | `gateway.networking.k8s.io/v1` | `GatewayClass`, `Gateway`, `HTTPRoute`, `GRPCRoute`, `TLSRoute`, `TCPRoute`, `UDPRoute`, `ReferenceGrant`, `BackendTLSPolicy`, `GatewayPolicy` (experimental) | Modern API for load balancing and traffic routing |
+| **🚪 Cilium Gateway** | `1.18.3` | `cilium.io/v2alpha1` | `CiliumGateway`, `CiliumGatewayConfiguration` | eBPF-based gateway implementation |
+
+### 🔄 Messaging & Streaming CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **📬 Strimzi Kafka** | `0.48.0` | `kafka.strimzi.io/v1beta2` | `Kafka`, `KafkaTopic`, `KafkaUser`, `KafkaBridge`, `KafkaConnect`, `KafkaMirrorMaker2`, `KafkaNodePool`, `KafkaConnector`, `KafkaRebalance` | Apache Kafka cluster management and streaming platform |
+
+### 🚀 CI/CD & Automation CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🏃 GitHub Actions ARC** | `0.12.0` | `actions.summerwind.dev/v1alpha1` | `Runner`, `RunnerDeployment`, `RunnerReplicaSet`, `HorizontalRunnerAutoscaler`, `RunnerSet`, `SelfHostedRunner`, `EnterpriseRunner`, `OrganizationRunner`, `RepositoryRunner` | GitHub Actions self-hosted runners management |
+
+### 🔐 Security & Policy CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🛡️ PodSecurity** | `v1.2.0` | `policy/v1` (built-in) | `PodSecurityPolicy` (deprecated), `PodSecurityAdmission` | Pod security standards and enforcement |
+| **🔑 SPIRE** | `0.12.0` | `spireid.org/v1alpha1` | `ClusterFederatedTrustDomain`, `ClusterSPIFFEID`, `NodeSPIFFEID` | Zero-trust identity and workload authentication |
+
+### 📦 Package Management CRDs
+
+| Operator | Version | API Group | Custom Resources | Purpose |
+|---|---|---|---|---|
+| **🔧 Helm Toolkit** | `v2.7+` | `helm.toolkit.fluxcd.io/v2` | `HelmRelease` (listed under Flux) | Helm chart management |
+| **📋 OCI Repository** | `v2.4+` | `source.toolkit.fluxcd.io/v1` | `OCIRepository` (listed under Flux) | OCI artifact management |
+
+### 🎯 API Version Standards & Compatibility
+
+| Component | Standard API Version | Minimum Kubernetes Version | Notes |
+|---|---|---|---|
+| **Core Kubernetes** | `apps/v1`, `batch/v1`, `policy/v1` | `1.29+` | GA versions for stability |
+| **Gateway API** | `gateway.networking.k8s.io/v1` | `1.29+` | Requires Gateway API support |
+| **Flux CD** | `toolkit.fluxcd.io/v1` and `v2` | `1.28+` | Latest stable APIs |
+| **Cilium** | `cilium.io/v2` | `1.28+` | Stable Cilium APIs |
+| **cert-manager** | `cert-manager.io/v1` | `1.28+` | GA APIs only |
+| **CNPG** | `postgresql.cnpg.io/v1` | `1.27+` | Stable database APIs |
+| **Rook-Ceph** | `ceph.rook.io/v1` | `1.27+` | Mature storage APIs |
+| **VictoriaMetrics** | `operator.victoriametrics.com/v1beta1` | `1.27+` | Beta APIs with operator support |
+| **Strimzi** | `kafka.strimzi.io/v1beta2` | `1.27+` | Well-established Kafka APIs |
+| **External Secrets** | `external-secrets.io/v1beta1` | `1.27+` | Stable secret management |
+
+### 🔧 CRD Installation Strategy
+
+#### **Phase 0: Bootstrap CRDs**
+```bash
+# Install all CRDs before operators
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e <cluster> template \
+  | yq ea 'select(.kind == "CustomResourceDefinition")' \
+  | kubectl apply -f -
+```
+
+#### **Phase 1: Operator Installation**
+```bash
+# Install operators with CRD creation disabled
+helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e <cluster> sync
+```
+
+### 📋 CRD Management Best Practices
+
+| Practice | Implementation | Impact |
+|---|---|---|
+| **🔄 Version Pinning** | Explicit CRD versions in bootstrap | Prevents accidental upgrades |
+| **✅ Validation** | `kubeconform` + `kustomize build` in CI | Ensures manifest compatibility |
+| **📊 Monitoring** | CRD readiness checks in Flux Kustomizations | Guarantees proper installation |
+| **🔧 Upgrades** | Phased CRD updates before operators | Maintains system stability |
+| **📝 Documentation** | Centralized API matrix tracking | Clear version standards |
+
+### 🚨 CRD Health Checks & Validation
+
+| Check Type | Command | Success Criteria |
+|---|---|---|
+| **CRD Installation** | `kubectl get crds | grep -E "(cilium|flux|cert-manager|rook|cnpg|victoria-metrics)"` | All expected CRDs present |
+| **API Readiness** | `kubectl api-resources | grep -E "(cilium|flux|cert-manager|rook|cnpg|victoria-metrics)"` | All API groups registered |
+| **Operator Health** | `kubectl get pods -n <namespace> -l app.kubernetes.io/name=<operator>` | All operators running |
+| **Flux Reconciliation** | `flux get kustomizations -A` | All Kustomizations Ready |
+| **CRD Compatibility** | `kubectl get crd <crd-name> -o jsonpath='{.spec.versions[*].name}'` | Expected versions available |
+
+### 🔮 Future CRD Considerations
+
+| Emerging CRD | Status | Evaluation Criteria |
+|---|---|---|
+| **Kyverno Policies** | Consider | Security policy engine alternatives |
+| **Karpenter** | Evaluate | Node lifecycle management |
+| **Crossplane** | Monitor | Cloud resource management |
+| **KEDA** | Potential | Event-driven autoscaling |
+| **Backstage** | Future | Developer portal integration |
+
+**🎯 Standardization Principle**: We prioritize GA APIs over beta/alpha versions for production stability, while adopting mature beta APIs only when necessary for critical functionality.
+
+## 21. 🔗 Cilium ClusterMesh + SPIRE (Zero‑Trust, Multi‑Cluster)
 
 > **🛡️ Secure Multi-Cluster Identity & Connectivity**
 >
@@ -1505,11 +2233,11 @@ spec:
 | **⏰ Credential Management** | Short‑lived SVIDs reduce blast radius; automated rotation |
 | **🔒 Secret Security** | ClusterMesh secrets never stored in Git; pulled at reconcile time from secret store |
 
-## 21. Security & Network Policy Baseline
+## 22. Security & Network Policy Baseline
 
 This section defines the cluster‑wide network security posture and the policy building blocks teams use. We default‑deny all traffic and then explicitly allow the minimum required flows. Policies use a mix of Kubernetes `NetworkPolicy` and Cilium `CiliumNetworkPolicy`/`CiliumAuthPolicy` to enable SPIFFE/mTLS authorization.
 
-### 21.1 🎯 Objectives
+### 22.1 🎯 Objectives
 
 | Objective | Implementation Strategy |
 | :--- | :--- |
@@ -1517,7 +2245,7 @@ This section defines the cluster‑wide network security posture and the policy 
 | **🛡️ Identity‑Aware Auth** | SPIRE (SPIFFE) + Cilium Auth for mTLS between workloads |
 | **🧩 Composable Policies** | Small, reusable allow patterns (DNS, API server, observability, gateway ingress, FQDN egress) |
 
-### 21.2 📋 Namespace Baseline
+### 22.2 📋 Namespace Baseline
 
 Apply these policies in every application namespace:
 
@@ -1573,7 +2301,7 @@ spec:
         - ports: [{ port: "443", protocol: TCP }]
 ```
 
-### 21.3 🌍 FQDN Egress Allowlists
+### 22.3 🌍 FQDN Egress Allowlists
 
 | Use Case | 🔧 Implementation | 📋 Allowed Destinations |
 | :--- | :--- | :--- |
@@ -1600,7 +2328,7 @@ spec:
             - { port: "443", protocol: TCP }
 ```
 
-### 21.4 🚪 Ingress via Gateway Only
+### 22.4 🚪 Ingress via Gateway Only
 
 | Security Principle | 🔧 Implementation | 📋 Traffic Control |
 | :--- | :--- | :--- |
@@ -1625,7 +2353,7 @@ spec:
         - ports: [{ port: "80", protocol: TCP }, { port: "443", protocol: TCP }]
 ```
 
-### 21.5 📊 Observability Paths
+### 22.5 📊 Observability Paths
 
 | Observability Type | 🔧 Allowed Traffic | 📋 Implementation |
 | :--- | :--- | :--- |
@@ -1633,7 +2361,7 @@ spec:
 | **📝 Log Shipping** | Allow logs egress to VictoriaLogs insert endpoint | Cross‑namespace: prefer Cilium policies over IP allowlists |
 | **🔍 Policy Preference** | Avoid brittle IP allowlists | Use identity-based policies for reliability |
 
-### 21.6 🛡️ SPIFFE/mTLS Authorization
+### 22.6 🛡️ SPIFFE/mTLS Authorization
 
 | Security Requirement | 🔧 Implementation | 📋 Purpose |
 | :--- | :--- | :--- |
@@ -1661,7 +2389,7 @@ spec:
 - **🛡️ Authentication**: SPIFFE identity verification via `CiliumAuthPolicy`
 - **🎯 Authorization**: L4/L7 traffic control via `CiliumNetworkPolicy`
 
-### 21.7 ✅ Application Policy Checklist
+### 22.7 ✅ Application Policy Checklist
 
 | ✅ Requirement | 📋 Description |
 | :--- | :--- |
@@ -1673,7 +2401,7 @@ spec:
 | **🛡️ mTLS Between Services** | Add SPIFFE `CiliumAuthPolicy` for mTLS between internal services |
 | **📊 Observability** | Add observability egress/ingress as needed |
 
-### 21.8 ⚠️ Exceptions
+### 22.8 ⚠️ Exceptions
 
 | Exception Type | Management |
 | :--- | :--- |
@@ -1681,7 +2409,7 @@ spec:
 | **📁 Policy Tracking** | Separate policies per namespace |
 | **📋 Central Logging** | Track in central `EXCEPTIONS.md` file |
 
-### 21.9 🔍 Validation & Monitoring
+### 22.9 🔍 Validation & Monitoring
 
 | Validation Method | Purpose |
 | :--- | :--- |
@@ -1689,7 +2417,7 @@ spec:
 | **🚨 Alerting** | Add Prometheus alerts for denied flows above threshold |
 | **🛡️ Identity Monitoring** | Monitor SPIRE SVID issuance failures |
 
-### 21.10 ⬆️ Upgrades & Migration
+### 22.10 ⬆️ Upgrades & Migration
 
 | Migration Strategy | Implementation |
 | :--- | :--- |
@@ -1697,11 +2425,11 @@ spec:
 | **✅ Enforcement** | Enforce policies after validation |
 | **📝 Version Control** | Version policy docs with app releases to avoid drift |
 
-## 22. Multi‑Cluster Mesh Options — Decision Matrix (as of 2025‑10‑20)
+## 23. Multi‑Cluster Mesh Options — Decision Matrix (as of 2025‑10‑20)
 
 This section compares Cilium ClusterMesh with alternative meshes frequently used for cross‑cluster traffic (Istio, Linkerd, Kuma, Consul). It focuses on what matters operationally for Talos bare‑metal clusters.
 
-22.1 Quick Comparison
+### 23.1 Quick Comparison
 
 | Dimension | 🌐 Cilium ClusterMesh | 🏗️ Istio (sidecar) | 🚀 Istio Ambient (multicluster) | ⚡ Linkerd | 🌍 Kuma | 🔗 Consul |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -1713,7 +2441,7 @@ This section compares Cilium ClusterMesh with alternative meshes frequently used
 | **🎛️ Control‑plane complexity** | Low (Cilium only) once underlay solved | Medium/High (Istio CP per cluster + gateways) | Medium (new components) | Low/Medium | Medium (global + zone CPs) | Medium (Consul servers + gateways) |
 | **🎯 Best for** | Highest performance with eBPF; same policy model across clusters; simple east‑west LB | Rich L7 + cross‑cluster mTLS now | Sidecar‑less future; not production for multicluster yet | Lightweight secure multicluster | Hybrid environments, policy‑rich | Hybrid and multi‑platform estates |
 
-### 22.2 🎯 When to Choose Which
+### 23.2 🎯 When to Choose Which
 
 | Solution | ✅ Choose When... | ❌ Avoid When... |
 | :--- | :--- | :--- |
@@ -1722,7 +2450,7 @@ This section compares Cilium ClusterMesh with alternative meshes frequently used
 | **⚡ Linkerd** | Want lightweight, opinionated mesh; cross‑cluster mTLS via gateways and service mirroring | Need advanced L7 features; require complex routing |
 | **🌍 Kuma/Consul** | Expect hybrid environments (K8s + VMs); need multi‑zone/global control‑plane | Pure K8s environment; want simpler setup |
 
-### 22.3 🛣️ Recommended Path for Our Talos Greenfield
+### 23.3 🛣️ Recommended Path for Our Talos Greenfield
 
 | Approach | 🎯 Strategy | 🔧 Key Configuration |
 | :--- | :--- | :--- |
@@ -1743,7 +2471,7 @@ This section compares Cilium ClusterMesh with alternative meshes frequently used
 - **📋 Production Guidance**: Documented production-ready implementation
 - **🔄 Migration Plan**: Pilot to remove app‑level TLS and consolidate on Cilium mTLS |
 
-### 22.4 📋 Migration & Validation Plan
+### 23.4 📋 Migration & Validation Plan
 
 | Phase | 🔄 Step | ✅ Validation |
 | :--- | :--- | :--- |
@@ -1782,8 +2510,8 @@ spec:
 
 | Issue | 🔧 Solution | ✅ Verification |
 | :--- | :--- | :--- |
-| **🏗️ Controller Conflicts** | Install Cilium core by Helmfile; manage day‑2 via Flux | Avoids controller conflict and ordering issues |
-| **🌐 Day‑2 Management** | BGP, gateway, clustermesh, IPAM via Flux | Clear separation of concerns |
+| **🏗️ Controller Conflicts** | Author all manifests before bootstrap; let Flux adopt after bootstrap | Avoids controller conflict and ordering issues |
+| **🌐 GitOps Management** | BGP, gateway, clustermesh, IPAM via Flux | Clear separation of concerns |
 | **✅ Health Checks** | `kubectl -n kube-system get ds cilium` | Verify Cilium DaemonSet status |
 | **✅ Operator Status** | `kubectl -n kube-system get deploy cilium-operator` | Verify Cilium Operator deployment |
 
@@ -1810,7 +2538,7 @@ spec:
 - Metrics (Prometheus-compatible)
   - Infra runs the global VictoriaMetrics vmcluster (vmselect/vminsert/vmstorage) with vmauth and vmalert.
   - Apps runs vmagent that scrapes local targets (kube-state-metrics, node-exporter, Cilium) and remote-writes to infra.
-  - Cluster settings provide endpoints and storage classes: `${GLOBAL_VM_INSERT_ENDPOINT}`, `${GLOBAL_VM_SELECT_ENDPOINT}`, `${GLOBAL_ALERTMANAGER_ENDPOINT}`, `${OBSERVABILITY_BLOCK_SC}`.
+  - Cluster settings provide endpoints and storage classes: `${GLOBAL_VM_INSERT_ENDPOINT}`, `${GLOBAL_VM_SELECT_ENDPOINT}`, `${GLOBAL_ALERTMANAGER_ENDPOINT}`, `${BLOCK_SC}`.
 - Logs
   - Infra runs VictoriaLogs (vmstorage/vmselect/vminsert) with vmauth; ServiceMonitor enabled.
   - Fluent Bit DaemonSet on each cluster ships container/system logs over HTTP JSON to vmauth `/insert` with header `X-Scope-OrgID=${OBSERVABILITY_LOG_TENANT}`.
@@ -1894,7 +2622,7 @@ spec:
 
 ---
 
-## 23. 🌐 DNS, ExternalDNS, and Cloudflare Tunnel
+## 24. 🌐 DNS, ExternalDNS, and Cloudflare Tunnel
 
 Public and private DNS automation with two ExternalDNS controllers (Cloudflare and RFC2136/BIND), integrated with Cloudflare Tunnel for zero‑origin‑exposure ingress.
 

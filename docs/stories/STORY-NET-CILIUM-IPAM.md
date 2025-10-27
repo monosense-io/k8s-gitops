@@ -1,54 +1,98 @@
-# 03 — STORY-NET-CILIUM-IPAM — LB IP Pools via GitOps
+# 02 — STORY-NET-CILIUM-IPAM — Create Cilium IPAM LoadBalancer Pool Manifests
 
-Sequence: 03/41 | Prev: STORY-NET-CILIUM-CORE-GITOPS.md | Next: STORY-NET-CILIUM-GATEWAY.md
+Sequence: 02/50 | Prev: STORY-NET-CILIUM-CORE-GITOPS.md | Next: STORY-NET-CILIUM-GATEWAY.md
 Sprint: 1 | Lane: Networking
-Global Sequence: 3/41
+Global Sequence: 02/50
 
-Status: Refined
+Status: Draft (v3.0 Refinement)
 Owner: Platform Engineering
-Date: 2025-10-22 (Refined after architectural analysis)
-Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/ipam; kubernetes/infrastructure/networking/cilium/ks.yaml; bootstrap/clusters/{cluster}/cilium-values.yaml
+Date: 2025-10-26 (v3.0 Refinement)
+Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/ipam/
 
 ## Story
-Define cluster-isolated LoadBalancer IP pools for infra and apps clusters using Cilium IPAM with proper pool segmentation and cross-cluster protection.
+As a platform engineer, I want to **create Cilium IPAM LoadBalancer pool manifests** for infra and apps clusters with proper pool segmentation and cluster isolation, so that LoadBalancer services receive deterministic IP addresses from cluster-specific pools when deployed in Story 45.
+
+This story creates the declarative CiliumLoadBalancerIPPool manifests. Actual deployment and IP allocation validation happen in Story 45 (VALIDATE-NETWORKING).
 
 ## Why / Outcome
-- **Deterministic LB allocation** from dedicated pools per cluster; eliminates IP conflicts.
-- **Pool isolation** prevents cross-cluster IP allocation when shared infrastructure manifests deploy to both clusters.
-- **Greenfield correctness** ensures bootstrap configs, IPAM pools, and cluster-settings are aligned from day 1.
+- Create IPAM pool manifests with cluster-specific IP ranges
+- Configure pool isolation to prevent cross-cluster IP conflicts
+- Enable deterministic LoadBalancer IP allocation from dedicated pools
+- Align pool definitions with bootstrap configurations and cluster-settings
 
 ## Scope
-- Resources: `kubernetes/infrastructure/networking/cilium/ipam/*`
-- Bootstrap configs: `bootstrap/clusters/{cluster}/cilium-values.yaml`
-- Cluster settings: `kubernetes/clusters/{cluster}/cluster-settings.yaml`
+
+**This Story (Manifest Creation):**
+- Create CiliumLoadBalancerIPPool manifests in `kubernetes/infrastructure/networking/cilium/ipam/`
+- Create Kustomization for IPAM pools
+- Update bootstrap configs if needed: `bootstrap/clusters/{cluster}/cilium-values.yaml`
+- Validate pool definitions align with cluster-settings
+- Local validation (flux build, kubeconform)
+
+**Deferred to Story 45 (Deployment & Validation):**
+- Deploying IPAM pools to clusters
+- Verifying pool isolation (disabled flag per cluster)
+- Testing LoadBalancer IP allocation
+- Cross-cluster reachability validation
 
 ## Acceptance Criteria
-1) **IPAM Pools Deployed with Cluster Isolation:**
-   - Flux reconciles `cilium-ipam` Kustomization successfully on both clusters.
-   - `infra-pool` shows `disabled: false` on infra cluster, `disabled: true` on apps cluster.
-   - `apps-pool` shows `disabled: true` on infra cluster, `disabled: false` on apps cluster.
 
-2) **Services Allocate from Correct Pools:**
-   - Infra ClusterMesh API server gets `10.25.11.100` (first IP in infra pool).
-   - Apps ClusterMesh API server gets `10.25.11.120` (first IP in apps pool).
-   - Infra Gateway gets `10.25.11.110` (explicit assignment in infra pool).
-   - Apps Gateway gets `10.25.11.121` (explicit assignment in apps pool).
+**Manifest Creation (This Story):**
 
-3) **Pool Alignment Verified:**
-   - ALL infra cluster LB IPs fall within `10.25.11.100-119` (20 IPs).
-   - ALL apps cluster LB IPs fall within `10.25.11.120-139` (20 IPs).
-   - `Gateway.status.addresses` matches `${CILIUM_GATEWAY_LB_IP}` from cluster-settings.
-   - No IP conflicts between clusters; each pool serves only its intended cluster.
+1) **IPAM Pool Manifests Created:**
+   - `kubernetes/infrastructure/networking/cilium/ipam/lb-ippool-infra.yaml` exists
+     - Pool name: `infra-pool`
+     - CIDR: `10.25.11.100-10.25.11.119` (20 IPs)
+     - Disabled condition: `${CLUSTER} != "infra"` (enabled only on infra cluster)
+   - `kubernetes/infrastructure/networking/cilium/ipam/lb-ippool-apps.yaml` exists
+     - Pool name: `apps-pool`
+     - CIDR: `10.25.11.120-10.25.11.139` (20 IPs)
+     - Disabled condition: `${CLUSTER} != "apps"` (enabled only on apps cluster)
 
-4) **Cross-Cluster Reachability:**
-   - Apps cluster can reach infra ClusterMesh API at `10.25.11.100` via BGP.
-   - Infra cluster can reach apps ClusterMesh API at `10.25.11.120` via BGP.
-   - BGP peer (10.25.11.1) shows routes for both pool ranges.
+2) **Kustomization Created:**
+   - `kubernetes/infrastructure/networking/cilium/ipam/ks.yaml` exists
+   - References both pool manifests
+   - Includes dependency on cilium-core
+   - `kubernetes/infrastructure/networking/cilium/ipam/kustomization.yaml` glue file exists
+
+3) **Cluster Settings Alignment:**
+   - Cluster-settings include IP pool variables (if needed)
+   - Bootstrap cilium-values.yaml reference correct IPs:
+     - Infra ClusterMesh API: `10.25.11.100` (first IP in infra pool)
+     - Apps ClusterMesh API: `10.25.11.120` (first IP in apps pool)
+     - Infra Gateway: `10.25.11.110` (within infra pool)
+     - Apps Gateway: `10.25.11.121` (within apps pool)
+
+4) **Local Validation Passes:**
+   - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure` succeeds
+   - `flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure` succeeds
+   - Output shows correct pool substitution for each cluster (infra-pool enabled on infra, apps-pool enabled on apps)
+   - `kubeconform --strict` validates IPAM pool manifests
+
+5) **Pool Segmentation Correct:**
+   - No IP overlap between pools (100-119 vs 120-139)
+   - Each pool contains 20 IPs
+   - Pools are within shared L2 subnet `10.25.11.0/24`
+   - Pool ranges documented in architecture.md
+
+**Deferred to Story 45 (Deployment & Validation):**
+- ❌ IPAM pools deployed to clusters
+- ❌ Pool isolation verified (disabled flag working)
+- ❌ Services allocating IPs from correct pools
+- ❌ Cross-cluster reachability via BGP
 
 ## Dependencies / Inputs
-- STORY-NET-CILIUM-CORE-GITOPS (Cilium core installed via bootstrap).
-- BGP peering established (or L2 announcements configured).
-- Cluster-settings ConfigMaps present in flux-system namespace.
+
+**Prerequisites (v3.0):**
+- Story 01 (STORY-NET-CILIUM-CORE-GITOPS) complete (Cilium core manifests created)
+- Cluster-settings ConfigMaps created (from Story 01 or earlier)
+- Access to `docs/architecture.md` for IP allocation plan
+- Tools: kubectl (for dry-run), flux CLI, kubeconform
+
+**NOT Required (v3.0):**
+- ❌ Cluster access (validation is local-only)
+- ❌ BGP peering configured (deployment in Story 45)
+- ❌ Running clusters (Story 45 handles deployment)
 
 ## Architecture Decision — IP Allocation Plan
 
@@ -74,9 +118,9 @@ Define cluster-isolated LoadBalancer IP pools for infra and apps clusters using 
 - Gateways follow ClusterMesh in sequence.
 - ~17 IPs reserved per cluster for future LoadBalancer services.
 
-## Tasks / Subtasks — Implementation Plan
+## Tasks / Subtasks
 
-### **Phase 1: Fix Bootstrap Configuration** (CRITICAL)
+**T1 — Fix Bootstrap Configuration** (if needed)
 
 - [ ] **Fix apps cluster subnet mismatch** (`bootstrap/clusters/apps/cilium-values.yaml`):
   ```yaml
@@ -98,7 +142,7 @@ Define cluster-isolated LoadBalancer IP pools for infra and apps clusters using 
   ```
   **Issue:** .120 is start of apps pool; infra gateway must be in infra pool (100-119).
 
-### **Phase 2: Add Pool Isolation to IPAM Manifests**
+**T2 — Create IPAM Pool Manifests with Cluster Isolation**
 
 - [ ] **Update infra pool with disabled flag** (`kubernetes/infrastructure/networking/cilium/ipam/lb-ippool-infra.yaml`):
   ```yaml
@@ -132,7 +176,7 @@ Define cluster-isolated LoadBalancer IP pools for infra and apps clusters using 
   ```
   **Fix:** Remove manual label requirement; use disabled flag for cluster isolation.
 
-### **Phase 3: Update Cluster-Settings**
+**T3 — Update Cluster-Settings with Pool Variables**
 
 - [ ] **Update infra cluster-settings** (`kubernetes/clusters/infra/cluster-settings.yaml`):
   ```yaml
@@ -164,55 +208,46 @@ Define cluster-isolated LoadBalancer IP pools for infra and apps clusters using 
   CILIUM_LB_POOL_END: "10.25.11.139"
   ```
 
-### **Phase 4: Validation & Smoke Testing**
+**T4 — Create Kustomization for IPAM Pools**
+- [ ] Create `kubernetes/infrastructure/networking/cilium/ipam/ks.yaml`:
+  - Reference both pool manifests
+  - Add dependency on cilium-core
+  - Configure health checks (if applicable)
+- [ ] Create `kubernetes/infrastructure/networking/cilium/ipam/kustomization.yaml` glue file
+- [ ] Update infrastructure kustomization to include IPAM pools
 
-- [ ] **Pre-deployment validation:**
+**T5 — Local Validation** (NO Cluster Access)
+- [ ] Validate pool manifests:
   ```bash
   # Verify Flux variable substitution works
-  flux build kustomization cilium-ipam --path ./kubernetes/infrastructure/networking/cilium/ipam
+  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure
+  flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure
 
   # Check YAML syntax
   kubectl --dry-run=client -f kubernetes/infrastructure/networking/cilium/ipam/
 
   # Verify pool ranges don't overlap
   yq '.spec.blocks[].start, .spec.blocks[].stop' kubernetes/infrastructure/networking/cilium/ipam/*.yaml
+  # Expected: 10.25.11.100, 10.25.11.119, 10.25.11.120, 10.25.11.139
+
+  # Verify cluster isolation (disabled flags)
+  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+    yq 'select(.kind == "CiliumLoadBalancerIPPool")' | grep -A2 disabled
+  # Expected: infra-pool disabled=false, apps-pool disabled=true (on infra)
   ```
 
-- [ ] **Post-deployment pool verification:**
-  ```bash
-  # Infra cluster: Check pools deployed correctly
-  kubectl --context=infra get ciliumloadbalancerippool -A -o yaml | grep -A5 "name: infra-pool"
-  kubectl --context=infra get ciliumloadbalancerippool -A -o yaml | grep -A5 "name: apps-pool"
-  # Expected: infra-pool enabled, apps-pool disabled
+**T6 — Documentation**
+- [ ] Document IP allocation plan in Dev Notes
+- [ ] Update architecture.md with pool ranges (if not already documented)
+- [ ] Note bootstrap configuration fixes applied
 
-  # Apps cluster: Check pools deployed correctly
-  kubectl --context=apps get ciliumloadbalancerippool -A -o yaml | grep -A5 "name: infra-pool"
-  kubectl --context=apps get ciliumloadbalancerippool -A -o yaml | grep -A5 "name: apps-pool"
-  # Expected: infra-pool disabled, apps-pool enabled
-  ```
-
-- [ ] **Service IP allocation verification:**
-  ```bash
-  # Infra ClusterMesh IP
-  kubectl --context=infra get svc -n kube-system clustermesh-apiserver \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-  # Expected: 10.25.11.100
-
-  # Apps ClusterMesh IP
-  kubectl --context=apps get svc -n kube-system clustermesh-apiserver \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-  # Expected: 10.25.11.120
-
-  # Infra Gateway IP
-  kubectl --context=infra get gateway -n kube-system \
-    -o jsonpath='{.items[0].status.addresses[0].value}'
-  # Expected: 10.25.11.110
-
-  # Apps Gateway IP
-  kubectl --context=apps get gateway -n kube-system \
-    -o jsonpath='{.items[0].status.addresses[0].value}'
-  # Expected: 10.25.11.121
-  ```
+**Runtime Validation (MOVED TO STORY 45):**
+```bash
+# These commands execute in Story 45, NOT this story:
+# - Pool deployment verification
+# - Service IP allocation testing
+# - Cross-cluster reachability testing
+```
 
 - [ ] **BGP reachability test:**
   ```bash
@@ -285,14 +320,25 @@ show ip route bgp
 ```
 
 ## Definition of Done
-- All acceptance criteria met (4/4).
-- Bootstrap configs corrected for both clusters (subnet + IPs).
-- IPAM pools deployed with cluster isolation (disabled flags).
-- Cluster-settings updated with correct IP allocations.
-- Validation steps pass on both clusters.
-- Gateway services have correct IPs from their respective pools.
-- Cross-cluster ClusterMesh connectivity verified.
-- Evidence documented in Dev Notes or QA evidence log.
+
+**Manifest Creation Complete:**
+- [ ] IPAM pool manifests created for both infra and apps clusters
+- [ ] Pool manifests include cluster isolation (disabled flag with ${CLUSTER} substitution)
+- [ ] Bootstrap configurations fixed (if needed) with correct IP allocations
+- [ ] Cluster-settings updated with pool control variables
+- [ ] Kustomization created for IPAM pools
+- [ ] Local validation passes (flux build, kubeconform, YAML syntax)
+- [ ] Pool ranges validated (no overlap, within subnet)
+- [ ] IP allocation plan documented
+- [ ] Manifests committed to git
+- [ ] Story 45 (VALIDATE-NETWORKING) can proceed with deployment
+
+**NOT Part of DoD (Moved to Story 45):**
+- ❌ IPAM pools deployed to clusters
+- ❌ Pool isolation verified (disabled flags working)
+- ❌ Services allocating IPs from correct pools
+- ❌ Cross-cluster reachability via BGP
+- ❌ Gateway IP allocation verified
 
 ---
 
@@ -312,3 +358,11 @@ show ip route bgp
 ## Optional Steps
 - Add `CiliumL2AnnouncementPolicy` if using L2 announcements instead of BGP.
 - Introduce `serviceSelector` to dedicate specific subranges for Gateway vs. other LBs.
+
+---
+
+## Change Log
+| Date       | Version | Description                          | Author  |
+|------------|---------|--------------------------------------|---------|
+| 2025-10-22 | 1.0     | Initial refined version              | Platform Engineering |
+| 2025-10-26 | 2.0     | **v3.0 Refinement**: Updated header, story, scope, AC, dependencies, tasks, DoD for manifests-first approach. Separated manifest creation from deployment (moved to Story 45). | Winston |

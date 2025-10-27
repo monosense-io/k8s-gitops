@@ -1,349 +1,1898 @@
-# 34 — STORY-CICD-GITLAB-APPS — GitLab + Runners (DIND) on Apps Cluster
+# 33 — STORY-CICD-GITLAB-APPS — Create GitLab Manifests (apps)
 
-Sequence: 34/41 | Prev: STORY-CICD-GITHUB-ARC.md | Next: STORY-APP-HARBOR.md
-Sprint: 7 | Lane: Applications
-Global Sequence: 34/41
+**Status:** v3.0 (Manifests-first) | **Date:** 2025-10-26
+**Sequence:** 33/50 | **Prev:** STORY-CICD-GITHUB-ARC.md | **Next:** STORY-APP-HARBOR.md
+**Sprint:** 7 | **Lane:** Applications | **Global Sequence:** 33/50
 
-Status: Draft
-Owner: Platform Engineering
-Date: 2025-10-21
-Links: docs/architecture.md §“GitLab Configuration”; kubernetes/workloads/tenants/gitlab; kubernetes/infrastructure/networking/cilium/gateway; kubernetes/workloads/platform/databases/cloudnative-pg/poolers
-
-## Story
-Deploy GitLab (Helm chart) in the apps cluster with external state (PostgreSQL via CNPG pooler, Redis via Dragonfly), S3-compatible object storage, HTTPS via Gateway API, and GitLab Runner with Kubernetes executor that supports Docker-in-Docker (DIND) for container builds.
-
-## Why / Outcome
-- First-class, self-managed GitLab with CI that builds/pushes images from the cluster.
-- Separation of stateless vs. stateful components per our architecture (DB in infra cluster, object storage external, Redis service).
-- Runners provide isolated, ephemeral build pods with optional privileged DIND support.
-
-## Scope
-- Namespaces: `gitlab-system` (GitLab), `gitlab-runner` (Runner — isolated)
-- GitLab via HelmRelease; external Postgres/Redis/ObjectStorage; HTTPS through Gateway API (Cilium).
-- GitLab Runner via HelmRelease, Kubernetes executor. Privileged jobs (DIND) run only in `gitlab-runner` with PSA guardrails; prefer non‑privileged alternatives (BuildKit/Kaniko) for most projects.
-
-## Acceptance Criteria
-1) GitLab endpoints are reachable over HTTPS at `${GITLAB_HOST}`; admin bootstrap succeeds (root cred via ExternalSecret).
-2) External DB: Rails, Sidekiq, and migrations connect to CNPG through `${GITLAB_DB_SECRET_PATH}` with the `gitlab_app` role; health checks pass. 
-3) External Redis (Dragonfly or Redis): GitLab uses `${GITLAB_REDIS_SECRET_PATH}`; background jobs and cache work.
-4) Object storage: Artifacts/LFS/Uploads/Packages/Registry are configured to use S3-compatible storage via `${GITLAB_S3_SECRET_PATH}`; uploads and downloads succeed.
-5) GitLab Runner registers automatically using `${GITLAB_RUNNER_REG_TOKEN}` secret, schedules jobs via the Kubernetes executor, and can run DIND jobs with privileged containers.
-6) Sample pipeline builds and pushes an image using DIND to the target registry (Harbor or GitLab Registry per config).
-7) Monitoring: ServiceMonitors from the charts are discovered by Prometheus; basic dashboards show web, sidekiq, and runner health.
-
-## Dependencies / Inputs
-- CNPG shared cluster and `gitlab-pooler` (rw) exist in `cnpg-system`; secret `${GITLAB_DB_SECRET_PATH}` present. 
-- Dragonfly or Redis service reachable; secret `${GITLAB_REDIS_SECRET_PATH}` present.
-- S3 object storage reachable (MinIO RGW, AWS S3, etc.); secret `${GITLAB_S3_SECRET_PATH}` present.
-- cert-manager issuers available; Gateway API enabled with Cilium; `${GITLAB_HOST}`, `${GITLAB_REGISTRY_HOST}` set in `cluster-settings`.
-- ExternalSecrets store configured; `${GITLAB_ROOT_SECRET_PATH}` and `${GITLAB_RUNNER_REG_TOKEN}` defined.
-
-## Tasks / Subtasks — Implementation Plan (Story Only)
-- [ ] Prepare namespaces (Security Isolation)
-  - `kubernetes/workloads/tenants/gitlab/namespace.yaml` (ensure `gitlab-system` exists; no privileged workloads here)
-  - Add `kubernetes/workloads/tenants/gitlab-runner/namespace.yaml` (ns: `gitlab-runner`) with PSA labels:
-    - `pod-security.kubernetes.io/enforce: privileged`
-    - `pod-security.kubernetes.io/audit: privileged`
-    - `pod-security.kubernetes.io/warn: privileged`
-
-- [ ] ExternalSecrets
-  - `kubernetes/workloads/tenants/gitlab/externalsecrets.yaml` — map these keys to K8s secrets:
-    - DB (Secret `gitlab-db-credentials`): host, port, dbname, user, password, sslmode; source `${GITLAB_DB_SECRET_PATH}`
-    - Redis (Secret `gitlab-redis-credentials`): host, port, password (if set); source `${GITLAB_REDIS_SECRET_PATH}`
-    - S3 (Secret `gitlab-s3-credentials`): endpoint, region, access_key, secret_key, bucket, insecure (true|false); source `${GITLAB_S3_SECRET_PATH}`
-    - Root admin (Secret `gitlab-root`): password (or initial token); source `${GITLAB_ROOT_SECRET_PATH}`
-    - Runner registration (Secret `gitlab-runner-registration`): token; source `${GITLAB_RUNNER_REG_TOKEN}`
-
-- [ ] Gateway API exposure
-  - Add `kubernetes/infrastructure/networking/cilium/gateway/gitlab-httproutes.yaml` — `HTTPRoute` for `${GITLAB_HOST}` (web) and optional `${GITLAB_REGISTRY_HOST}` (registry) with TLS from cert-manager (issuer per cluster policy). Attach to the existing `Gateway` in the same folder.
-
-- [ ] GitLab HelmRelease (production posture; external state)
-  - `kubernetes/workloads/tenants/gitlab/helmrelease.yaml` (chart: `gitlab/gitlab`):
-    - Disable in-chart Postgres and Redis: `postgresql.install: false`, `redis.install: false`.
-    - Configure external Postgres via `global.psql.*` pointing at the CNPG pooler host (e.g., `gitlab-pooler-rw.cnpg-system.svc.cluster.local`) and secret `gitlab-db-credentials`.
-    - Configure external Redis via `global.redis.*` and secret `gitlab-redis-credentials`.
-    - Configure object storage by disabling in-chart MinIO and setting `global.minio.enabled=false`, then configure `global.registry` and `global.appConfig.object_store` to use `gitlab-s3-credentials`.
-    - Ingress/Routes: disable chart Ingress and rely on Gateway API HTTPRoutes, or keep Service exposure only (no in-chart ingress).
-    - Optionally disable built-in GitLab Container Registry if Harbor is the authoritative registry.
-
-- [ ] GitLab Runner (Kubernetes executor + DIND support)
-  - Configure runner via `gitlab-runner` block in the same HelmRelease (preferred) or add a sibling HelmRelease under the same tenant folder; set `.namespace: gitlab-runner`.
-  - Set `gitlabUrl: https://${GITLAB_HOST}` and inject `runnerRegistrationToken` from `gitlab-runner-registration` secret.
-  - Security posture: dedicated ServiceAccount with minimal permissions; scope RBAC to namespace where possible.
-  - Enable privileged mode only for tags that truly require DIND: in TOML `[runners.kubernetes] privileged = true` and restrict via tags; pin pods via nodeSelector/tolerations if isolated nodes available.
-  - Set pod template defaults: nodeSelector/tolerations, ServiceAccount, runtimeClassName if needed. Optional: S3 cache using existing credentials.
-
-## Validation Steps
-
-AC1 — HTTPS reachability and bootstrap
-- Reconcile: `flux -n flux-system --context=apps reconcile ks apps-workloads --with-source`
-- Endpoints: `kubectl --context=apps -n gitlab-system get svc` (webservice/registry present)
-- TLS: `curl -Ik https://${GITLAB_HOST}` returns 200/302 with correct issuer; registry host optional check if enabled.
-
-AC2 — External DB connectivity (CNPG pooler)
-- Pods healthy: `kubectl --context=apps -n gitlab-system get pods | rg "webservice|sidekiq"`
-- Toolbox exec: `kubectl --context=apps -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash -lc "psql 'host=<pooler-rw> dbname=gitlab user=gitlab_app sslmode=require' -c 'select 1'"`
-- Migrations complete in logs; `rails db:prepare` not failing.
-
-AC3 — External Redis
-- Sidekiq processing: confirm queues active in Admin → Monitoring or check sidekiq logs for successful connection
-- Optional: run `redis-cli -h <redis-host> -a <password> ping` from a debug pod if available
-
-AC4 — Object storage
-- Upload an artifact (e.g., pipeline job artifact) and verify object appears via S3 client: `aws --endpoint-url $S3_ENDPOINT s3 ls s3://$BUCKET/path` (using `gitlab-s3-credentials`)
-- Verify SSE: `aws --endpoint-url $S3_ENDPOINT s3api head-object --bucket $BUCKET --key <object> | jq -r .ServerSideEncryption` shows `AES256` (or KMS if required)
-- Download succeeds via UI/API
-
-AC5 — Runner registration and scheduling
-- Runner pod Ready: `kubectl --context=apps -n gitlab-system get pods | rg runner`
-- GitLab Admin → Runners shows online runner; registration token consumed
-
-AC6 — DIND pipeline proof
-- Run sample `.gitlab-ci.yml` job building an image with docker:27 + docker:27-dind; verify push to Harbor/GitLab Registry
-
-AC7 — Monitoring
-- ServiceMonitors discovered; time series for GitLab (web/sidekiq) and runner > 0
-
-Evidence to capture (Dev Notes)
-- curl -Ik output, toolbox psql result, S3 listing, runner online screenshot/CLI, sample pipeline URL, VM query for `up{job~"gitlab.*|gitlab-runner"}`
-
-Cleanup (optional)
-- Disable sample pipeline project or remove test image tags from registry
-
-- [ ] Network Policies (tighten later)
-  - Allow egress from GitLab to CNPG pooler, Redis/Dragonfly, S3 endpoint, SMTP (if used).
-  - Allow egress from Runner jobs to registries and the GitLab API; egress to the Docker registry mirror if configured (Spegel).
-
-- [ ] Example CI for DIND (documentation asset only)
-  - Add `.gitlab-ci.yml` snippet (in docs) that uses `docker:27` and `docker:27-dind` with `DOCKER_HOST=tcp://docker:2375` and privileged true, to validate image build/push path.
-
-## Validation Steps
-- Flux: `flux -n flux-system --context=apps reconcile ks apps-workloads --with-source`
-- Pods: `kubectl --context=apps -n gitlab-system get pods` (webservice, sidekiq, gitaly, toolbox healthy)
-- DB: From toolbox pod, `gitlab-rake db:doctor` succeeds; migrations complete.
-- Redis/Dragonfly: login, create project, start pipeline; Sidekiq processes jobs.
-- Object storage: push artifacts and LFS; verify in S3 backend.
-- Gateway: `curl -Ik https://${GITLAB_HOST}` returns 200/302 with valid certificate.
-- Runner: `kubectl -n gitlab-runner get pods`; runner shows online in GitLab → Admin → Runners.
-- DIND job: run the sample pipeline building and pushing to Harbor or GitLab Registry; ensure image appears and can be pulled.
-
-## Definition of Done
-- All ACs met; evidence (commands, screenshots) recorded in Dev Notes; file list updated.
+**Owner:** Platform Engineering
+**Links:** docs/architecture.md §"GitLab Configuration"; kubernetes/workloads/tenants/gitlab; kubernetes/infrastructure/networking/cilium/gateway
 
 ---
 
-## Integration — Keycloak SSO (OIDC)
+## 📖 Story
 
-Goal
-- Enable Keycloak as an OpenID Connect (OIDC) provider for GitLab sign‑in, with just‑in‑time (JIT) user provisioning, optional auto‑linking for existing users, and profile sync (name/email). GitLab continues to use external Postgres/Redis/S3 as defined above.
+As a **Platform Engineer**, I need to **create Kubernetes manifests** for GitLab with external state (PostgreSQL via CNPG pooler, Redis via Dragonfly, S3 object storage), Gateway API HTTPS exposure, Keycloak OIDC SSO, and GitLab Runner with privileged DIND support on the **apps cluster**, so that I have a complete, version-controlled configuration for self-managed GitLab with CI/CD capabilities, ready for deployment and validation in Story 45.
 
-Acceptance Criteria (SSO)
-1) “Sign in with Keycloak” appears on the GitLab sign‑in page; clicking completes an OIDC flow and signs in successfully.
-2) JIT provisioning works when `allowSingleSignOn: ['openid_connect']` is enabled; created users have correct name/email.
-3) Existing users can be auto‑linked when `autoLinkUser: ['openid_connect']` is enabled and emails match.
-4) TLS to Keycloak is trusted by GitLab components (custom CA mounted if Keycloak uses private PKI).
-5) Logout/login round‑trip works; no user creation occurs when `blockAutoCreatedUsers: true` is set (if chosen).
+## 🎯 Scope
 
-Design
-- Protocol: OpenID Connect via GitLab OmniAuth provider `openid_connect` with discovery.
-- Scopes: `openid`, `profile`, `email`.
-- Issuer: `https://<keycloak-host>/realms/<realm>`; Keycloak must use HTTPS and RS256/RS512 token signing.
-- Callback: `https://${GITLAB_HOST}/users/auth/openid_connect/callback`.
-- Helm path: `global.appConfig.omniauth.*` and `global.appConfig.omniauth.providers[*]` in the GitLab chart.
-- Optional: mount custom CA for Keycloak under `global.certificates.customCAs` (Secret or ConfigMap).
+### This Story (33): Manifest Creation (Local Only)
+- Create all Kubernetes manifests for GitLab and GitLab Runner
+- Define HelmReleases for GitLab (external DB/Redis/S3) and Runner (Kubernetes executor)
+- Configure External Secrets for database, Redis, S3, root credentials, OIDC client
+- Set up Gateway API HTTPRoutes for HTTPS exposure (GitLab web + registry)
+- Configure Keycloak OIDC integration for SSO (JIT provisioning, auto-linking)
+- Define security isolation (privileged namespace for runner, PSA labels)
+- Document architecture, external dependencies, and operational patterns
+- **NO cluster deployment** (all work happens locally in git repository)
 
-Tasks / Subtasks — Implementation Plan (Story Only)
-1) Keycloak (admin)
-   - Create a confidential client in the target realm:
+### Story 45: Deployment and Validation
+- Bootstrap infrastructure on both clusters using helmfile
+- Deploy all manifests via Flux reconciliation
+- Validate GitLab web/registry HTTPS endpoints
+- Test database/Redis/S3 connectivity
+- Validate Keycloak SSO login flow
+- Test GitLab Runner registration and DIND pipeline
+- Validate monitoring and metrics
+
+---
+
+## ✅ Acceptance Criteria
+
+### Manifest Completeness (AC1-AC14)
+
+**AC1**: GitLab namespace manifests exist:
+- `kubernetes/workloads/tenants/gitlab/namespace.yaml` (namespace: `gitlab-system`, no privileged workloads)
+
+**AC2**: GitLab Runner namespace with privileged PSA labels:
+- `kubernetes/workloads/tenants/gitlab-runner/namespace.yaml`:
+  - `pod-security.kubernetes.io/enforce: privileged` (DIND requires privileged containers)
+  - `pod-security.kubernetes.io/audit: privileged`
+  - `pod-security.kubernetes.io/warn: privileged`
+
+**AC3**: External Secrets configured for all dependencies:
+- `kubernetes/workloads/tenants/gitlab/externalsecrets.yaml`:
+  - Database secret: `gitlab-db-credentials` (host, port, dbname, user, password, sslmode) from `${GITLAB_DB_SECRET_PATH}`
+  - Redis secret: `gitlab-redis-credentials` (host, port, password) from `${GITLAB_REDIS_SECRET_PATH}`
+  - S3 secret: `gitlab-s3-credentials` (endpoint, region, access_key, secret_key, bucket) from `${GITLAB_S3_SECRET_PATH}`
+  - Root admin secret: `gitlab-root` (password) from `${GITLAB_ROOT_SECRET_PATH}`
+  - OIDC client secret: `gitlab-oidc-credentials` (client_id, client_secret) from `${GITLAB_OIDC_SECRET_PATH}`
+- `kubernetes/workloads/tenants/gitlab-runner/externalsecrets.yaml`:
+  - Runner registration secret: `gitlab-runner-registration` (token) from `${GITLAB_RUNNER_REG_TOKEN}`
+
+**AC4**: GitLab HelmRelease configured with external state:
+- `kubernetes/workloads/tenants/gitlab/helmrelease.yaml`:
+  - Chart: `gitlab/gitlab` (version 8.0+)
+  - Disable in-chart dependencies: `postgresql.install: false`, `redis.install: false`, `minio.enabled: false`
+  - External PostgreSQL: `global.psql.*` pointing to CNPG pooler (`gitlab-pooler-rw.cnpg-system.svc.cluster.local`)
+  - External Redis: `global.redis.*` pointing to Dragonfly service
+  - External S3: `global.appConfig.object_store.*` using `gitlab-s3-credentials`
+  - Ingress disabled: rely on Gateway API HTTPRoutes
+  - Root password: from `gitlab-root` secret
+  - Resource requests/limits for production sizing
+
+**AC5**: Keycloak OIDC integration configured:
+- `global.appConfig.omniauth.*` in GitLab HelmRelease:
+  - `enabled: true`
+  - `allowSingleSignOn: ['openid_connect']` (JIT provisioning)
+  - `autoLinkUser: ['openid_connect']` (auto-link existing users)
+  - `blockAutoCreatedUsers: false`
+  - `syncProfileFromProvider: ['openid_connect']`
+  - Provider: `openid_connect` with `issuer`, `client_id`, `client_secret`, `redirect_uri`
+
+**AC6**: Gateway API HTTPRoutes for HTTPS exposure:
+- `kubernetes/infrastructure/networking/cilium/gateway/gitlab-httproutes.yaml`:
+  - HTTPRoute for `${GITLAB_HOST}` (GitLab web UI)
+  - HTTPRoute for `${GITLAB_REGISTRY_HOST}` (GitLab container registry, optional)
+  - TLS termination with cert-manager issuer
+  - Attach to existing Gateway in `cilium-gateway` namespace
+
+**AC7**: GitLab Runner HelmRelease with privileged DIND support:
+- `kubernetes/workloads/tenants/gitlab-runner/helmrelease.yaml`:
+  - Chart: `gitlab/gitlab-runner` (version 0.66+)
+  - `gitlabUrl: https://${GITLAB_HOST}`
+  - `runnerRegistrationToken` from `gitlab-runner-registration` secret
+  - Kubernetes executor: `runners.executor: kubernetes`
+  - Privileged mode: `runners.config.kubernetes.privileged: true` (DIND support)
+  - Dedicated ServiceAccount with minimal RBAC
+  - S3 cache configuration (optional, using `gitlab-s3-credentials`)
+
+**AC8**: RBAC for GitLab Runner:
+- `kubernetes/workloads/tenants/gitlab-runner/rbac.yaml`:
+  - ServiceAccount: `gitlab-runner`
+  - Role: Permissions for pods, secrets, configmaps in `gitlab-runner` namespace
+  - RoleBinding: Bind ServiceAccount to Role
+
+**AC9**: NetworkPolicies for security isolation:
+- `kubernetes/workloads/tenants/gitlab/networkpolicy.yaml`:
+  - Allow egress: CNPG pooler, Redis/Dragonfly, S3 endpoint, SMTP (optional), DNS
+  - Allow ingress: From Gateway for HTTPRoute traffic
+- `kubernetes/workloads/tenants/gitlab-runner/networkpolicy.yaml`:
+  - Allow egress: GitLab API, registries (Harbor/GitLab), Docker registry mirror (Spegel), DNS
+  - Deny all other traffic
+
+**AC10**: Monitoring and alerting configured:
+- `kubernetes/workloads/tenants/gitlab/monitoring/prometheusrule.yaml` (or `vmrule.yaml`):
+  - 8+ alerts: GitLab web unavailable, Sidekiq queue backlog, database connectivity, Redis connectivity, S3 errors, certificate expiry, high error rate, low success rate
+- ServiceMonitor enabled in HelmRelease for GitLab and Runner
+
+**AC11**: Flux Kustomizations with correct dependencies:
+- `kubernetes/workloads/tenants/gitlab/ks.yaml`:
+  - Depends on: CNPG shared cluster, External Secrets, cert-manager, Gateway
+  - Health check: GitLab webservice Deployment
+  - Wait: true, timeout: 15m (GitLab takes time to initialize)
+- `kubernetes/workloads/tenants/gitlab-runner/ks.yaml`:
+  - Depends on: GitLab (runner needs GitLab API)
+  - Health check: GitLab Runner Deployment
+  - Wait: true, timeout: 5m
+
+**AC12**: Cluster settings updated with GitLab variables:
+- `GITLAB_HOST` (e.g., `gitlab.apps.example.com`)
+- `GITLAB_REGISTRY_HOST` (e.g., `registry.gitlab.apps.example.com`)
+- `GITLAB_DB_SECRET_PATH`, `GITLAB_REDIS_SECRET_PATH`, `GITLAB_S3_SECRET_PATH`, `GITLAB_ROOT_SECRET_PATH`, `GITLAB_OIDC_SECRET_PATH`, `GITLAB_RUNNER_REG_TOKEN`
+- Keycloak OIDC: `KEYCLOAK_HOST`, `KEYCLOAK_REALM`, `GITLAB_OIDC_CLIENT_ID`
+
+**AC13**: Comprehensive README created:
+- `kubernetes/workloads/tenants/gitlab/README.md`:
+  - Architecture overview (external DB/Redis/S3, Gateway API, OIDC SSO)
+  - External dependencies and prerequisites
+  - Keycloak OIDC setup instructions (client creation, redirect URIs)
+  - GitLab Runner DIND usage guide
+  - Troubleshooting guide (database connectivity, Redis, S3, OIDC, runner registration)
+  - Example `.gitlab-ci.yml` for DIND pipeline
+
+**AC14**: Example CI/CD pipeline for DIND:
+- `kubernetes/workloads/tenants/gitlab/examples/dind-pipeline.yml`:
+  - Sample `.gitlab-ci.yml` using `docker:27` + `docker:27-dind`
+  - Build and push image to registry (Harbor or GitLab Registry)
+  - Security best practices (no secrets in logs, use CI variables)
+
+---
+
+## 📋 Dependencies / Inputs
+
+### Local Tools Required
+- Text editor (VS Code, vim, etc.)
+- `yq` for YAML validation
+- `kustomize` for manifest validation (`kustomize build`)
+- `flux` CLI for Kustomization validation (`flux build kustomization`)
+- Git for version control
+
+### Upstream Stories (Deployment Prerequisites - Story 45)
+- **STORY-DB-CNPG-APPS** — CNPG shared cluster with `gitlab-pooler` (rw)
+- **STORY-DB-DRAGONFLY** — Dragonfly (Redis-compatible) deployed
+- **STORY-SEC-EXTERNAL-SECRETS-BASE** — External Secrets Operator configured
+- **STORY-SEC-CERT-MANAGER** — cert-manager with issuers for TLS
+- **STORY-NET-CILIUM-GATEWAY** — Gateway API enabled with Cilium
+- **STORY-OBS-VM-STACK** — VictoriaMetrics for ServiceMonitor
+
+### External Prerequisites (Story 45)
+- S3-compatible object storage (MinIO, Rook RGW, AWS S3) with bucket created
+- Keycloak realm configured with OIDC client for GitLab
+- 1Password secrets at specified paths (database, Redis, S3, root, OIDC, runner token)
+- DNS records: `${GITLAB_HOST}`, `${GITLAB_REGISTRY_HOST}` pointing to cluster ingress
+
+---
+
+## 🛠️ Tasks / Subtasks
+
+### T1: Prerequisites and Strategy
+
+- [ ] **T1.1**: Review GitLab architecture with external state
+  - Study [GitLab Helm chart docs](https://docs.gitlab.com/charts/)
+  - Understand external PostgreSQL/Redis/S3 configuration
+  - Review Keycloak OIDC integration requirements
+  - Understand privileged DIND security implications
+
+- [ ] **T1.2**: Define directory structure
+  ```
+  kubernetes/workloads/tenants/
+  ├── gitlab/
+  │   ├── namespace.yaml
+  │   ├── externalsecrets.yaml
+  │   ├── helmrelease.yaml
+  │   ├── networkpolicy.yaml
+  │   ├── kustomization.yaml
+  │   ├── ks.yaml
+  │   ├── README.md
+  │   ├── monitoring/
+  │   │   ├── prometheusrule.yaml
+  │   │   └── kustomization.yaml
+  │   └── examples/
+  │       └── dind-pipeline.yml
+  └── gitlab-runner/
+      ├── namespace.yaml
+      ├── externalsecrets.yaml
+      ├── helmrelease.yaml
+      ├── rbac.yaml
+      ├── networkpolicy.yaml
+      ├── kustomization.yaml
+      └── ks.yaml
+
+  kubernetes/infrastructure/networking/cilium/gateway/
+  └── gitlab-httproutes.yaml
+  ```
+
+### T2: Namespace Manifests
+
+- [ ] **T2.1**: Create `gitlab/namespace.yaml`
+  ```yaml
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: gitlab-system
+    labels:
+      app.kubernetes.io/managed-by: flux
+      toolkit.fluxcd.io/tenant: gitlab
+      # Default PSA: baseline (no privileged workloads in GitLab)
+  ```
+
+- [ ] **T2.2**: Create `gitlab-runner/namespace.yaml`
+  ```yaml
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: gitlab-runner
+    labels:
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/warn: privileged
+      app.kubernetes.io/managed-by: flux
+      toolkit.fluxcd.io/tenant: gitlab-runner
+  ```
+
+### T3: External Secrets
+
+- [ ] **T3.1**: Create `gitlab/externalsecrets.yaml`
+  ```yaml
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-db-credentials
+    namespace: gitlab-system
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-db-credentials
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          host: "{{ .host }}"
+          port: "{{ .port }}"
+          database: "{{ .database }}"
+          username: "{{ .username }}"
+          password: "{{ .password }}"
+          sslmode: "{{ .sslmode | default \"require\" }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_DB_SECRET_PATH}
+  ---
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-redis-credentials
+    namespace: gitlab-system
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-redis-credentials
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          host: "{{ .host }}"
+          port: "{{ .port }}"
+          password: "{{ .password | default \"\" }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_REDIS_SECRET_PATH}
+  ---
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-s3-credentials
+    namespace: gitlab-system
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-s3-credentials
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          endpoint: "{{ .endpoint }}"
+          region: "{{ .region | default \"us-east-1\" }}"
+          bucket: "{{ .bucket }}"
+          access_key: "{{ .access_key }}"
+          secret_key: "{{ .secret_key }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_S3_SECRET_PATH}
+  ---
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-root
+    namespace: gitlab-system
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-root
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          password: "{{ .password }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_ROOT_SECRET_PATH}
+  ---
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-oidc-credentials
+    namespace: gitlab-system
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-oidc-credentials
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          client_id: "{{ .client_id }}"
+          client_secret: "{{ .client_secret }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_OIDC_SECRET_PATH}
+  ```
+
+- [ ] **T3.2**: Create `gitlab-runner/externalsecrets.yaml`
+  ```yaml
+  apiVersion: external-secrets.io/v1beta1
+  kind: ExternalSecret
+  metadata:
+    name: gitlab-runner-registration
+    namespace: gitlab-runner
+  spec:
+    refreshInterval: 1h
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: onepassword
+    target:
+      name: gitlab-runner-registration
+      creationPolicy: Owner
+      template:
+        type: Opaque
+        data:
+          runner-registration-token: "{{ .token }}"
+    dataFrom:
+      - extract:
+          key: ${GITLAB_RUNNER_REG_TOKEN}
+  ```
+
+### T4: GitLab HelmRelease
+
+- [ ] **T4.1**: Create `gitlab/helmrelease.yaml` (External State Configuration)
+  ```yaml
+  apiVersion: source.toolkit.fluxcd.io/v1
+  kind: HelmRepository
+  metadata:
+    name: gitlab
+    namespace: gitlab-system
+  spec:
+    interval: 12h
+    url: https://charts.gitlab.io
+  ---
+  apiVersion: helm.toolkit.fluxcd.io/v2
+  kind: HelmRelease
+  metadata:
+    name: gitlab
+    namespace: gitlab-system
+  spec:
+    interval: 1h
+    chart:
+      spec:
+        chart: gitlab
+        version: ">=8.0.0 <9.0.0"  # Latest stable
+        sourceRef:
+          kind: HelmRepository
+          name: gitlab
+        interval: 12h
+    maxHistory: 3
+    install:
+      createNamespace: false
+      remediation:
+        retries: 3
+      timeout: 15m
+    upgrade:
+      cleanupOnFail: true
+      remediation:
+        retries: 3
+        strategy: rollback
+      timeout: 15m
+    values:
+      # Global configuration
+      global:
+        # Hosts and TLS
+        hosts:
+          domain: ${SECRET_DOMAIN}
+          gitlab:
+            name: ${GITLAB_HOST}
+          registry:
+            name: ${GITLAB_REGISTRY_HOST}
+
+        # Ingress: Disable chart ingress, use Gateway API
+        ingress:
+          enabled: false
+
+        # External PostgreSQL (CNPG pooler)
+        psql:
+          host: gitlab-pooler-rw.cnpg-system.svc.cluster.local
+          port: 5432
+          database: gitlab
+          username: gitlab_app
+          password:
+            secret: gitlab-db-credentials
+            key: password
+
+        # External Redis (Dragonfly)
+        redis:
+          host: dragonfly.dragonfly-system.svc.cluster.local
+          port: 6379
+          password:
+            secret: gitlab-redis-credentials
+            key: password
+
+        # External S3 object storage (disable in-chart MinIO)
+        minio:
+          enabled: false
+
+        # Object storage configuration
+        appConfig:
+          # Artifacts storage
+          artifacts:
+            enabled: true
+            bucket: ${GITLAB_S3_BUCKET_ARTIFACTS}
+            connection:
+              secret: gitlab-s3-credentials
+              key: connection
+
+          # LFS storage
+          lfs:
+            enabled: true
+            bucket: ${GITLAB_S3_BUCKET_LFS}
+            connection:
+              secret: gitlab-s3-credentials
+              key: connection
+
+          # Uploads storage
+          uploads:
+            enabled: true
+            bucket: ${GITLAB_S3_BUCKET_UPLOADS}
+            connection:
+              secret: gitlab-s3-credentials
+              key: connection
+
+          # Packages storage
+          packages:
+            enabled: true
+            bucket: ${GITLAB_S3_BUCKET_PACKAGES}
+            connection:
+              secret: gitlab-s3-credentials
+              key: connection
+
+          # Container registry storage
+          registry:
+            bucket: ${GITLAB_S3_BUCKET_REGISTRY}
+            connection:
+              secret: gitlab-s3-credentials
+              key: connection
+
+          # OmniAuth (Keycloak OIDC)
+          omniauth:
+            enabled: true
+            allowSingleSignOn: ['openid_connect']
+            autoLinkUser: ['openid_connect']
+            blockAutoCreatedUsers: false
+            syncProfileFromProvider: ['openid_connect']
+            syncProfileAttributes: ['name', 'email']
+            providers:
+              - name: openid_connect
+                label: Keycloak
+                args:
+                  name: openid_connect
+                  scope: ['openid', 'profile', 'email']
+                  response_type: code
+                  issuer: https://${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}
+                  discovery: true
+                  uid_field: preferred_username
+                  client_auth_method: query
+                  send_scope_to_token_endpoint: false
+                  pkce: true
+                  client_options:
+                    identifier:
+                      secret: gitlab-oidc-credentials
+                      key: client_id
+                    secret:
+                      secret: gitlab-oidc-credentials
+                      key: client_secret
+                    redirect_uri: https://${GITLAB_HOST}/users/auth/openid_connect/callback
+
+        # Initial root password
+        initialRootPassword:
+          secret: gitlab-root
+          key: password
+
+      # Disable in-chart PostgreSQL
+      postgresql:
+        install: false
+
+      # Disable in-chart Redis
+      redis:
+        install: false
+
+      # GitLab components
+      gitlab:
+        # Webservice (Rails app)
+        webservice:
+          replicaCount: 2
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          workhorse:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+
+        # Sidekiq (background jobs)
+        sidekiq:
+          replicaCount: 1
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+        # Gitaly (Git repository storage)
+        gitaly:
+          persistence:
+            enabled: true
+            storageClass: ${BLOCK_SC}
+            size: 50Gi
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+        # GitLab Shell (Git SSH access)
+        gitlab-shell:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+        # Toolbox (admin CLI)
+        toolbox:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+      # Container Registry
+      registry:
+        enabled: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+      # Monitoring
+      prometheus:
+        install: false  # Use VictoriaMetrics
+
+      # Shared components
+      shared-secrets:
+        enabled: true
+
+      # Certmanager
+      certmanager:
+        install: false  # Already deployed
+
+      # Nginx Ingress Controller
+      nginx-ingress:
+        enabled: false  # Use Cilium Gateway API
+  ```
+
+### T5: GitLab Runner HelmRelease
+
+- [ ] **T5.1**: Create `gitlab-runner/rbac.yaml`
+  ```yaml
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: gitlab-runner
+    namespace: gitlab-runner
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    name: gitlab-runner
+    namespace: gitlab-runner
+  rules:
+    # Pod management for Kubernetes executor
+    - apiGroups: [""]
+      resources: ["pods", "pods/exec", "pods/log", "pods/attach"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    # ConfigMap management
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    # Secret management (for runner jobs)
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    # Service management
+    - apiGroups: [""]
+      resources: ["services"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  ---
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: gitlab-runner
+    namespace: gitlab-runner
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: gitlab-runner
+  subjects:
+    - kind: ServiceAccount
+      name: gitlab-runner
+      namespace: gitlab-runner
+  ```
+
+- [ ] **T5.2**: Create `gitlab-runner/helmrelease.yaml`
+  ```yaml
+  apiVersion: helm.toolkit.fluxcd.io/v2
+  kind: HelmRelease
+  metadata:
+    name: gitlab-runner
+    namespace: gitlab-runner
+  spec:
+    interval: 1h
+    chart:
+      spec:
+        chart: gitlab-runner
+        version: ">=0.66.0 <1.0.0"  # Latest stable
+        sourceRef:
+          kind: HelmRepository
+          name: gitlab
+          namespace: gitlab-system
+        interval: 12h
+    maxHistory: 3
+    install:
+      createNamespace: false
+      remediation:
+        retries: 3
+    upgrade:
+      cleanupOnFail: true
+      remediation:
+        retries: 3
+        strategy: rollback
+    values:
+      # GitLab URL
+      gitlabUrl: https://${GITLAB_HOST}
+
+      # Runner registration token
+      runnerRegistrationToken:
+        secret: gitlab-runner-registration
+        key: runner-registration-token
+
+      # Service account
+      rbac:
+        create: false
+        serviceAccountName: gitlab-runner
+
+      # Runner configuration
+      runners:
+        # Executor type
+        executor: kubernetes
+
+        # Runner tags
+        tags: "k8s,dind"
+
+        # Run untagged jobs
+        runUntagged: true
+
+        # Kubernetes executor configuration
+        config: |
+          [[runners]]
+            [runners.kubernetes]
+              namespace = "gitlab-runner"
+              image = "ubuntu:22.04"
+              privileged = true  # Enable DIND
+
+              # Service account for runner jobs
+              service_account = "gitlab-runner"
+
+              # Resource limits for runner jobs
+              cpu_limit = "2"
+              cpu_request = "500m"
+              memory_limit = "4Gi"
+              memory_request = "1Gi"
+
+              # Helper image
+              helper_image = "gitlab/gitlab-runner-helper:x86_64-latest"
+
+              # Pull policy
+              pull_policy = ["if-not-present"]
+
+              # Node selector (optional)
+              # node_selector = { "node-role.kubernetes.io/worker" = "true" }
+
+              # Tolerations (optional)
+              # tolerations = []
+
+              # DNS policy
+              dns_policy = "cluster-first"
+
+            [runners.cache]
+              Type = "s3"
+              Shared = true
+              [runners.cache.s3]
+                ServerAddress = "${GITLAB_S3_ENDPOINT}"
+                BucketName = "${GITLAB_S3_BUCKET_CACHE}"
+                BucketLocation = "${GITLAB_S3_REGION}"
+                Insecure = false
+                AuthenticationType = "access-key"
+                AccessKey = "${GITLAB_S3_ACCESS_KEY}"
+                SecretKey = "${GITLAB_S3_SECRET_KEY}"
+
+      # Resources for runner manager
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Metrics
+      metrics:
+        enabled: true
+        port: 9252
+        serviceMonitor:
+          enabled: true
+  ```
+
+### T6: Gateway API HTTPRoutes
+
+- [ ] **T6.1**: Create `infrastructure/networking/cilium/gateway/gitlab-httproutes.yaml`
+  ```yaml
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    name: gitlab-web
+    namespace: gitlab-system
+  spec:
+    parentRefs:
+      - name: cilium-gateway
+        namespace: cilium-gateway
+    hostnames:
+      - ${GITLAB_HOST}
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - name: gitlab-webservice-default
+            port: 8181
+  ---
+  apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    name: gitlab-registry
+    namespace: gitlab-system
+  spec:
+    parentRefs:
+      - name: cilium-gateway
+        namespace: cilium-gateway
+    hostnames:
+      - ${GITLAB_REGISTRY_HOST}
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        backendRefs:
+          - name: gitlab-registry
+            port: 5000
+  ```
+
+- [ ] **T6.2**: Update `infrastructure/networking/cilium/gateway/kustomization.yaml`
+  ```yaml
+  # Add gitlab-httproutes.yaml to resources
+  ```
+
+### T7: NetworkPolicies
+
+- [ ] **T7.1**: Create `gitlab/networkpolicy.yaml`
+  ```yaml
+  apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: gitlab-egress
+    namespace: gitlab-system
+  spec:
+    podSelector:
+      matchLabels:
+        app: gitlab
+    policyTypes:
+      - Egress
+    egress:
+      # Allow DNS
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - protocol: UDP
+            port: 53
+
+      # Allow CNPG pooler (PostgreSQL)
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: cnpg-system
+        ports:
+          - protocol: TCP
+            port: 5432
+
+      # Allow Redis/Dragonfly
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: dragonfly-system
+        ports:
+          - protocol: TCP
+            port: 6379
+
+      # Allow S3 (external, allow all HTTPS)
+      - to:
+          - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 443
+
+      # Allow SMTP (optional)
+      - to:
+          - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 587
+  ```
+
+- [ ] **T7.2**: Create `gitlab-runner/networkpolicy.yaml`
+  ```yaml
+  apiVersion: networking.k8s.io/v1
+  kind: NetworkPolicy
+  metadata:
+    name: gitlab-runner-egress
+    namespace: gitlab-runner
+  spec:
+    podSelector:
+      matchLabels:
+        app: gitlab-runner
+    policyTypes:
+      - Egress
+    egress:
+      # Allow DNS
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: kube-system
+        ports:
+          - protocol: UDP
+            port: 53
+
+      # Allow GitLab API
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: gitlab-system
+        ports:
+          - protocol: TCP
+            port: 8181
+          - protocol: TCP
+            port: 5000
+
+      # Allow registries (Harbor, GitLab, Docker Hub)
+      - to:
+          - namespaceSelector: {}
+        ports:
+          - protocol: TCP
+            port: 443
+
+      # Allow Spegel (Docker registry mirror)
+      - to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: spegel-system
+        ports:
+          - protocol: TCP
+            port: 5000
+  ```
+
+### T8: Monitoring and Alerting
+
+- [ ] **T8.1**: Create `gitlab/monitoring/prometheusrule.yaml`
+  ```yaml
+  apiVersion: monitoring.coreos.com/v1
+  kind: PrometheusRule
+  metadata:
+    name: gitlab
+    namespace: gitlab-system
+    labels:
+      prometheus: vmagent
+  spec:
+    groups:
+      - name: gitlab
+        interval: 30s
+        rules:
+          # GitLab web unavailable
+          - alert: GitLabWebUnavailable
+            expr: |
+              kube_deployment_status_replicas_available{namespace="gitlab-system",deployment="gitlab-webservice-default"} < 1
+            for: 5m
+            labels:
+              severity: critical
+              component: gitlab-web
+            annotations:
+              summary: "GitLab web is unavailable"
+              description: "GitLab webservice has no available replicas for {{ $value }} minutes."
+
+          # Sidekiq queue backlog
+          - alert: GitLabSidekiqQueueBacklog
+            expr: |
+              gitlab_sidekiq_queue_size > 1000
+            for: 15m
+            labels:
+              severity: warning
+              component: gitlab-sidekiq
+            annotations:
+              summary: "GitLab Sidekiq queue backlog"
+              description: "Sidekiq queue {{ $labels.queue }} has {{ $value }} jobs waiting."
+
+          # Database connectivity
+          - alert: GitLabDatabaseConnectivityIssue
+            expr: |
+              increase(gitlab_database_connection_errors_total[5m]) > 10
+            for: 5m
+            labels:
+              severity: critical
+              component: gitlab-db
+            annotations:
+              summary: "GitLab database connectivity issues"
+              description: "{{ $value }} database connection errors in the last 5 minutes."
+
+          # Redis connectivity
+          - alert: GitLabRedisConnectivityIssue
+            expr: |
+              increase(gitlab_redis_connection_errors_total[5m]) > 10
+            for: 5m
+            labels:
+              severity: critical
+              component: gitlab-redis
+            annotations:
+              summary: "GitLab Redis connectivity issues"
+              description: "{{ $value }} Redis connection errors in the last 5 minutes."
+
+          # S3 errors
+          - alert: GitLabS3Errors
+            expr: |
+              increase(gitlab_object_storage_errors_total[10m]) > 50
+            for: 10m
+            labels:
+              severity: warning
+              component: gitlab-s3
+            annotations:
+              summary: "GitLab S3 errors"
+              description: "{{ $value }} S3 errors in the last 10 minutes."
+
+          # Certificate expiry
+          - alert: GitLabCertificateExpiringSoon
+            expr: |
+              (x509_cert_not_after{job="gitlab"} - time()) / 86400 < 30
+            for: 1h
+            labels:
+              severity: warning
+              component: gitlab-cert
+            annotations:
+              summary: "GitLab certificate expiring soon"
+              description: "Certificate {{ $labels.subject }} expires in {{ $value | humanizeDuration }}."
+
+          # High error rate
+          - alert: GitLabHighErrorRate
+            expr: |
+              rate(gitlab_http_requests_total{status=~"5.."}[5m]) > 0.05
+            for: 10m
+            labels:
+              severity: warning
+              component: gitlab-web
+            annotations:
+              summary: "GitLab high error rate"
+              description: "{{ $value | humanizePercentage }} of requests are returning 5xx errors."
+
+          # Low success rate
+          - alert: GitLabLowSuccessRate
+            expr: |
+              rate(gitlab_http_requests_total{status=~"2.."}[5m]) / rate(gitlab_http_requests_total[5m]) < 0.9
+            for: 15m
+            labels:
+              severity: warning
+              component: gitlab-web
+            annotations:
+              summary: "GitLab low success rate"
+              description: "Only {{ $value | humanizePercentage }} of requests are successful."
+  ```
+
+- [ ] **T8.2**: Create `gitlab/monitoring/kustomization.yaml`
+  ```yaml
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  namespace: gitlab-system
+  resources:
+    - prometheusrule.yaml
+  ```
+
+### T9: Flux Kustomizations
+
+- [ ] **T9.1**: Create `gitlab/ks.yaml`
+  ```yaml
+  apiVersion: kustomize.toolkit.fluxcd.io/v1
+  kind: Kustomization
+  metadata:
+    name: gitlab
+    namespace: flux-system
+  spec:
+    interval: 10m
+    path: ./kubernetes/workloads/tenants/gitlab
+    prune: true
+    wait: true
+    timeout: 15m  # GitLab takes time to initialize
+    sourceRef:
+      kind: GitRepository
+      name: flux-system
+    dependsOn:
+      - name: cluster-apps-infrastructure
+      - name: external-secrets
+      - name: cert-manager
+      - name: cilium-gateway
+    healthChecks:
+      - apiVersion: apps/v1
+        kind: Deployment
+        name: gitlab-webservice-default
+        namespace: gitlab-system
+    postBuild:
+      substituteFrom:
+        - kind: ConfigMap
+          name: cluster-settings
+  ```
+
+- [ ] **T9.2**: Create `gitlab-runner/ks.yaml`
+  ```yaml
+  apiVersion: kustomize.toolkit.fluxcd.io/v1
+  kind: Kustomization
+  metadata:
+    name: gitlab-runner
+    namespace: flux-system
+  spec:
+    interval: 10m
+    path: ./kubernetes/workloads/tenants/gitlab-runner
+    prune: true
+    wait: true
+    timeout: 5m
+    sourceRef:
+      kind: GitRepository
+      name: flux-system
+    dependsOn:
+      - name: gitlab
+    healthChecks:
+      - apiVersion: apps/v1
+        kind: Deployment
+        name: gitlab-runner
+        namespace: gitlab-runner
+    postBuild:
+      substituteFrom:
+        - kind: ConfigMap
+          name: cluster-settings
+  ```
+
+### T10: Kustomizations
+
+- [ ] **T10.1**: Create `gitlab/kustomization.yaml`
+  ```yaml
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  namespace: gitlab-system
+  resources:
+    - namespace.yaml
+    - externalsecrets.yaml
+    - helmrelease.yaml
+    - networkpolicy.yaml
+    - monitoring
+  ```
+
+- [ ] **T10.2**: Create `gitlab-runner/kustomization.yaml`
+  ```yaml
+  apiVersion: kustomize.config.k8s.io/v1beta1
+  kind: Kustomization
+  namespace: gitlab-runner
+  resources:
+    - namespace.yaml
+    - externalsecrets.yaml
+    - rbac.yaml
+    - helmrelease.yaml
+    - networkpolicy.yaml
+  ```
+
+### T11: Example DIND Pipeline
+
+- [ ] **T11.1**: Create `gitlab/examples/dind-pipeline.yml`
+  ```yaml
+  # Example .gitlab-ci.yml for Docker-in-Docker pipeline
+  # This demonstrates how to build and push Docker images using DIND
+
+  stages:
+    - build
+    - push
+
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_DRIVER: overlay2
+
+  # Build stage
+  build-image:
+    stage: build
+    image: docker:27
+    services:
+      - docker:27-dind
+    tags:
+      - k8s
+      - dind
+    before_script:
+      - docker info
+      - docker version
+    script:
+      # Build image
+      - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+      - docker build -t $CI_REGISTRY_IMAGE:latest .
+
+      # Save image (optional, for artifacts)
+      - docker save $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -o image.tar
+    artifacts:
+      paths:
+        - image.tar
+      expire_in: 1 day
+
+  # Push stage
+  push-image:
+    stage: push
+    image: docker:27
+    services:
+      - docker:27-dind
+    tags:
+      - k8s
+      - dind
+    before_script:
+      - docker info
+      - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    script:
+      # Load image from artifacts (if using)
+      - docker load -i image.tar
+
+      # Or re-build (if not using artifacts)
+      # - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA .
+      # - docker build -t $CI_REGISTRY_IMAGE:latest .
+
+      # Push to registry
+      - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+      - docker push $CI_REGISTRY_IMAGE:latest
+    dependencies:
+      - build-image
+
+  # Security best practices:
+  # - Use CI variables for sensitive data (Settings > CI/CD > Variables)
+  # - Mark sensitive variables as "Masked" and "Protected"
+  # - Never echo secrets in script sections
+  # - Use minimal images (alpine-based where possible)
+  # - Scan images for vulnerabilities (use Trivy, Snyk, etc.)
+  ```
+
+### T12: Comprehensive README
+
+- [ ] **T12.1**: Create `gitlab/README.md`
+  ```markdown
+  # GitLab Self-Managed with External State
+
+  ## Overview
+
+  Self-managed GitLab with external dependencies on the **apps cluster**:
+
+  - **Database**: PostgreSQL via CNPG pooler (`gitlab-pooler-rw.cnpg-system`)
+  - **Cache**: Redis-compatible Dragonfly (`dragonfly.dragonfly-system`)
+  - **Object Storage**: S3-compatible (MinIO, Rook RGW, AWS S3)
+  - **SSO**: Keycloak OIDC (just-in-time provisioning, auto-linking)
+  - **Ingress**: Gateway API with Cilium (HTTPS via cert-manager)
+  - **CI/CD**: GitLab Runner with privileged DIND support
+
+  ## Architecture
+
+  ```
+  ┌─────────────────────────────────────────────────────────────┐
+  │                     Apps Cluster                            │
+  │                                                             │
+  │  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐ │
+  │  │   Gateway    │────▶│    GitLab    │────▶│  CNPG Pooler │ │
+  │  │   (Cilium)   │     │  (gitlab-    │     │  (Postgres)  │ │
+  │  │              │     │   system)    │     │              │ │
+  │  └──────────────┘     └──────────────┘     └──────────────┘ │
+  │                              │                              │
+  │                              │                              │
+  │                       ┌──────▼────────┐                     │
+  │                       │   Dragonfly   │                     │
+  │                       │    (Redis)    │                     │
+  │                       └───────────────┘                     │
+  │                                                             │
+  │  ┌──────────────┐                        ┌──────────────┐   │
+  │  │ GitLab Runner│────▶ DIND Jobs ───────▶│   Harbor/    │   │
+  │  │ (gitlab-     │     (privileged)       │   Registry   │   │
+  │  │  runner)     │                        │              │   │
+  │  └──────────────┘                        └──────────────┘   │
+  └─────────────────────────────────────────────────────────────┘
+                              │
+                              │
+                    ┌─────────▼─────────┐
+                    │  S3 Object Store  │
+                    │ (artifacts, LFS,  │
+                    │  uploads, etc.)   │
+                    └───────────────────┘
+  ```
+
+  ## Components
+
+  ```
+  gitlab/
+  ├── namespace.yaml              # gitlab-system namespace
+  ├── externalsecrets.yaml        # DB, Redis, S3, root, OIDC secrets
+  ├── helmrelease.yaml            # GitLab chart with external state
+  ├── networkpolicy.yaml          # Egress to DB/Redis/S3/SMTP
+  ├── monitoring/                 # PrometheusRule (8 alerts)
+  └── examples/                   # Sample DIND pipeline
+
+  gitlab-runner/
+  ├── namespace.yaml              # gitlab-runner namespace (PSA privileged)
+  ├── externalsecrets.yaml        # Runner registration token
+  ├── rbac.yaml                   # ServiceAccount, Role, RoleBinding
+  ├── helmrelease.yaml            # GitLab Runner chart (Kubernetes executor)
+  └── networkpolicy.yaml          # Egress to GitLab/registries
+  ```
+
+  ## External Dependencies
+
+  ### 1. PostgreSQL (CNPG Pooler)
+
+  **Service**: `gitlab-pooler-rw.cnpg-system.svc.cluster.local:5432`
+  **Database**: `gitlab`
+  **User**: `gitlab_app`
+  **Required Extensions**: None (Rails handles schema)
+
+  **Secret Path**: `${GITLAB_DB_SECRET_PATH}` (1Password)
+  **Secret Keys**: `host`, `port`, `database`, `username`, `password`, `sslmode`
+
+  **Testing**:
+  ```bash
+  kubectl -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash -lc "psql 'host=gitlab-pooler-rw.cnpg-system.svc.cluster.local dbname=gitlab user=gitlab_app sslmode=require' -c 'select 1'"
+  ```
+
+  ### 2. Redis (Dragonfly)
+
+  **Service**: `dragonfly.dragonfly-system.svc.cluster.local:6379`
+  **Password**: Optional (set in secret if required)
+
+  **Secret Path**: `${GITLAB_REDIS_SECRET_PATH}` (1Password)
+  **Secret Keys**: `host`, `port`, `password`
+
+  **Testing**:
+  ```bash
+  kubectl -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash -lc "redis-cli -h dragonfly.dragonfly-system.svc.cluster.local -p 6379 ping"
+  ```
+
+  ### 3. S3 Object Storage
+
+  **Buckets Required**:
+  - `${GITLAB_S3_BUCKET_ARTIFACTS}` (CI/CD artifacts)
+  - `${GITLAB_S3_BUCKET_LFS}` (Git LFS objects)
+  - `${GITLAB_S3_BUCKET_UPLOADS}` (User uploads)
+  - `${GITLAB_S3_BUCKET_PACKAGES}` (Package registry)
+  - `${GITLAB_S3_BUCKET_REGISTRY}` (Container registry)
+  - `${GITLAB_S3_BUCKET_CACHE}` (Runner cache, optional)
+
+  **Secret Path**: `${GITLAB_S3_SECRET_PATH}` (1Password)
+  **Secret Keys**: `endpoint`, `region`, `bucket`, `access_key`, `secret_key`
+
+  **Testing**:
+  ```bash
+  aws --endpoint-url https://${GITLAB_S3_ENDPOINT} s3 ls s3://${GITLAB_S3_BUCKET_ARTIFACTS}
+  ```
+
+  ## Keycloak OIDC Integration
+
+  ### Keycloak Client Setup
+
+  1. **Create Client** in Keycloak realm:
      - Client ID: `gitlab` (or `${GITLAB_OIDC_CLIENT_ID}`)
-     - Access type: Confidential; Standard Flow enabled.
+     - Access Type: **Confidential**
+     - Standard Flow: **Enabled**
      - Valid Redirect URIs: `https://${GITLAB_HOST}/users/auth/openid_connect/callback`
-     - Web Origins: `https://${GITLAB_HOST}` (add registry host if using OAuth in registry UI).
-     - Realm Settings → Tokens: set Default Signature Algorithm to RS256 (or RS512).
-   - Create or note the client secret; store it in secrets manager.
+     - Web Origins: `https://${GITLAB_HOST}`
 
-2) ExternalSecrets (apps cluster)
-   - File: `kubernetes/workloads/apps/gitlab/externalsecrets.yaml`
-     - Add an item for the OIDC client credentials → K8s Secret `gitlab-oidc-credentials` with keys `client_id`, `client_secret` (sourced from your secret store path, e.g., `${GITLAB_OIDC_SECRET_PATH}`).
-   - If Keycloak uses a private CA, create `Secret` or `ConfigMap` containing the CA and reference it via `global.certificates.customCAs`.
+  2. **Configure Token Signature**:
+     - Realm Settings → Tokens → Default Signature Algorithm: **RS256**
 
-3) GitLab Helm values (apps cluster)
-   - File: `kubernetes/workloads/apps/gitlab/helmrelease.yaml`
-     - Under `global.appConfig.omniauth` set:
-       - `enabled: true`
-       - `allowSingleSignOn: ['openid_connect']` (or `false` if you want to disable JIT)
-       - `autoLinkUser: ['openid_connect']` (optional; auto‑links existing users with matching emails)
-       - `blockAutoCreatedUsers: false` (or `true` to require admin approval)
-       - `syncProfileFromProvider: ['openid_connect']`
-       - `syncProfileAttributes: ['name','email']`
-     - Add provider entry:
-       - name: `openid_connect`, label: `Keycloak`, args:
-         - `scope: ['openid','profile','email']`
-         - `issuer: https://<keycloak-host>/realms/<realm>`
-         - `response_type: 'code'`, `discovery: true`, `uid_field: 'preferred_username'`
-         - `client_options.identifier`: from Secret `gitlab-oidc-credentials:client_id`
-         - `client_options.secret`: from Secret `gitlab-oidc-credentials:client_secret`
-         - `client_options.redirect_uri`: `https://${GITLAB_HOST}/users/auth/openid_connect/callback`
+  3. **Generate Client Secret**:
+     - Credentials tab → Copy client secret
+     - Store in 1Password at `${GITLAB_OIDC_SECRET_PATH}` with keys: `client_id`, `client_secret`
 
-4) Optional: Auto‑sign‑in
-   - If you want to always redirect to Keycloak, set `autoSignInWithProvider: 'openid_connect'` (ensure at least one admin can still sign in if the IdP is unavailable).
+  ### GitLab OIDC Configuration
 
-Validation Steps (SSO)
-- Admin → Settings → General → Sign‑in: verify provider enabled in UI.
-- Browse to `https://${GITLAB_HOST}/users/sign_in` and click “Keycloak”; confirm login completes.
-- Create a fresh user in Keycloak; verify JIT creates a GitLab account when allowed.
-- Disable JIT and confirm sign‑in is blocked for unknown users, if required.
-- Check profile name/email synced on sign‑in when `syncProfileFromProvider` is set.
-- Inspect GitLab webservice pod logs on error; verify TLS trust chain if using custom CA (`global.certificates.customCAs`).
+  Already configured in `helmrelease.yaml`:
+  - Provider: `openid_connect`
+  - Issuer: `https://${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}`
+  - Scopes: `openid`, `profile`, `email`
+  - JIT Provisioning: Enabled (`allowSingleSignOn`)
+  - Auto-Linking: Enabled (`autoLinkUser`)
+  - Profile Sync: Enabled (`syncProfileFromProvider`)
 
-Notes
-- Use OIDC (not OAuth2 Generic) for Keycloak; it provides discovery and better defaults.
-- Ensure the GitLab chart uses the `global.appConfig.omniauth.providers` structure; do not edit Omnibus `gitlab.rb` directly on Kubernetes.
+  ### Testing SSO
 
-## Design Notes
+  1. Navigate to `https://${GITLAB_HOST}/users/sign_in`
+  2. Click "Sign in with Keycloak"
+  3. Authenticate with Keycloak credentials
+  4. Verify user is created/logged in to GitLab
 
-- Deployment method: official GitLab Helm chart for GitLab; official `gitlab-runner` Helm chart for runners.
-- External state: use CNPG (external PostgreSQL), Redis/Dragonfly, and external S3 object storage per GitLab production guidance (disable in-chart Postgres/Redis, MinIO).
-- Runners: Kubernetes executor with privileged pods to enable DIND when needed; projects can choose safer alternatives (BuildKit, Kaniko) later.
+  ### Troubleshooting OIDC
 
-### Sample DIND job snippet (for docs only)
-```yaml
-image: docker:27
-services: ["docker:27-dind"]
-variables:
-  DOCKER_HOST: tcp://docker:2375
-  DOCKER_TLS_CERTDIR: ""        # disable TLS for simplicity in test
-  DOCKER_DRIVER: overlay2
-  # Optional: REGISTRY auth vars via CI variables
-build-and-push:
-  stage: build
-  tags: [k8s]
-  script:
-    - docker version
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-    - docker build -t "$CI_REGISTRY_IMAGE:ci-$CI_COMMIT_SHORT_SHA" .
-    - docker push "$CI_REGISTRY_IMAGE:ci-$CI_COMMIT_SHORT_SHA"
+  **Error: "Could not authenticate you from Keycloak"**
+  - Check client secret is correct in `gitlab-oidc-credentials`
+  - Verify redirect URI matches exactly: `https://${GITLAB_HOST}/users/auth/openid_connect/callback`
+  - Check Keycloak realm signature algorithm (RS256 required)
+
+  **Error: "TLS verification failed"**
+  - If Keycloak uses private CA, mount CA certificate:
+    ```yaml
+    global:
+      certificates:
+        customCAs:
+          - secret: keycloak-ca
+    ```
+
+  ## GitLab Runner DIND Usage
+
+  ### Pipeline Configuration
+
+  See `examples/dind-pipeline.yml` for a complete example.
+
+  **Key Points**:
+  - Image: `docker:27`
+  - Service: `docker:27-dind`
+  - Tags: `k8s`, `dind` (match runner tags)
+  - Variables:
+    - `DOCKER_HOST: tcp://docker:2375`
+    - `DOCKER_TLS_CERTDIR: ""` (disable TLS for simplicity)
+    - `DOCKER_DRIVER: overlay2`
+
+  ### Security Considerations
+
+  **Privileged Containers**:
+  - Runner jobs run in `gitlab-runner` namespace with PSA `privileged` enforcement
+  - Isolated from other workloads
+  - Use tags to restrict DIND jobs: `tags: [k8s, dind]`
+
+  **Alternatives to DIND**:
+  - **Kaniko**: Build images without privileged containers
+  - **BuildKit**: Rootless builds with better security
+  - **img**: Unprivileged container builds
+
+  **Best Practices**:
+  - Use CI variables for secrets (masked + protected)
+  - Never echo credentials in scripts
+  - Scan images for vulnerabilities (Trivy, Snyk)
+  - Use minimal base images (Alpine-based)
+  - Set resource limits on runner jobs
+
+  ## Troubleshooting
+
+  ### Check GitLab Status
+
+  ```bash
+  # Check all pods
+  kubectl -n gitlab-system get pods
+
+  # Check webservice
+  kubectl -n gitlab-system logs -l app=webservice
+
+  # Check Sidekiq
+  kubectl -n gitlab-system logs -l app=sidekiq
+
+  # Check migrations
+  kubectl -n gitlab-system logs -l app=migrations
+  ```
+
+  ### Database Connectivity
+
+  ```bash
+  # Exec into toolbox
+  kubectl -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash
+
+  # Test DB connection
+  gitlab-rake db:doctor
+
+  # Check migrations
+  gitlab-rake db:migrate:status
+  ```
+
+  ### Redis Connectivity
+
+  ```bash
+  # From toolbox
+  redis-cli -h dragonfly.dragonfly-system.svc.cluster.local -p 6379 ping
+
+  # Check Sidekiq processing
+  gitlab-rake sidekiq:queues:clear
+  ```
+
+  ### S3 Object Storage
+
+  ```bash
+  # List artifacts bucket
+  aws --endpoint-url https://${GITLAB_S3_ENDPOINT} s3 ls s3://${GITLAB_S3_BUCKET_ARTIFACTS}
+
+  # Check SSE encryption
+  aws --endpoint-url https://${GITLAB_S3_ENDPOINT} s3api head-object --bucket ${GITLAB_S3_BUCKET_ARTIFACTS} --key <object-key> | jq -r .ServerSideEncryption
+  ```
+
+  ### HTTPS Endpoints
+
+  ```bash
+  # Test GitLab web
+  curl -Ik https://${GITLAB_HOST}
+
+  # Test registry
+  curl -Ik https://${GITLAB_REGISTRY_HOST}/v2/
+
+  # Check certificate
+  echo | openssl s_client -connect ${GITLAB_HOST}:443 -servername ${GITLAB_HOST} 2>/dev/null | openssl x509 -noout -text
+  ```
+
+  ### Runner Registration
+
+  ```bash
+  # Check runner pod
+  kubectl -n gitlab-runner get pods
+
+  # Check runner logs
+  kubectl -n gitlab-runner logs -l app=gitlab-runner
+
+  # Verify runner in GitLab UI
+  # Admin → CI/CD → Runners
+  ```
+
+  ## Monitoring
+
+  ### Metrics
+
+  ```bash
+  # Check ServiceMonitors
+  kubectl -n gitlab-system get servicemonitor
+  kubectl -n gitlab-runner get servicemonitor
+
+  # Query VictoriaMetrics
+  # up{job~"gitlab.*|gitlab-runner"}
+  ```
+
+  ### Alerts
+
+  8 PrometheusRule alerts configured:
+  - GitLab web unavailable (critical)
+  - Sidekiq queue backlog (warning)
+  - Database connectivity issues (critical)
+  - Redis connectivity issues (critical)
+  - S3 errors (warning)
+  - Certificate expiring soon (warning)
+  - High error rate (warning)
+  - Low success rate (warning)
+
+  ## References
+
+  - [GitLab Helm Chart Docs](https://docs.gitlab.com/charts/)
+  - [External PostgreSQL](https://docs.gitlab.com/charts/advanced/external-db/)
+  - [External Redis](https://docs.gitlab.com/charts/advanced/external-redis/)
+  - [External Object Storage](https://docs.gitlab.com/charts/advanced/external-object-storage/)
+  - [OmniAuth OIDC](https://docs.gitlab.com/ee/administration/auth/oidc.html)
+  - [GitLab Runner](https://docs.gitlab.com/runner/)
+  - [Kubernetes Executor](https://docs.gitlab.com/runner/executors/kubernetes.html)
+  ```
+
+### T13: Cluster Settings Update
+
+- [ ] **T13.1**: Update `kubernetes/clusters/apps/cluster-settings.yaml`
+  ```yaml
+  # GitLab configuration
+  GITLAB_HOST: "gitlab.apps.example.com"
+  GITLAB_REGISTRY_HOST: "registry.gitlab.apps.example.com"
+
+  # Secret paths (1Password)
+  GITLAB_DB_SECRET_PATH: "kubernetes/apps/gitlab/database"
+  GITLAB_REDIS_SECRET_PATH: "kubernetes/apps/gitlab/redis"
+  GITLAB_S3_SECRET_PATH: "kubernetes/apps/gitlab/s3"
+  GITLAB_ROOT_SECRET_PATH: "kubernetes/apps/gitlab/root"
+  GITLAB_OIDC_SECRET_PATH: "kubernetes/apps/gitlab/oidc"
+  GITLAB_RUNNER_REG_TOKEN: "kubernetes/apps/gitlab/runner-token"
+
+  # S3 buckets
+  GITLAB_S3_ENDPOINT: "s3.apps.example.com"
+  GITLAB_S3_REGION: "us-east-1"
+  GITLAB_S3_BUCKET_ARTIFACTS: "gitlab-artifacts"
+  GITLAB_S3_BUCKET_LFS: "gitlab-lfs"
+  GITLAB_S3_BUCKET_UPLOADS: "gitlab-uploads"
+  GITLAB_S3_BUCKET_PACKAGES: "gitlab-packages"
+  GITLAB_S3_BUCKET_REGISTRY: "gitlab-registry"
+  GITLAB_S3_BUCKET_CACHE: "gitlab-cache"
+
+  # Keycloak OIDC
+  KEYCLOAK_HOST: "keycloak.apps.example.com"
+  KEYCLOAK_REALM: "master"
+  GITLAB_OIDC_CLIENT_ID: "gitlab"
+  ```
+
+### T14: Validation and Git Commit
+
+- [ ] **T14.1**: Validate all manifests with kustomize
+  ```bash
+  # Validate GitLab kustomization
+  kustomize build kubernetes/workloads/tenants/gitlab
+
+  # Validate GitLab Runner kustomization
+  kustomize build kubernetes/workloads/tenants/gitlab-runner
+
+  # Validate Gateway HTTPRoutes
+  kustomize build kubernetes/infrastructure/networking/cilium/gateway
+  ```
+
+- [ ] **T14.2**: Validate Flux Kustomizations
+  ```bash
+  # Validate GitLab Flux Kustomization
+  flux build kustomization gitlab \
+    --path ./kubernetes/workloads/tenants/gitlab \
+    --kustomization-file ./kubernetes/workloads/tenants/gitlab/ks.yaml
+
+  # Validate GitLab Runner Flux Kustomization
+  flux build kustomization gitlab-runner \
+    --path ./kubernetes/workloads/tenants/gitlab-runner \
+    --kustomization-file ./kubernetes/workloads/tenants/gitlab-runner/ks.yaml
+  ```
+
+- [ ] **T14.3**: Commit manifests to git
+  ```bash
+  git add kubernetes/workloads/tenants/gitlab/
+  git add kubernetes/workloads/tenants/gitlab-runner/
+  git add kubernetes/infrastructure/networking/cilium/gateway/gitlab-httproutes.yaml
+  git commit -m "feat(gitlab): add GitLab manifests with external state and Keycloak OIDC
+
+  - Create GitLab HelmRelease with external PostgreSQL/Redis/S3
+  - Configure Keycloak OIDC integration (JIT, auto-linking, profile sync)
+  - Create GitLab Runner with privileged DIND support
+  - Set up Gateway API HTTPRoutes for HTTPS (web + registry)
+  - Add External Secrets for all dependencies
+  - Create NetworkPolicies for security isolation
+  - Add PrometheusRule with 8 alerts
+  - Document architecture, OIDC setup, and troubleshooting
+
+  External dependencies:
+  - PostgreSQL: CNPG pooler (gitlab-pooler-rw.cnpg-system)
+  - Redis: Dragonfly (dragonfly.dragonfly-system)
+  - S3: Object storage for artifacts/LFS/uploads/packages/registry
+  - SSO: Keycloak OIDC (openid_connect provider)
+
+  Security:
+  - GitLab Runner in dedicated namespace with PSA privileged
+  - Minimal RBAC for runner jobs
+  - NetworkPolicies for egress restrictions
+
+  Story: STORY-CICD-GITLAB-APPS (33/50)
+  Related: STORY-DB-CNPG-APPS, STORY-DB-DRAGONFLY, STORY-NET-CILIUM-GATEWAY"
+  ```
+
+---
+
+## 🧪 Runtime Validation (Deferred to Story 45)
+
+**IMPORTANT**: The following validation steps are **NOT performed in this story**. They are documented here for reference and will be executed in Story 45 after deployment.
+
+### Deployment Validation (Story 45)
+
+```bash
+# 1. Bootstrap infrastructure
+task bootstrap:apps
+
+# 2. Verify Flux reconciliation
+flux --context=apps get kustomizations -A
+flux --context=apps get helmreleases -n gitlab-system
+
+# 3. Check GitLab pods
+kubectl --context=apps -n gitlab-system get pods
+
+# 4. Test HTTPS endpoints
+curl -Ik https://${GITLAB_HOST}
+curl -Ik https://${GITLAB_REGISTRY_HOST}/v2/
+
+# 5. Test database connectivity (from toolbox)
+kubectl --context=apps -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash -lc "psql 'host=gitlab-pooler-rw.cnpg-system.svc.cluster.local dbname=gitlab user=gitlab_app sslmode=require' -c 'select 1'"
+
+# 6. Test Redis connectivity
+kubectl --context=apps -n gitlab-system exec -ti deploy/gitlab-toolbox -- bash -lc "redis-cli -h dragonfly.dragonfly-system.svc.cluster.local -p 6379 ping"
+
+# 7. Test S3 connectivity
+aws --endpoint-url https://${GITLAB_S3_ENDPOINT} s3 ls s3://${GITLAB_S3_BUCKET_ARTIFACTS}
+
+# 8. Test Keycloak OIDC
+# Navigate to: https://${GITLAB_HOST}/users/sign_in
+# Click "Sign in with Keycloak"
+# Authenticate with Keycloak credentials
+# Verify user login
+
+# 9. Check runner registration
+kubectl --context=apps -n gitlab-runner get pods
+# Verify in GitLab: Admin → CI/CD → Runners (should show online)
+
+# 10. Test DIND pipeline
+# Create project, add .gitlab-ci.yml from examples/dind-pipeline.yml
+# Push commit, trigger pipeline
+# Verify image built and pushed to registry
+
+# 11. Check metrics
+kubectl --context=apps -n gitlab-system port-forward svc/gitlab-webservice-default 8181:8181
+curl http://localhost:8181/-/metrics
 ```
 
-### Helm values pointers
-- Runner Helm values: `gitlabUrl`, `runnerRegistrationToken`, `rbac`, `runners.config` (privileged).
-- GitLab Helm values: `global.psql.*`, `redis.install=false` + `global.redis.*`, `global.minio.enabled=false` + object storage sections.
+---
 
-## QA Results — Risk Profile (2025-10-21)
+## ✅ Definition of Done
 
-Reviewer: Quinn (Test Architect & Quality Advisor)
+### Manifest Creation (This Story)
+- [ ] All manifests created per AC1-AC14
+- [ ] Kustomize validation passes (`kustomize build`)
+- [ ] Flux validation passes (`flux build kustomization`)
+- [ ] README.md comprehensive and accurate
+- [ ] Example DIND pipeline created
+- [ ] Git commit pushed to repository
+- [ ] No deployment or cluster access performed
 
-Summary
-- Total Risks Identified: 13
-- Critical: 3 | High: 5 | Medium: 4 | Low: 1
-- Overall Story Risk Score: 54/100
+### Deployment and Validation (Story 45)
+- [ ] GitLab web and registry HTTPS endpoints accessible
+- [ ] Database connectivity verified (CNPG pooler)
+- [ ] Redis connectivity verified (Dragonfly)
+- [ ] S3 object storage functional (upload/download artifacts)
+- [ ] Keycloak OIDC SSO login works (JIT provisioning, auto-linking)
+- [ ] GitLab Runner registered and online
+- [ ] DIND pipeline builds and pushes image successfully
+- [ ] Metrics scraped by VictoriaMetrics
+- [ ] All 8 alerts active
 
-Critical Risks (Must Address Within This Story)
-- SEC-001 — Privileged DIND runner elevates cluster risk (Score 9).
-  - Mitigation: Restrict runner to dedicated namespace with PSA labels; use least‑privilege SA/RBAC; set nodeSelector/tolerations to isolated nodes if available; document and prefer non‑privileged alternatives (BuildKit/Kaniko) for most projects; enable privileged only for repos that require it (tags/policies).
-- DATA-002 — Object storage misconfiguration causes artifact/LFS/package data loss (Score 9).
-  - Mitigation: Validate S3 creds/endpoint/bucket with CLI; enforce SSE (AES256/KMS) if policy requires; verify upload/download in Validation Steps; add retention policy notes.
-- OPS-003 — GitLab not reachable due to missing/miswired HTTPRoute/TLS (Score 9).
-  - Mitigation: Create gitlab-httproutes.yaml attached to existing Gateway; confirm cert issuance and 200/302 via curl; ensure correct Services and ports.
+---
 
-Risk Matrix
-| ID | Category | Description | Prob | Impact | Score | Priority | Mitigation / Owner |
-|---|---|---|---|---|---:|---|---|
-| SEC-001 | Security | Privileged DIND runner increases attack surface | High(3) | High(3) | 9 | Critical | Isolate namespace, least‑privilege RBAC, restricted nodes; plan non‑privileged path. Owner: Platform |
-| DATA-002 | Data | S3 config errors lead to artifact/LFS loss | High(3) | High(3) | 9 | Critical | CLI validation, SSE, retention checks; proof via upload/download. Owner: Dev |
-| OPS-003 | Operational | HTTPRoute/cert misconfig blocks access | High(3) | High(3) | 9 | Critical | Add/verify HTTPRoute + issuer; curl check. Owner: Dev |
-| TECH-004 | Technical | CNPG pooler DNS/secret mismatch breaks Rails/Sidekiq | Medium(2) | High(3) | 6 | High | Confirm service name/secret keys; toolbox psql check. Owner: Dev |
-| TECH-005 | Technical | Redis config wrong; Sidekiq queues fail | Medium(2) | High(3) | 6 | High | Validate env/secret; sidekiq logs/health. Owner: Dev |
-| OPS-006 | Operational | Runner registration token miswired; runner offline | Medium(2) | High(3) | 6 | High | Verify ExternalSecret; check Admin→Runners online. Owner: Dev |
-| SEC-007 | Security | Secrets leakage in CI logs or values | Low(1) | High(3) | 3 | Low | Keep secrets in ExternalSecrets; mask CI vars; avoid echoing creds. Owner: Dev |
-| PERF-008 | Performance | Under‑sized web/sidekiq → poor UX | Medium(2) | Medium(2) | 4 | Medium | Start with sane requests/limits; review after smoke. Owner: Platform |
-| OPS-009 | Operational | ServiceMonitor selectors don’t match; no metrics | Medium(2) | Medium(2) | 4 | Medium | Confirm labels; check up{job~"gitlab.*|gitlab-runner"}. Owner: Dev |
-| TECH-010 | Technical | Registry exposure misaligned when Harbor authoritative | Medium(2) | Medium(2) | 4 | Medium | Disable built‑in registry or route correctly; test push/pull. Owner: Dev |
-| DATA-011 | Data | DB migrations fail/partial → inconsistent state | Low(1) | High(3) | 3 | Low | Review migration logs; re‑run prepare; rollback plan. Owner: Dev |
-| OPS-012 | Operational | PSA not permitting privileged runner pods | Medium(2) | Medium(2) | 4 | Medium | Add PSA labels or move to allowed namespace; document. Owner: Platform |
-| TECH-013 | Technical | Chart/values drift from cluster‑settings | Low(1) | Medium(2) | 2 | Low | Template from cluster settings; review at reconcile. Owner: Platform |
+## 📐 Design Notes
 
-Risk‑Based Testing Focus
-- P1 (Critical):
-  - DIND runner isolation: verify namespace PSA, RBAC scope, and that privileged jobs only run where intended (tags/policies).
-  - S3 survivability: upload artifact; list via CLI; download; confirm SSE/bucket policy where applicable.
-  - HTTPRoute/TLS: verify curl -Ik to ${GITLAB_HOST} (and registry if enabled); confirm cert issuer.
-- P2 (High/Medium):
-  - CNPG pooler: toolbox psql ‘select 1’; migrations complete.
-  - Redis: sidekiq queue activity/logs.
-  - Monitoring: presence of gitlab and runner metrics; alerts baseline loaded.
+### External State Architecture
 
-Gate Decision
-- Decision: CONCERNS — Proceed when SEC‑001, DATA‑002, and OPS‑003 mitigations are implemented and evidenced in Dev Notes (isolation+privileged policy, S3 upload/download with details, HTTPRoute/TLS curl output).
+**Why External PostgreSQL/Redis/S3?**
 
-## QA Results — Test Design (2025-10-21)
+GitLab Helm chart includes PostgreSQL, Redis, and MinIO by default, but production deployments should use external services:
 
-Designer: Quinn (Test Architect)
+**Benefits**:
+- **Separation of concerns**: Stateful services managed separately
+- **Reliability**: CNPG provides HA PostgreSQL with automated failover
+- **Performance**: Dedicated resources for database/cache/storage
+- **Scalability**: Independent scaling of GitLab components vs storage
+- **Backup/DR**: Centralized backup strategy for all databases
 
-Test Strategy Overview
-- Focus on integration/E2E validation mapped to AC1–AC7, with P0 emphasis on reachability/TLS, object storage survivability, and secure runner operation.
+**Trade-offs**:
+- More complex configuration (connection strings, secrets)
+- Additional dependencies (CNPG, Dragonfly, S3 service must be running first)
+- Cross-namespace communication (requires NetworkPolicies)
 
-Test Scenarios by Acceptance Criteria
+### Keycloak OIDC Integration
 
-AC1 — HTTPS reachability and bootstrap
-- ID: GITLAB-APPS-INT-001 | Level: Integration | Priority: P0 | Mitigates: OPS-003
-  - Given HTTPRoutes are defined and cert-manager issuers are available
-  - When `curl -Ik https://${GITLAB_HOST}` is executed from outside the cluster
-  - Then response is 200/302 and the certificate issuer matches the expected issuer
+**Why OIDC instead of SAML?**
 
-AC2 — External DB connectivity (CNPG pooler)
-- ID: GITLAB-APPS-INT-002 | Level: Integration | Priority: P1 | Mitigates: TECH-004, DATA-011
-  - Given the toolbox pod is running
-  - When executing `psql 'host=<pooler-rw> dbname=gitlab user=gitlab_app sslmode=require' -c 'select 1'`
-  - Then command exits 0 and migrations complete without errors in logs
+GitLab supports both OIDC and SAML for SSO, but OIDC is preferred:
 
-AC3 — External Redis
-- ID: GITLAB-APPS-INT-003 | Level: Integration | Priority: P1 | Mitigates: TECH-005
-  - Given Sidekiq is deployed
-  - When observing Sidekiq logs/metrics
-  - Then Redis connection established and queues process jobs
+**Advantages**:
+- **Discovery**: OIDC supports auto-discovery via `.well-known/openid-configuration`
+- **Modern**: JWT-based tokens, simpler than SAML XML
+- **Standardized**: Better tooling and library support
+- **Fine-grained scopes**: `openid`, `profile`, `email`
 
-AC4 — Object storage survivability
-- ID: GITLAB-APPS-E2E-004 | Level: E2E | Priority: P0 | Mitigates: DATA-002
-  - Given S3 credentials and bucket are configured
-  - When uploading an artifact (or LFS/package) and listing via S3 CLI
-  - Then the object is present and downloadable; verify SSE/bucket policy if required
+**OmniAuth Provider Configuration**:
+- `allowSingleSignOn`: Enable JIT user provisioning (create GitLab account on first login)
+- `autoLinkUser`: Auto-link existing GitLab users with matching email
+- `blockAutoCreatedUsers`: Set `false` to allow immediate access, `true` to require admin approval
+- `syncProfileFromProvider`: Sync name/email from Keycloak on each login
 
-AC5 — Runner registration and scheduling
-- ID: GITLAB-APPS-INT-005 | Level: Integration | Priority: P1 | Mitigates: OPS-006
-  - Given ExternalSecret rendered the registration token
-  - When the runner comes up
-  - Then it shows Online in Admin→Runners and schedules a trivial job
+**Security Considerations**:
+- Always use HTTPS for Keycloak (TLS certificate must be trusted by GitLab)
+- Use confidential client (not public client)
+- Validate redirect URIs strictly
+- Use RS256/RS512 token signing (not HS256)
 
-AC6 — DIND pipeline proof (privileged)
-- ID: GITLAB-APPS-E2E-006 | Level: E2E | Priority: P0 | Mitigates: SEC-001
-  - Given a project with the sample DIND job and runner with `privileged=true`
-  - When the pipeline runs
-  - Then the image is built and pushed to the configured registry; verify tag exists
+### GitLab Runner Privileged DIND
 
-AC7 — Monitoring
-- ID: GITLAB-APPS-INT-007 | Level: Integration | Priority: P2 | Mitigates: OPS-009
-  - Given ServiceMonitors are enabled
-  - When scraping Prometheus/VictoriaMetrics
-  - Then `up{job~"gitlab.*|gitlab-runner"}` time series exist and > 0
+**Why Privileged Containers?**
 
-Negative / Edge Cases
-- ID: GITLAB-APPS-NEG-001 | Level: Integration | Priority: P1 | Case: Wrong S3 creds/endpoint
-  - Expect upload to fail with explicit error; fix by correcting ExternalSecret values
-- ID: GITLAB-APPS-NEG-002 | Level: E2E | Priority: P1 | Case: Runner not privileged for DIND
-  - Expect pipeline to fail at docker build/push due to permissions; document non‑privileged alternatives
-- ID: GITLAB-APPS-NEG-003 | Level: Integration | Priority: P1 | Case: HTTPRoute missing/misbound
-  - Expect curl to fail (404/503) or cert missing; fix route/issuer attachment
+Docker-in-Docker requires privileged containers to access the host's Docker daemon socket. This elevates security risk.
 
-Recommended Execution Order
-1) P0: INT-001 (HTTPS), E2E-004 (S3), E2E-006 (DIND)
-2) P1: INT-002 (DB), INT-003 (Redis), INT-005 (Runner)
-3) P2: INT-007 (Monitoring) and Negative cases
+**Risk Mitigation**:
+1. **Namespace Isolation**: Runner in dedicated `gitlab-runner` namespace with PSA `privileged`
+2. **RBAC Minimization**: ServiceAccount limited to pod management in runner namespace only
+3. **NetworkPolicy**: Egress restricted to GitLab API, registries, DNS
+4. **Node Isolation** (optional): Use nodeSelector/tolerations to run DIND jobs on dedicated nodes
+5. **Tag Restrictions**: Use tags (`k8s`, `dind`) to control which jobs can use privileged runner
 
-Evidence to Capture (Dev Notes)
-- curl -Ik output (status, issuer)
-- toolbox psql `select 1` result and migration log excerpt
-- Sidekiq log line showing Redis connection and processed job
-- S3 listing and download command output; SSE evidence if applicable
-- Runner Online screenshot/CLI output; sample pipeline URL and image tag in registry
-- VM query results for `up{job~"gitlab.*|gitlab-runner"}`
+**Alternatives to DIND**:
+- **Kaniko**: Build images without privileged containers (uses user namespaces)
+- **BuildKit**: Rootless builds with better caching
+- **img**: Unprivileged container builds
+- **Buildah**: Rootless image builds
+
+**Selected: DIND** for compatibility with existing pipelines, but recommend migrating to Kaniko/BuildKit long-term.
+
+### S3 Object Storage Structure
+
+**Bucket Strategy**:
+
+GitLab requires separate buckets (or prefixes) for different object types:
+
+- **Artifacts**: CI/CD job artifacts (`.gitlab-ci.yml` artifacts)
+- **LFS**: Git Large File Storage objects
+- **Uploads**: User-uploaded files (issues, merge requests)
+- **Packages**: Package registry (npm, Maven, NuGet, etc.)
+- **Registry**: Container registry images
+- **Cache**: Runner cache (optional, improves build performance)
+
+**Why Separate Buckets?**
+- **Access Control**: Fine-grained IAM/bucket policies
+- **Retention Policies**: Different lifecycle rules per bucket
+- **Monitoring**: Separate metrics/billing per bucket
+- **Performance**: Independent scaling and tuning
+
+**Alternative**: Single bucket with prefixes (`gitlab-artifacts/`, `gitlab-lfs/`, etc.) - simpler but less flexible.
+
+### Gateway API vs Ingress
+
+**Why Gateway API?**
+
+GitLab Helm chart defaults to Ingress resources, but we use Gateway API:
+
+**Advantages**:
+- **Native Cilium integration**: Better performance and observability
+- **Standardized**: Kubernetes-native API (GA in v1.29)
+- **TLS termination**: Integrated with cert-manager
+- **Multi-tenancy**: Separate Gateway resource from routes
+
+**Configuration**:
+- Disable chart Ingress: `global.ingress.enabled: false`
+- Create HTTPRoutes manually (in `cilium/gateway/`)
+- Attach to existing Gateway (`cilium-gateway`)
+
+### Resource Sizing Guidance
+
+**GitLab Components**:
+
+| Component | Replicas | CPU Request | Memory Request | CPU Limit | Memory Limit |
+|-----------|----------|-------------|----------------|-----------|--------------|
+| Webservice | 2 | 500m | 2Gi | 2000m | 4Gi |
+| Sidekiq | 1 | 500m | 1Gi | 2000m | 2Gi |
+| Gitaly | 1 | 500m | 1Gi | 2000m | 2Gi |
+| Registry | 1 | 100m | 256Mi | 500m | 512Mi |
+| Shell | 1 | 100m | 128Mi | 500m | 256Mi |
+| Toolbox | 1 | 100m | 256Mi | 500m | 512Mi |
+
+**Total**: ~2 CPU / ~5Gi memory (minimum)
+
+**GitLab Runner**:
+- Manager: 100m CPU / 128Mi memory
+- Jobs: Configurable per job (default: 500m CPU / 1Gi memory)
+
+### Monitoring Strategy
+
+**8 PrometheusRule Alerts**:
+
+1. **GitLabWebUnavailable** (critical): No webservice replicas available
+2. **GitLabSidekiqQueueBacklog** (warning): Sidekiq queue > 1000 jobs
+3. **GitLabDatabaseConnectivityIssue** (critical): DB connection errors
+4. **GitLabRedisConnectivityIssue** (critical): Redis connection errors
+5. **GitLabS3Errors** (warning): S3 operation errors
+6. **GitLabCertificateExpiringSoon** (warning): TLS cert expires in <30 days
+7. **GitLabHighErrorRate** (warning): >5% 5xx responses
+8. **GitLabLowSuccessRate** (warning): <90% 2xx responses
+
+**Metrics Sources**:
+- GitLab exposes Prometheus metrics at `/-/metrics`
+- Runner exposes metrics at `:9252/metrics`
+- ServiceMonitors auto-discovered by VictoriaMetrics
+
+---
+
+## 📝 Change Log
+
+### v3.0 - 2025-10-26
+- Refined to manifests-first architecture pattern
+- Separated manifest creation (Story 33) from deployment (Story 45)
+- Configured external PostgreSQL (CNPG pooler), Redis (Dragonfly), S3 object storage
+- Added Keycloak OIDC integration (JIT, auto-linking, profile sync)
+- Created Gateway API HTTPRoutes for HTTPS exposure
+- Configured GitLab Runner with privileged DIND support in isolated namespace
+- Created 8 PrometheusRule alerts for comprehensive monitoring
+- Documented architecture, external dependencies, and security considerations
+- Added comprehensive README with troubleshooting and example DIND pipeline
+
+### v2.0 - 2025-10-21
+- Original implementation-focused story with QA risk assessment
+- Included deployment and validation tasks
+
+---
+
+**Story Owner:** Platform Engineering
+**Last Updated:** 2025-10-26
+**Status:** v3.0 (Manifests-first)

@@ -1,8 +1,8 @@
-# 17 — STORY-OBS-VICTORIA-LOGS-IMPLEMENT — Implement Logs Stack
+# 21 — STORY-OBS-VICTORIA-LOGS-IMPLEMENT — Implement Logs Stack
 
-Sequence: 17/41 | Prev: STORY-OBS-VM-STACK-IMPLEMENT.md | Next: STORY-OBS-FLUENT-BIT-IMPLEMENT.md
+Sequence: 21/50 | Prev: STORY-OBS-VM-STACK-IMPLEMENT.md | Next: STORY-OBS-FLUENT-BIT-IMPLEMENT.md
 Sprint: 4 | Lane: Observability
-Global Sequence: 17/41
+Global Sequence: 21/50
 
 Status: Draft
 Owner: Platform Engineering
@@ -14,7 +14,7 @@ Apply and validate the VictoriaLogs cluster with vmauth on infra per the archite
 
 ## Acceptance Criteria
 1) `victoria-logs` HelmRelease reconciles; vmstorage/vminsert/vmselect and vmauth Ready.
-2) Retention `${OBSERVABILITY_LOGS_RETENTION}` and storage class `${OBSERVABILITY_BLOCK_SC}` in effect.
+2) Retention `${OBSERVABILITY_LOGS_RETENTION}` and storage class `${BLOCK_SC}` in effect.
 3) ServiceMonitor scrapes Victorialogs; health endpoint returns OK.
 
 ## Tasks / Subtasks

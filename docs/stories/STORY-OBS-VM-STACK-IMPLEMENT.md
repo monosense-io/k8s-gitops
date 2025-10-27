@@ -1,8 +1,8 @@
-# 16 — STORY-OBS-VM-STACK-IMPLEMENT — Implement Global Metrics Stack
+# 20 — STORY-OBS-VM-STACK-IMPLEMENT — Implement Global Metrics Stack
 
-Sequence: 16/41 | Prev: STORY-OBS-FLUENT-BIT.md | Next: STORY-OBS-VICTORIA-LOGS-IMPLEMENT.md
+Sequence: 20/50 | Prev: STORY-OBS-FLUENT-BIT.md | Next: STORY-OBS-VICTORIA-LOGS-IMPLEMENT.md
 Sprint: 4 | Lane: Observability
-Global Sequence: 16/41
+Global Sequence: 20/50
 
 Status: Draft
 Owner: Platform Engineering
@@ -13,7 +13,7 @@ Links: kubernetes/bases/victoria-metrics-global; kubernetes/bases/victoria-metri
 Apply and validate the global VictoriaMetrics stack on infra and the vmagent-only stack on apps, using existing bases and cluster-settings. No design changes; this executes the plan.
 
 ## Acceptance Criteria
-1) Infra: `victoria-metrics-global` HelmRelease reconciles; vmcluster, vmauth, vmalert, alertmanager Ready; storage bound to `${OBSERVABILITY_BLOCK_SC}`.
+1) Infra: `victoria-metrics-global` HelmRelease reconciles; vmcluster, vmauth, vmalert, alertmanager Ready; storage bound to `${BLOCK_SC}`.
 2) Apps: `victoria-metrics` HelmRelease reconciles; vmagent Ready with remote write to `${GLOBAL_VM_INSERT_ENDPOINT}` (2xx).
 3) NetworkPolicies and PDBs applied; Grafana accessible with admin from `${OBSERVABILITY_GRAFANA_SECRET_PATH}`.
 4) At least one dashboard shows live cluster metrics; sample alert fires and reaches Alertmanager.

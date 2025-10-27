@@ -1,4 +1,3 @@
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -19,12 +18,18 @@ data:
   K8S_SERVICE_HOST: "infra-k8s.monosense.io"
 
   # Cilium Configuration
-  CILIUM_VERSION: "1.18.2"
+  CILIUM_VERSION: "1.18.3"
   CLUSTERMESH_IP: "10.25.11.100"
   CILIUM_GATEWAY_LB_IP: "10.25.11.110"
   CILIUM_BGP_LOCAL_ASN: "64512"
   CILIUM_BGP_PEER_ASN: "64501"
   CILIUM_BGP_PEER_ADDRESS: "10.25.11.1/32"
+
+  # IPAM Pool Control
+  INFRA_POOL_DISABLED: "false"
+  APPS_POOL_DISABLED: "true"
+  CILIUM_LB_POOL_START: "10.25.11.100"
+  CILIUM_LB_POOL_END: "10.25.11.119"
 
   # CoreDNS Configuration
   COREDNS_CLUSTER_IP: "10.245.0.10"
@@ -48,20 +53,19 @@ data:
   ROOK_CEPH_CLUSTER_NAME: "rook-ceph"
   ROOK_CEPH_BLOCKPOOL_NAME: "rook-ceph-block"
   ROOK_CEPH_IMAGE_TAG: v19.2.3
-  # Device Configuration: Using node-specific by-id paths in cephcluster.yaml
-  # No longer using device filter since node-specific config explicitly lists devices per node
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
-  CEPH_BLOCK_STORAGE_CLASS: "rook-ceph-block"
+
+  # Storage Classes
+  BLOCK_SC: "rook-ceph-block"  # Generic Rook-Ceph block storage (RBD)
+  OPENEBS_LOCAL_SC: "openebs-local-nvme"  # Local NVMe storage
 
   # OpenEBS Configuration
   OPENEBS_BASEPATH: "/var/mnt/openebs"
-  OPENEBS_STORAGE_CLASS: "openebs-local-nvme"
 
   # Observability Configuration
-  OBSERVABILITY_BLOCK_SC: "rook-ceph-block"
   OBSERVABILITY_METRICS_RETENTION: "30d"
-  OBSERVABILITY_LOGS_RETENTION: "14d"
+  OBSERVABILITY_LOGS_RETENTION: "30d"
   OBSERVABILITY_LOG_ENDPOINT_HOST: "victorialogs-vmauth.observability.svc.cluster.local"
   OBSERVABILITY_LOG_ENDPOINT_PORT: "9428"
   OBSERVABILITY_LOG_ENDPOINT_PATH: "/insert"
@@ -75,20 +79,22 @@ data:
   GLOBAL_ALERTMANAGER_ENDPOINT: "victoria-metrics-global-alertmanager.observability.svc.cluster.local:9093"
 
   # CloudNative-PG Configuration
-  CNPG_OPERATOR_VERSION: "0.25.0"  # Chart version (contains operator 1.26.1) - downgrade to fix WaitForFirstConsumer bug
+  CNPG_OPERATOR_VERSION: "0.25.0"
   CNPG_POSTGRES_VERSION: "16.8"
-  CNPG_STORAGE_CLASS: "openebs-local-nvme"  # Use original WaitForFirstConsumer
+  CNPG_STORAGE_CLASS: "openebs-local-nvme"
   CNPG_DATA_SIZE: "80Gi"
   CNPG_WAL_SIZE: "20Gi"
   CNPG_INSTANCES: "3"
   CNPG_SHARED_CLUSTER_NAME: "shared-postgres"
   CNPG_BACKUP_BUCKET: "monosense-cnpg"
+  # NOTE: CNPG ScheduledBackup uses a six-field cron expression (seconds first).
+  # Example below runs at 02:00:00 UTC daily.
   CNPG_BACKUP_SCHEDULE: "0 0 2 * * *"
   CNPG_MINIO_ENDPOINT_URL: "http://10.25.11.3:9000"
   CNPG_MINIO_SECRET_PATH: "kubernetes/infra/cloudnative-pg/minio"
   CNPG_SUPERUSER_SECRET_PATH: "kubernetes/infra/cloudnative-pg/superuser"
 
-  # Dragonfly Configuration
+  # Dragonfly Configuration (infra)
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
-  DRAGONFLY_DATA_SIZE: "30Gi"
+  DRAGONFLY_DATA_SIZE: "30Gi"           # default for shared cache; tune per-tenant if split
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"

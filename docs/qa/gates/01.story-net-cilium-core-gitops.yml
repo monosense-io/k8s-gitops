@@ -1,0 +1,30 @@
+risk_summary:
+  totals:
+    critical: 0
+    high: 3
+    medium: 4
+    low: 3
+  highest:
+    id: TECH-002
+    score: 6
+    title: "Flux postBuild substitution misconfigured or not applied"
+  recommendations:
+    must_fix:
+      - "Add/verify postBuild.substituteFrom to reference ConfigMap/cluster-settings in both clusters"
+      - "Wire cilium/core Kustomization in infra/apps with healthChecks"
+      - "Add CI preflight: verify OCI mirror or use official Cilium OCI for 1.18.3"
+    monitor:
+      - "Optional CI: helm template chart render to detect value key drift"
+      - "Periodic diff: bootstrap values vs HelmRelease"
+
+test_design:
+  scenarios_total: 18
+  by_level:
+    unit: 0
+    integration: 18
+    e2e: 0
+  by_priority:
+    p0: 3
+    p1: 15
+    p2: 0
+  coverage_gaps: []

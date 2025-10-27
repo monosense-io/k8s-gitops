@@ -1,101 +1,148 @@
-# 04 — STORY-NET-CILIUM-GATEWAY — Gateway API with Cilium
+# 03 — STORY-NET-CILIUM-GATEWAY — Create Gateway API Manifests
 
-Sequence: 04/41 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-DNS-COREDNS-BASE.md
+Sequence: 03/50 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-DNS-COREDNS-BASE.md
 Sprint: 1 | Lane: Networking
-Global Sequence: 4/41
+Global Sequence: 03/50
 
-Status: Draft
+Status: Draft (v3.0 Refinement)
 Owner: Platform Engineering
-Date: 2025-10-22
-Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/gateway
-
----
-
-## 🎯 Quick Start (Greenfield)
-
-**Prerequisites**: STORY-NET-CILIUM-IPAM (03/41) complete, bootstrap Phase 1 & 2 done
-**Estimated Time**: 2-3 hours
-**Key Deliverable**: Working Gateway with TLS + echo test
+Date: 2025-10-26 (v3.0 Refinement)
+Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/gateway/
 
 ---
 
 ## Story
 
-Expose L7 HTTP(S) traffic using Gateway API implemented by Cilium, managed by Flux, with a default GatewayClass and a cluster Gateway per environment.
+As a platform engineer, I want to **create Gateway API manifests** for exposing L7 HTTP(S) traffic using Cilium's Gateway API implementation, so that when deployed in Story 45, applications can use standards-based traffic management with eBPF-based L7 routing.
+
+This story creates the declarative Gateway API manifests (GatewayClass, Gateway, TLS certificates). Actual deployment and gateway validation happen in Story 45 (VALIDATE-NETWORKING).
 
 ## Why / Outcome
 
-- Standards‑based traffic management (Gateway API) with Cilium dataplane
-- Git‑managed routing, TLS termination delegated to cert‑manager issuers
-- High-performance eBPF-based L7 routing with near bare-metal performance
-- Foundation for advanced traffic policies (rate limiting, timeouts, retries)
+- Create Gateway API manifests with Cilium as the controller
+- Configure cluster-specific gateways with dedicated LoadBalancer IPs
+- Enable Git-managed routing and TLS termination
+- Foundation for HTTPRoutes in application workload stories
 
 ## Scope
 
-- **Clusters**: infra, apps
-- **Resources**: `kubernetes/infrastructure/networking/cilium/gateway/*`
-- **Gateway controller**: Enabled via Cilium Helm values in bootstrap phase
+**This Story (Manifest Creation):**
+- Create Gateway API manifests in `kubernetes/infrastructure/networking/cilium/gateway/`
+- Create GatewayClass manifest (Cilium controller)
+- Create Gateway manifests with cluster-specific IPs
+- Create wildcard TLS Certificate manifests
+- Create Kustomization for gateway resources
+- Local validation (flux build, kubeconform)
+
+**Deferred to Story 45 (Deployment & Validation):**
+- Deploying Gateway API resources to clusters
+- Verifying Gateway programmed and ready
+- Testing HTTP/HTTPS reachability
+- BGP advertisement validation
+- E2E testing with echo HTTPRoute
 
 ---
 
 ## Acceptance Criteria
 
-1. **CRD Presence**: Gateway API CRDs installed and Ready
-2. **GatewayClass Ready**: `cilium` GatewayClass Accepted=True
-3. **Gateway Programmed**: `cluster-gateway` in `kube-system` with Programmed=True
-4. **Correct IPs**: Infra `10.25.11.110`, Apps `10.25.11.121`
-5. **BGP Advertisement**: Gateway IPs advertised via BGP
-6. **HTTP Reachability**: `curl http://<GATEWAY-IP>` responds
-7. **TLS Certificate**: Wildcard cert Ready
-8. **E2E Test**: Echo HTTPRoute working
+**Manifest Creation (This Story):**
+
+1. **GatewayClass Manifest Created:**
+   - `kubernetes/infrastructure/networking/cilium/gateway/gatewayclass.yaml` exists
+   - Specifies `controllerName: io.cilium/gateway-controller`
+   - GatewayClass name: `cilium`
+
+2. **Gateway Manifests Created:**
+   - `kubernetes/infrastructure/networking/cilium/gateway/gateway.yaml` exists
+   - Gateway name: `cluster-gateway` in `kube-system` namespace
+   - References GatewayClass `cilium`
+   - Specifies LoadBalancer IP via annotation: `${CILIUM_GATEWAY_LB_IP}`
+   - Listeners configured for HTTP (80) and HTTPS (443)
+   - TLS certificate reference configured
+
+3. **Certificate Manifests Created:**
+   - Wildcard certificate manifest exists
+   - References cert-manager ClusterIssuer
+   - Certificate namespace: `kube-system`
+   - DNS names include wildcard (e.g., `*.${SECRET_DOMAIN}`)
+
+4. **Cluster-Specific Configuration:**
+   - Gateway IP substitution configured via `postBuild.substitute`
+   - Infra gateway uses `10.25.11.110` (from cluster-settings)
+   - Apps gateway uses `10.25.11.121` (from cluster-settings)
+   - Certificate domains use `${SECRET_DOMAIN}` substitution
+
+5. **Kustomization Created:**
+   - `kubernetes/infrastructure/networking/cilium/gateway/ks.yaml` exists
+   - References all gateway manifests
+   - Includes dependency on cilium-core and cert-manager
+   - `kubernetes/infrastructure/networking/cilium/gateway/kustomization.yaml` glue file exists
+
+6. **Local Validation Passes:**
+   - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure` succeeds
+   - `flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure` succeeds
+   - Output shows correct IP substitution for each cluster
+   - `kubeconform --strict` validates Gateway API manifests
+
+**Deferred to Story 45 (Deployment & Validation):**
+- ❌ Gateway API CRDs installed (handled in Story 43)
+- ❌ GatewayClass Accepted=True
+- ❌ Gateway Programmed=True
+- ❌ LoadBalancer IP allocated correctly
+- ❌ BGP advertisement working
+- ❌ HTTP/HTTPS reachability
+- ❌ TLS certificate issued
+- ❌ E2E testing with HTTPRoute
 
 ---
 
 ## Dependencies
 
-- **STORY-NET-CILIUM-IPAM**: IPAM pools with cluster isolation
-- **STORY-SEC-CERT-MANAGER-ISSUERS**: ClusterIssuer ready
-- **Bootstrap Phase 1 & 2**: Cilium with `gatewayAPI.enabled: true`
+**Prerequisites (v3.0):**
+- Story 01 (STORY-NET-CILIUM-CORE-GITOPS) complete (Cilium core manifests with `gatewayAPI.enabled: true`)
+- Story 02 (STORY-NET-CILIUM-IPAM) complete (IPAM pools created)
+- Story 06 (STORY-SEC-CERT-MANAGER-ISSUERS) complete (cert-manager manifests created)
+- Cluster-settings ConfigMaps with `CILIUM_GATEWAY_LB_IP` and `SECRET_DOMAIN`
+- Tools: kubectl (for dry-run), flux CLI, kubeconform
+
+**NOT Required (v3.0):**
+- ❌ Cluster access (validation is local-only)
+- ❌ ClusterIssuer deployed (deployment in Story 45)
+- ❌ Running clusters (Story 45 handles deployment)
 
 ---
 
 ## Implementation Tasks
 
-### Phase 1: Prerequisites (5 tasks, 10 min)
+### T1: Verify Prerequisites (Local Validation Only)
 
-- [ ] Verify IPAM pools deployed:
+- [ ] Verify Story 01 complete (Cilium core manifests created):
   ```bash
-  kubectl --context=infra get ciliumloadbalancerippool -A
-  kubectl --context=apps get ciliumloadbalancerippool -A
+  ls -la kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml
+  # Confirm gatewayAPI.enabled: true in values
   ```
 
-- [ ] Verify Gateway API CRDs installed:
+- [ ] Verify Story 02 complete (IPAM pool manifests created):
   ```bash
-  kubectl --context=infra get crd gateways.gateway.networking.k8s.io
+  ls -la kubernetes/infrastructure/networking/cilium/ipam/lb-ippool-*.yaml
   ```
 
-- [ ] Verify Gateway controller running:
+- [ ] Verify Story 06 complete (cert-manager manifests created):
   ```bash
-  kubectl --context=infra -n kube-system logs -l app.kubernetes.io/name=cilium-operator --tail=50 | grep -i gateway
+  ls -la kubernetes/infrastructure/security/cert-manager/
+  # Confirm ClusterIssuer manifests exist
   ```
 
-- [ ] Verify cert-manager ClusterIssuer Ready:
+- [ ] Verify cluster-settings have Gateway IP variables:
   ```bash
-  kubectl --context=infra get clusterissuer letsencrypt-production -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-  # Expected: True
-  ```
-
-- [ ] Verify cluster-settings have correct Gateway IPs:
-  ```bash
-  # Infra: 10.25.11.110
-  kubectl --context=infra -n flux-system get cm cluster-settings -o jsonpath='{.data.CILIUM_GATEWAY_LB_IP}'
-  # Apps: 10.25.11.121
-  kubectl --context=apps -n flux-system get cm cluster-settings -o jsonpath='{.data.CILIUM_GATEWAY_LB_IP}'
+  grep CILIUM_GATEWAY_LB_IP kubernetes/clusters/infra/cluster-settings.yaml
+  grep CILIUM_GATEWAY_LB_IP kubernetes/clusters/apps/cluster-settings.yaml
+  grep SECRET_DOMAIN kubernetes/clusters/infra/cluster-settings.yaml
   ```
 
 ---
 
-### Phase 2: Create Manifests (5 tasks, 20 min)
+### T2: Create Gateway API Manifests (5 files)
 
 - [ ] Create directory:
   ```bash
@@ -166,7 +213,7 @@ Expose L7 HTTP(S) traffic using Gateway API implemented by Cilium, managed by Fl
     - "${SECRET_DOMAIN}"
   ```
 
-- [ ] Create `kustomization.yaml`:
+- [ ] Create `kustomization.yaml` (glue file):
   ```yaml
   ---
   apiVersion: kustomize.config.k8s.io/v1beta1
@@ -179,7 +226,7 @@ Expose L7 HTTP(S) traffic using Gateway API implemented by Cilium, managed by Fl
 
 ---
 
-### Phase 3: Flux Wiring (2 tasks, 10 min)
+### T3: Create Flux Kustomization
 
 - [ ] Create `ks.yaml`:
   ```yaml
@@ -218,171 +265,136 @@ Expose L7 HTTP(S) traffic using Gateway API implemented by Cilium, managed by Fl
       namespace: kube-system
   ```
 
-- [ ] Validate manifests:
+---
+
+### T4: Local Validation (NO Cluster Access)
+
+- [ ] Validate manifest syntax:
+  ```bash
+  kubectl --dry-run=client -f kubernetes/infrastructure/networking/cilium/gateway/
+  ```
+
+- [ ] Validate with kustomize:
   ```bash
   kustomize build kubernetes/infrastructure/networking/cilium/gateway
   ```
 
+- [ ] Validate Flux builds for both clusters:
+  ```bash
+  # Infra cluster (should substitute 10.25.11.110)
+  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+    yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
+  # Expected: 10.25.11.110
+
+  # Apps cluster (should substitute 10.25.11.121)
+  flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure | \
+    yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
+  # Expected: 10.25.11.121
+  ```
+
+- [ ] Validate Gateway API schemas with kubeconform:
+  ```bash
+  kubeconform --strict kubernetes/infrastructure/networking/cilium/gateway/*.yaml
+  ```
+
+- [ ] Verify certificate domain substitution:
+  ```bash
+  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+    yq 'select(.kind == "Certificate") | .spec.dnsNames'
+  # Expected: ["*.monosense.io", "monosense.io"] (or actual SECRET_DOMAIN)
+  ```
+
 ---
 
-### Phase 4: Deploy & Validate (7 tasks, 30 min)
+### T5: Update Infrastructure Kustomization
+
+- [ ] Update `kubernetes/infrastructure/networking/cilium/kustomization.yaml`:
+  ```yaml
+  resources:
+  - core/ks.yaml
+  - ipam/ks.yaml
+  - gateway/ks.yaml  # ADD THIS LINE
+  ```
+
+---
+
+### T6: Commit Manifests to Git
 
 - [ ] Commit and push:
   ```bash
   git add kubernetes/infrastructure/networking/cilium/gateway/
-  git commit -m "feat(networking): add Cilium Gateway API resources"
+  git commit -m "feat(networking): add Cilium Gateway API manifests
+
+  - Create GatewayClass for Cilium controller
+  - Create Gateway with cluster-specific LoadBalancer IPs
+  - Create wildcard TLS Certificate
+  - Configure Flux Kustomization with dependencies
+  - Add local validation steps
+
+  Part of Story 03 (v3.0 manifests-first approach)
+  Deployment deferred to Story 45 (VALIDATE-NETWORKING)"
   git push origin main
-  ```
-
-- [ ] Monitor Flux reconciliation:
-  ```bash
-  flux get kustomizations -n flux-system --context=infra --watch
-  # Wait for cilium-gateway Applied/True
-  ```
-
-- [ ] Verify GatewayClass Accepted:
-  ```bash
-  kubectl --context=infra get gatewayclass cilium -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}'
-  # Expected: True
-  ```
-
-- [ ] Verify Gateway Programmed:
-  ```bash
-  kubectl --context=infra get gateway -n kube-system cluster-gateway -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}'
-  # Expected: True
-  ```
-
-- [ ] Verify Gateway IP allocation:
-  ```bash
-  kubectl --context=infra get gateway -n kube-system cluster-gateway -o jsonpath='{.status.addresses[0].value}'
-  # Expected: 10.25.11.110 (infra) or 10.25.11.121 (apps)
-  ```
-
-- [ ] Test HTTP reachability:
-  ```bash
-  curl -v http://10.25.11.110
-  # Expected: Connection succeeds, 404 response
-  ```
-
-- [ ] Verify Certificate Ready:
-  ```bash
-  kubectl --context=infra -n kube-system get certificate wildcard-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-  # Expected: True
   ```
 
 ---
 
-### Phase 5: E2E Test (6 tasks, 30 min)
+### Runtime Validation (MOVED TO STORY 45)
 
-- [ ] Create `httproute-echo.yaml`:
-  ```yaml
-  ---
-  apiVersion: v1
-  kind: Namespace
-  metadata:
-    name: testing
-  ---
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: http-echo
-    namespace: testing
-  spec:
-    selector:
-      app: http-echo
-    ports:
-    - port: 8080
-      targetPort: 8080
-  ---
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: http-echo
-    namespace: testing
-  spec:
-    replicas: 1
-    selector:
-      matchLabels:
-        app: http-echo
-    template:
-      metadata:
-        labels:
-          app: http-echo
-      spec:
-        containers:
-        - name: echo
-          image: ealen/echo-server:latest
-          ports:
-          - containerPort: 8080
-  ---
-  apiVersion: gateway.networking.k8s.io/v1
-  kind: HTTPRoute
-  metadata:
-    name: echo-route
-    namespace: testing
-  spec:
-    parentRefs:
-    - name: cluster-gateway
-      namespace: kube-system
-    hostnames:
-    - "echo.${SECRET_DOMAIN}"
-    rules:
-    - matches:
-      - path:
-          type: PathPrefix
-          value: /
-      backendRefs:
-      - name: http-echo
-        port: 8080
-  ```
+The following validation happens in **Story 45 (VALIDATE-NETWORKING)** after cluster bootstrap:
 
-- [ ] Add to kustomization:
-  ```yaml
-  # Edit kubernetes/infrastructure/networking/cilium/gateway/kustomization.yaml
-  resources:
-  - gatewayclass.yaml
-  - gateway.yaml
-  - certificate.yaml
-  - httproute-echo.yaml
-  ```
+```bash
+# Deploy & Validate Gateway (Story 45 only)
+flux reconcile kustomization cilium-gateway --with-source
 
-- [ ] Commit and deploy:
-  ```bash
-  git add kubernetes/infrastructure/networking/cilium/gateway/
-  git commit -m "test(networking): add echo HTTPRoute for Gateway validation"
-  git push origin main
-  ```
+# Verify GatewayClass Accepted
+kubectl get gatewayclass cilium -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}'
 
-- [ ] Wait for echo pod ready:
-  ```bash
-  kubectl --context=infra -n testing get pods -l app=http-echo --watch
-  ```
+# Verify Gateway Programmed
+kubectl get gateway -n kube-system cluster-gateway -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}'
 
-- [ ] Verify HTTPRoute attached:
-  ```bash
-  kubectl --context=infra -n testing get httproute echo-route -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'
-  # Expected: True
-  ```
+# Verify Gateway IP allocation
+kubectl get gateway -n kube-system cluster-gateway -o jsonpath='{.status.addresses[0].value}'
 
-- [ ] Test routing (PROOF):
-  ```bash
-  curl -H "Host: echo.monosense.io" http://10.25.11.110
-  # Expected: Echo service response
-  # Save output as proof
-  ```
+# Test HTTP reachability
+curl -v http://10.25.11.110
+
+# Verify Certificate Ready
+kubectl -n kube-system get certificate wildcard-tls -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+
+# E2E test with echo HTTPRoute
+curl -H "Host: echo.monosense.io" http://10.25.11.110
+```
 
 ---
 
 ## Definition of Done
 
-- [ ] Both clusters: Gateway Programmed=True
-- [ ] Correct IPs: infra .110, apps .121
-- [ ] BGP advertising Gateway IPs
-- [ ] HTTP/HTTPS reachable
-- [ ] Certificate Ready
-- [ ] Echo HTTPRoute working
-- [ ] Flux Kustomization healthy
-- [ ] Test evidence captured
+**Manifest Creation Complete (This Story):**
+- [ ] Directory created: `kubernetes/infrastructure/networking/cilium/gateway/`
+- [ ] GatewayClass manifest created with Cilium controller
+- [ ] Gateway manifest created with cluster-specific IP substitution
+- [ ] Certificate manifest created with wildcard domain
+- [ ] Kustomization glue file created
+- [ ] Flux Kustomization created with correct dependencies
+- [ ] Local validation passes:
+  - [ ] `kubectl --dry-run=client` succeeds
+  - [ ] `kustomize build` succeeds
+  - [ ] `flux build` shows correct IP substitution for both clusters
+  - [ ] `kubeconform --strict` validates Gateway API schemas
+- [ ] Infrastructure kustomization updated to include gateway
+- [ ] Manifests committed to git
+- [ ] Story 45 can proceed with deployment
+
+**NOT Part of DoD (Moved to Story 45):**
+- ❌ Gateway API CRDs installed
+- ❌ GatewayClass Accepted=True
+- ❌ Gateway Programmed=True
+- ❌ LoadBalancer IP allocated correctly (infra .110, apps .121)
+- ❌ BGP advertising Gateway IPs
+- ❌ HTTP/HTTPS reachable
+- ❌ Certificate Ready
+- ❌ Echo HTTPRoute working
+- ❌ E2E test evidence captured
 
 ---
 
@@ -432,3 +444,11 @@ eBPF Dataplane → HTTPRoute → Backend Service → Pods
 **References**:
 - Cilium Gateway API: https://docs.cilium.io/en/stable/network/servicemesh/gateway-api/
 - Architecture: docs/architecture.md §9
+
+---
+
+## Change Log
+
+| Date       | Version | Description                          | Author  |
+|------------|---------|--------------------------------------|---------|
+| 2025-10-26 | 3.0     | **v3.0 Refinement**: Updated header, story, scope, AC, dependencies, tasks, DoD for manifests-first approach. Separated manifest creation from deployment (moved to Story 45). Tasks simplified to T1-T6 focusing on local validation only. | Platform Engineering |

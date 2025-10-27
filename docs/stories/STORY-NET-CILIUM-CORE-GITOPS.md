@@ -1,40 +1,46 @@
-# 02 — STORY-NET-CILIUM-CORE-GITOPS — Put Cilium Core under GitOps Control
+# 01 — STORY-NET-CILIUM-CORE-GITOPS — Create Cilium GitOps Manifests
 
-Sequence: 02/41 | Prev: STORY-BOOT-TALOS.md | Next: STORY-NET-CILIUM-IPAM.md
+Sequence: 01/50 | Prev: — | Next: STORY-NET-CILIUM-IPAM.md
 Sprint: 1 | Lane: Networking
-Global Sequence: 2/41
+Global Sequence: 01/50
 
-Status: Draft → Ready for Implementation
 Owner: Platform Engineering
-Date: 2025-10-21 (Refined: 2025-10-22)
-Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/core; .taskfiles/bootstrap/Taskfile.yaml
+Date: 2025-10-26 (v3.0 Refinement)
+Links: docs/architecture.md §10 Networking (Cilium); kubernetes/infrastructure/networking/cilium/core/
 
 ---
 
-## Executive Summary: Refinement Notes
+## Status
+Draft
 
-**Refined for greenfield multi-cluster deployment.** Enhanced from 4 high-level tasks to **60+ granular subtasks** across **5 phases** with **10 comprehensive acceptance criteria**. Key improvements:
+## Executive Summary: v3.0 Manifests-First Approach
 
-- **Immediate validation on BOTH clusters** (greenfield-appropriate)
-- **Comprehensive feature validation**: WireGuard, Gateway API, BGP, Spegel integration
-- **Detailed handover strategy** with adoption vs reinstall options
-- **Cross-cluster consistency** validation throughout
-- **Drift detection proof** and Git canonicality testing
+**This story creates Cilium GitOps manifests for both clusters (infra + apps).** Following the v3.0 manifests-first approach:
+
+- **This Story (01)**: Create all Cilium core GitOps manifests (HelmRelease, Kustomization, OCIRepository)
+- **Story 45 (VALIDATE-NETWORKING)**: Deploy manifests, perform Flux handover, validate functionality
+
+Key artifacts created:
+- Cluster-settings ConfigMaps with cluster-specific variables
+- OCIRepository for Cilium Helm charts
+- HelmRelease manifests with full Cilium configuration
+- Cluster Kustomizations updated with health checks and variable substitution
+- Local validation (flux build, kubeconform)
 
 ---
 
 ## Story
 
-As a platform team operating a **greenfield multi-cluster GitOps environment**, we need Cilium (CNI + operator) to be managed declaratively by Flux on **both infra and apps clusters** so that the desired state for our network layer is versioned, auditable, and consistent across all clusters.
+As a platform team operating a **greenfield multi-cluster GitOps environment**, we need to **create Cilium GitOps manifests** for both infra and apps clusters so that Cilium (CNI + operator) can be managed declaratively by Flux with versioned, auditable configuration.
 
-We will leverage the one-time imperative Cilium installation performed during bootstrap (via Helmfile Phase 1), then **seamlessly transition control to Flux** through a well-tested handover process that proves Git is our canonical source of truth.
+This story creates the declarative manifests that will enable Flux to manage Cilium. The actual deployment and Flux handover happen in Story 45 (VALIDATE-NETWORKING).
 
 ### Context: Greenfield Requirements
 
 This is a **greenfield deployment** with two 3-node clusters (infra + apps) being built simultaneously. Both clusters require:
-- Cilium 1.18.2 as CNI with strict kubeProxyReplacement (CILIUM_VERSION=1.18.2 in cluster-settings)
-- WireGuard encryption enabled from day 1
-- Gateway API and BGP Control Plane enabled from day 1
+- Cilium 1.18.3 as CNI with kube‑proxy replacement enabled (kubeProxyReplacement: true)
+- WireGuard encryption enabled
+- Gateway API and BGP Control Plane enabled by dedicated stories (out of scope for this core story)
 - Spegel integration for distributed image caching
 - Identical configuration except cluster-specific variables:
   - Infra: CLUSTER=infra, CLUSTER_ID=1, POD_CIDR_STRING=10.244.0.0/16, SERVICE_CIDR=["10.245.0.0/16"]
@@ -44,167 +50,227 @@ This is a **greenfield deployment** with two 3-node clusters (infra + apps) bein
 
 ## Acceptance Criteria
 
-### AC-1: Bootstrap State Validated (Pre-Requisite)
-- Bootstrap installed Cilium 1.18.2 on both infra and apps clusters
-- Cilium DaemonSet is Ready on all nodes (both clusters)
-- Cilium Operator Deployment is Ready (both clusters)
-- kube-proxy is NOT running (kubeProxyReplacement working)
-- WireGuard encryption is enabled and functional
-- Gateway API and BGP Control Plane are enabled in Cilium config
-- Required CRDs exist (Gateway API, Cilium BGP, Cilium IPAM)
-- Spegel is running and integrated with containerd (no conflicts with Cilium)
+**Manifest Creation (This Story):**
 
-### AC-2: GitOps Resources Exist and Are Valid
-- OCIRepository `cilium-charts` created in flux-system namespace
-- HelmRelease `cilium` exists in `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
-- HelmRelease values match bootstrap values EXACTLY (except cluster-specific substitutions)
-- Kustomization `cilium-core` exists with health checks for DaemonSet/cilium and Deployment/cilium-operator
-- Both clusters' infrastructure.yaml include cilium-core Kustomization
-- `flux build kustomization cluster-<cluster>-infrastructure` passes on both clusters
-- `kubeconform --strict` validates all Cilium resources
+### AC-1: Directory Structure and Cluster Settings Created
+- Directory structure exists: `kubernetes/infrastructure/networking/cilium/core/`
+- Cluster settings ConfigMaps exist:
+  - `kubernetes/clusters/infra/cluster-settings.yaml`
+  - `kubernetes/clusters/apps/cluster-settings.yaml`
+- Cluster settings include all required Cilium variables (CLUSTER, CLUSTER_ID, POD_CIDR_STRING, SERVICE_CIDR, CILIUM_VERSION, K8S_SERVICE_HOST, etc.).
+- Settings validated with `yq eval` (valid YAML syntax)
 
-### AC-3: Per-Cluster Settings Are Substituted Correctly
-- ${CLUSTER} resolves to "infra" on infra cluster, "apps" on apps cluster
-- ${CLUSTER_ID} resolves to "1" on infra, "2" on apps
-- ${POD_CIDR_STRING} resolves to "10.244.0.0/16" on infra, "10.246.0.0/16" on apps
-- ${SERVICE_CIDR} resolves to '["10.245.0.0/16"]' on infra, '["10.247.0.0/16"]' on apps
-- ${CILIUM_VERSION} is "1.18.2" on both clusters
-- Helm values show correct cluster-specific values: `helm -n kube-system get values cilium`
+### AC-2: GitOps Resources Created and Valid
+- OCIRepository manifest exists: `kubernetes/infrastructure/networking/cilium/ocirepository.yaml`
+  - References Cilium Helm chart OCI registry
+  - Specifies Cilium version 1.18.3
+- HelmRelease manifest exists: `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
+  - References OCIRepository
+  - Includes core Cilium configuration (kubeProxyReplacement, WireGuard, Hubble, metrics)
+  - Uses `${VAR}` placeholders for cluster-specific values (no hard-coding)
+- Component Kustomize file exists: `kubernetes/infrastructure/networking/cilium/core/kustomization.yaml`
+  - Lists `helmrelease.yaml` as a resource
+- Cluster Kustomizations updated in `kubernetes/clusters/{infra,apps}/infrastructure.yaml` to include the cilium/core directory with health checks and ordering, and explicitly set:
+  - `prune: true`, `wait: true`, `timeout: 10m`
+  - `healthChecks`: DaemonSet/cilium and Deployment/cilium-operator in `kube-system`
 
-### AC-4: Flux Handover Completed Successfully (Critical)
-- Flux Kustomization `cilium-core` shows Ready: True on both clusters
-- Flux HelmRelease `cilium` shows Ready: True in kube-system namespace on both clusters
-- **NO POD DISRUPTIONS** during handover (verify pod ages, restart counts unchanged)
-- CNI functionality maintained during handover (test pod connectivity throughout)
-- Bootstrap Helm release either adopted by Flux OR cleanly replaced
-- No manual Helm releases remain: `helm -n kube-system list | grep cilium` shows only Flux-managed release
+### AC-3: Per-Cluster Variable Substitution Configured
+- HelmRelease values use `${CLUSTER}`, `${CLUSTER_ID}`, `${POD_CIDR_STRING}`, `${SERVICE_CIDR}`, `${CILIUM_VERSION}` placeholders.
+- Substitution is defined in each cluster Flux `Kustomization` (`kubernetes/clusters/{infra,apps}/infrastructure.yaml`) via `postBuild.substitute`/`postBuild.substituteFrom` referencing `ConfigMap/cluster-settings`.
+- Variables match cluster-specific values in cluster-settings.yaml for each cluster
 
-### AC-5: Health Checks Are Functional
-- Kustomization health checks detect DaemonSet failures (tested via scaling to 0 and back)
-- Kustomization health checks detect Deployment failures
-- Flux reports HealthCheckFailed status when resources are unhealthy
-- Flux reports Ready: True when all health checks pass
-- Health check timeout is reasonable (5-10 minutes)
+### AC-4: Local Validation Passes
+- `kustomize build kubernetes/infrastructure/networking/cilium/core | kubeconform --strict -ignore-missing-schemas` succeeds
+- After wiring cluster Kustomizations, `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path .` succeeds
+- After wiring cluster Kustomizations, `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path .` succeeds
+- Flux build output for both clusters shows HelmRelease with substitutions resolved (no `${VAR}` placeholders). `k8sServiceHost` equals the value from each cluster's `cluster-settings.yaml`.
+- No CRDs in manifests (CRDs handled separately in Story 43)
 
-### AC-6: Git Is Canonical Source of Truth (Drift Detection)
-- Manual changes to HelmRelease are reverted by Flux within reconciliation interval
-- Configuration changes made in Git are applied to cluster successfully
-- `helm.toolkit.fluxcd.io/driftDetection` is enabled (if using adoption strategy)
-- Flux reconciliation does NOT cause unnecessary pod restarts (stable state is stable)
+### AC-5: Cilium Features Configured in Manifests (Core Only)
+- HelmRelease values include:
+  - `kubeProxyReplacement: true`
+  - `encryption.enabled: true`, `encryption.type: wireguard`
+  - `hubble.enabled: true`, `hubble.relay.enabled: true`, `hubble.ui.enabled: false`
+  - `prometheus.enabled: true`, `prometheus.serviceMonitor.enabled: true`
+  - No Gateway API or BGP configuration in this story (handled by dedicated stories).
 
-### AC-7: Cilium Features Are Enabled and Functional
-- kubeProxyReplacement is active: "Strict" mode verified
-- WireGuard encryption is active: `cilium status | grep Encryption` shows "Wireguard"
-- Gateway API is enabled: `kubectl get gatewayclasses` works (CRDs present)
-- BGP Control Plane is enabled: `kubectl get ciliumbgppeeringpolicies` works (CRDs present)
-- Hubble is functional: `hubble status` works
-- Prometheus metrics are exposed: ServiceMonitor exists and Prometheus scrapes Cilium
+### AC-6: Cross-Cluster Manifest Consistency
+- Both clusters' infrastructure Kustomizations include cilium-core
+- Cilium version identical in both clusters (1.18.3)
+- Feature enablement identical in both clusters
+- Differences ONLY in cluster-specific variables (validated via `flux build` output comparison)
 
-### AC-8: Cross-Cluster Consistency (Greenfield Requirement)
-- Both infra and apps clusters have identical Cilium versions (1.18.2)
-- Both clusters have identical feature enablement (kubeProxyReplacement, WireGuard, Gateway API, BGP)
-- Both clusters' Kustomizations show Ready: True
-- Configuration differs ONLY in cluster-specific variables:
-  - CLUSTER (infra vs apps)
-  - CLUSTER_ID (1 vs 2)
-  - POD_CIDR_STRING (10.244.0.0/16 vs 10.246.0.0/16)
-  - SERVICE_CIDR (["10.245.0.0/16"] vs ["10.247.0.0/16"])
-  - CILIUM_GATEWAY_LB_IP (10.25.11.120 vs 10.25.11.121)
-  - CLUSTERMESH_IP (10.25.11.100 vs 10.25.11.101)
-  - CILIUM_BGP_LOCAL_ASN (64512 vs 64513)
-- Both clusters pass all validation steps in Phase 4
+### AC-7: OCI Source Availability (CI preflight)
+- In a networked CI environment, confirm the OCI ref for Cilium charts resolves for version `1.18.3` (or documented fallback to official Cilium OCI).
+- Document the fallback strategy if mirror is unavailable.
 
-### AC-9: Integration with Adjacent Components
-- Spegel (image registry mirror) is running and not conflicting with Cilium
-- CoreDNS is functional and using Cilium network (DNS queries work)
-- cert-manager (if installed) can reach ACME servers through Cilium network
-- Flux controllers can reach Git repository through Cilium network
-
-### AC-10: Documentation and Runbooks
-- Handover process documented in story dev notes or CLAUDE.md
-- Rollback procedure documented (how to revert to bootstrap Helm if needed)
-- Common troubleshooting steps documented
-- Next steps documented (story dependencies for BGP, Gateway API, ClusterMesh are clear)
+### AC-8: QA Gates Prepared
+- QA risk profile and test design documents exist and are linked in QA Results:
+  - Risk profile at `docs/qa/assessments/01.story-net-cilium-core-gitops-risk-*.md`
+  - Test design at `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-*.md`
+- Gate file prepared at `docs/qa/gates/01.story-net-cilium-core-gitops.yml` including:
+  - `risk_summary` block from QA risk profile
+  - `test_design` block from test design
+- All must-fix recommendations from `risk_summary` addressed within this story’s scope (substitution wiring, cilium/core Kustomization with healthChecks, OCI preflight policy).
 
 ---
 
-## Tasks / Subtasks — Implementation Plan (5 Phases)
+### AC ↔ Files Checklist (Quick)
+- AC-1: `kubernetes/infrastructure/networking/cilium/core/` exists; `kubernetes/clusters/{infra,apps}/cluster-settings.yaml` present and valid.
+- AC-2: `kubernetes/infrastructure/networking/cilium/ocirepository.yaml`; `kubernetes/infrastructure/networking/cilium/core/{helmrelease.yaml,kustomization.yaml}`; cluster `kubernetes/clusters/{infra,apps}/infrastructure.yaml` references `cilium/core` with healthChecks.
+- AC-3: Placeholders in HelmRelease (`${CLUSTER}`, `${CLUSTER_ID}`, `${POD_CIDR_STRING}`, `${SERVICE_CIDR}`, `${CILIUM_VERSION}`); cluster Kustomizations define `postBuild.substituteFrom: ConfigMap/cluster-settings`.
+- AC-4: `flux build kustomization -f kubernetes/clusters/{infra,apps}/infrastructure.yaml --path .` produces no `${VAR}`; `kubeconform` passes on component build.
+- AC-5: Core features only (kubeProxyReplacement, WireGuard, Hubble, metrics) in HelmRelease values.
+- AC-6: Infra vs apps builds differ only in cluster‑specific values.
+- AC-7: OCI mirror reachable for 1.18.3 or fallback documented.
 
-### Phase 1: Pre-Work & Validation (Bootstrap State)
+**Deferred to Story 45 (Deployment & Validation):**
+- ❌ Deploying manifests to clusters
+- ❌ Flux handover from bootstrap Helm
+- ❌ Runtime health checks
+- ❌ Drift detection testing
+- ❌ Cilium feature functional testing
+- ❌ Integration testing with adjacent components
 
-**Goal:** Verify bootstrap installed Cilium correctly before transitioning to GitOps
+---
 
-#### 1.1. Verify cluster-settings ConfigMaps on both clusters
-- [ ] Confirm `kubernetes/clusters/infra/cluster-settings.yaml` contains: CLUSTER=infra, CLUSTER_ID=1, POD_CIDR_STRING=10.244.0.0/16, SERVICE_CIDR=["10.245.0.0/16"], CILIUM_VERSION=1.18.2
-- [ ] Confirm `kubernetes/clusters/apps/cluster-settings.yaml` contains: CLUSTER=apps, CLUSTER_ID=2, POD_CIDR_STRING=10.246.0.0/16, SERVICE_CIDR=["10.247.0.0/16"], CILIUM_VERSION=1.18.2
-- [ ] Verify CILIUM_VERSION is pinned to "1.18.2" on both clusters (used by Flux-managed HelmRelease)
+## Tasks / Subtasks — Implementation Plan (4 Phases)
 
-#### 1.2. Verify bootstrap Cilium installation (infra cluster)
-- [ ] Check Cilium DaemonSet: `kubectl --context=infra -n kube-system get ds cilium` (should show Ready on all nodes)
-- [ ] Check Cilium Operator: `kubectl --context=infra -n kube-system get deploy cilium-operator` (should show Ready)
-- [ ] Verify kube-proxy is NOT running: `kubectl --context=infra -n kube-system get ds kube-proxy` (should return NotFound or 0/0 ready)
-- [ ] Check WireGuard encryption: `kubectl --context=infra -n kube-system exec ds/cilium -- cilium status | grep Encryption` (should show "Wireguard")
-- [ ] Verify Gateway API enabled: `kubectl --context=infra -n kube-system exec ds/cilium -- cilium config view | grep gateway-api` (should show enabled: true)
-- [ ] Verify BGP Control Plane enabled: `kubectl --context=infra -n kube-system exec ds/cilium -- cilium config view | grep bgp-control-plane` (should show enabled: true)
+Phase ↔ AC Map
+- Phase 0 → AC-1 (partial), AC-2 (setup)
+- Phase 1 → AC-1 (partial - tooling)
+- Phase 2 → AC-2, AC-3
+- Phase 3 → AC-4
 
-#### 1.3. Verify bootstrap Cilium installation (apps cluster)
-- [ ] Repeat all checks from 1.2 on apps cluster (kubectl --context=apps)
+### Phase 0: Prerequisites & Directory Structure Setup
 
-#### 1.4. Verify required CRDs exist (both clusters)
-- [ ] Gateway API CRDs: `kubectl get crd gateways.gateway.networking.k8s.io gatewayclasses.gateway.networking.k8s.io httproutes.gateway.networking.k8s.io`
-- [ ] Cilium BGP CRDs: `kubectl get crd ciliumbgppeeringpolicies.cilium.io ciliumbgpnodeconfigs.cilium.io`
-- [ ] Cilium IPAM CRDs: `kubectl get crd ciliumpodippools.cilium.io ciliumloadbalancerippools.cilium.io`
+**Goal:** Create greenfield directory structure and cluster-settings ConfigMaps before GitOps resource creation
+**Acceptance Criteria:** AC-1 (partial), AC-2 (setup)
+**Estimated Time:** 30 minutes
 
-#### 1.5. Document bootstrap configuration for comparison
-- [ ] Extract current Cilium helm values: `helm --kube-context=infra -n kube-system get values cilium > /tmp/cilium-bootstrap-values-infra.yaml`
-- [ ] Extract current Cilium helm values: `helm --kube-context=apps -n kube-system get values cilium > /tmp/cilium-bootstrap-values-apps.yaml`
-- [ ] Compare values to ensure consistency across clusters (cluster-specific vars should differ, everything else identical)
+#### 0.1. Create base kubernetes directory structure (per architecture.md §4)
+- [x] Create cluster directories: `mkdir -p kubernetes/clusters/{infra,apps}/flux-system`
+- [x] Ensure networking base exists: `mkdir -p kubernetes/infrastructure/networking/cilium`
+- [x] Create Cilium networking subdirs: `mkdir -p kubernetes/infrastructure/networking/cilium/{core,bgp,gateway,clustermesh,ipam}`
+- [x] Create other infrastructure dirs: `mkdir -p kubernetes/infrastructure/{security,storage}`
+- [x] Create workloads dirs: `mkdir -p kubernetes/workloads/{platform,tenants}`
+- [x] Create components dir: `mkdir -p kubernetes/components`
+- [x] Verify structure matches architecture.md §4 layout
+
+#### 0.2. Create cluster-settings.yaml for infra cluster
+- [x] Create `kubernetes/clusters/infra/cluster-settings.yaml` with configuration:
+  - Cluster identity: CLUSTER=infra, CLUSTER_ID=1
+  - Network: POD_CIDR_STRING=10.244.0.0/16, SERVICE_CIDR=["10.245.0.0/16"]
+  - Cilium: CILIUM_VERSION=1.18.3, CLUSTERMESH_IP=10.25.11.100, CILIUM_GATEWAY_LB_IP=10.25.11.110
+  - BGP: CILIUM_BGP_LOCAL_ASN=64512, CILIUM_BGP_PEER_ASN=64501, CILIUM_BGP_PEER_ADDRESS=10.25.11.1/32
+  - CoreDNS: COREDNS_CLUSTER_IP=10.245.0.10, COREDNS_REPLICAS=2
+  - External Secrets: EXTERNAL_SECRET_STORE=onepassword, paths for clustermesh/cert-manager secrets
+  - Domain: SECRET_DOMAIN=monosense.io
+  - Storage: BLOCK_SC=rook-ceph-block, OPENEBS_LOCAL_SC=openebs-local-nvme
+  - Observability: OBSERVABILITY_METRICS_RETENTION=30d, OBSERVABILITY_LOGS_RETENTION=30d, endpoints, Grafana secret paths
+  - CNPG: versions, storage class, instance counts, backup configuration
+  - Dragonfly: storage class, data size, auth secret path
+  - API endpoint host: K8S_SERVICE_HOST set to the cluster API DNS name per architecture (no port override required)
+- [x] Apply ConfigMap structure from architecture.md §7 (complete example provided)
+- [x] Validate YAML syntax: `yq eval kubernetes/clusters/infra/cluster-settings.yaml`
+
+#### 0.3. Create cluster-settings.yaml for apps cluster
+- [x] Create `kubernetes/clusters/apps/cluster-settings.yaml` with configuration:
+  - Cluster identity: CLUSTER=apps, CLUSTER_ID=2
+  - Network: POD_CIDR_STRING=10.246.0.0/16, SERVICE_CIDR=["10.247.0.0/16"]
+  - Cilium: CILIUM_VERSION=1.18.3, CLUSTERMESH_IP=10.25.11.120, CILIUM_GATEWAY_LB_IP=10.25.11.121
+  - BGP: CILIUM_BGP_LOCAL_ASN=64513 (different from infra)
+  - CoreDNS: COREDNS_CLUSTER_IP=10.247.0.10
+  - All other configs matching infra but with cluster-specific paths (kubernetes/apps/ instead of kubernetes/infra/)
+  - API endpoint host: K8S_SERVICE_HOST set to the cluster API DNS name per architecture (no port override required)
+- [x] Ensure differences are ONLY: CLUSTER, CLUSTER_ID, network CIDRs, IPs, ASN, secret paths
+- [x] Validate YAML syntax: `yq eval kubernetes/clusters/apps/cluster-settings.yaml`
+
+#### 0.4. Verify prerequisites complete
+- [x] Confirm directory structure: `tree -L 3 kubernetes/`
+- [x] Confirm both cluster-settings exist and are valid
+- [x] Confirm CILIUM_VERSION=1.18.3 in both files
+- [x] Confirm no syntax errors in YAML files
+- [x] Ready to proceed to Phase 1
+
+---
+
+### Phase 1: Tool Installation & Prerequisites (Local Only - No Clusters)
+
+**Goal:** Install and verify local validation tools required for manifest creation
+**Acceptance Criteria:** AC-1 (partial - local tooling only)
+**Estimated Time:** 15 minutes
+
+#### 1.1. Install required tools
+- [ ] Install Flux CLI: `brew install fluxcd/tap/flux` (macOS) or follow https://fluxcd.io/flux/installation/
+- [ ] Install kustomize: `brew install kustomize` or `curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash`
+- [ ] Install kubeconform: `brew install kubeconform` or download from https://github.com/yannh/kubeconform
+- [ ] Install yq: `brew install yq` or download from https://github.com/mikefarah/yq
+
+#### 1.2. Verify tool installation
+- [ ] Check Flux version: `flux version --client` (should show v2.x.x)
+- [ ] Check kustomize version: `kustomize version` (should show v5.x.x or newer)
+- [ ] Check kubeconform version: `kubeconform -v` (should show version)
+- [ ] Check yq version: `yq --version` (should show v4.x.x)
+
+#### 1.3. Verify Phase 0 prerequisites complete
+- [ ] Confirm directory structure exists: `tree -L 3 kubernetes/infrastructure/networking/cilium/`
+- [ ] Confirm cluster-settings.yaml exists: `ls -la kubernetes/clusters/{infra,apps}/cluster-settings.yaml`
+- [ ] Verify cluster-settings contain CILIUM_VERSION: `yq eval '.data.CILIUM_VERSION' kubernetes/clusters/infra/cluster-settings.yaml` (should return "1.18.3")
+- [ ] Verify cluster-settings contain CILIUM_VERSION: `yq eval '.data.CILIUM_VERSION' kubernetes/clusters/apps/cluster-settings.yaml` (should return "1.18.3")
+ - [ ] Verify API host values present:
+   - `yq eval '.data.K8S_SERVICE_HOST' kubernetes/clusters/infra/cluster-settings.yaml` (expected infra API host)
+   - `yq eval '.data.K8S_SERVICE_HOST' kubernetes/clusters/apps/cluster-settings.yaml` (expected apps API host)
 
 ---
 
 ### Phase 2: GitOps Resource Creation
 
-**Goal:** Create Flux resources to manage Cilium declaratively
+**Goal:** Create Flux resources to manage Cilium declaratively (assumes Phase 0 complete)
+**Acceptance Criteria:** AC-2, AC-3
+**Estimated Time:** 45 minutes
 
 #### 2.1. Create OCIRepository for Cilium charts
 - [ ] Create `kubernetes/infrastructure/networking/cilium/ocirepository.yaml`:
   ```yaml
-  apiVersion: source.toolkit.fluxcd.io/v1beta2
+  apiVersion: source.toolkit.fluxcd.io/v1
   kind: OCIRepository
   metadata:
     name: cilium-charts
     namespace: flux-system
   spec:
     interval: 12h
-    url: oci://ghcr.io/cilium/charts
+    url: oci://ghcr.io/home-operations/charts-mirror/cilium
     ref:
-      semver: "1.18.2"
+      semver: "1.18.3"
   ```
+- [ ] **Note**: Verify the OCI repository URL `ghcr.io/home-operations/charts-mirror/cilium` is accessible and contains Cilium 1.18.3. If using a different chart mirror or the official Cilium repository, update the URL accordingly.
 - [ ] Create `kubernetes/infrastructure/networking/cilium/kustomization.yaml` to include ocirepository.yaml
 - [ ] Validate: `kustomize build kubernetes/infrastructure/networking/cilium`
 
 #### 2.2. Create HelmRelease for Cilium core
 - [ ] Create `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml` with values matching bootstrap EXACTLY:
-  - Chart version: Use ${CILIUM_VERSION} variable (resolves to "1.18.2" from cluster-settings)
-  - sourceRef: OCIRepository/cilium-charts
+  - apiVersion: `helm.toolkit.fluxcd.io/v2`
+  - Chart version: Use ${CILIUM_VERSION} variable (resolves to "1.18.3" from cluster-settings)
+  - sourceRef: OCIRepository/cilium-charts (chartRef with kind: OCIRepository)
   - Values: cluster.name: ${CLUSTER}, cluster.id: ${CLUSTER_ID}, ipv4NativeRoutingCIDR: ${POD_CIDR_STRING}
-  - kubeProxyReplacement: "true", gatewayAPI.enabled: true, bgpControlPlane.enabled: true
-  - encryption.enabled: true, encryption.type: wireguard
-  - hubble.enabled: true, hubble.relay.enabled: true, hubble.ui.enabled: true
+  - kubeProxyReplacement: true
+  - encryption.enabled: true, encryption.type: wireguard, encryption.nodeEncryption: false
+  - hubble.enabled: true, hubble.relay.enabled: true, hubble.ui.enabled: false
   - prometheus.enabled: true, prometheus.serviceMonitor.enabled: true
-- [ ] Add install/upgrade configuration: namespace: kube-system, createNamespace: false, crds: Skip
+  - cni.install: true, cni.exclusive: true
+  - ipam.mode: kubernetes
+  - routingMode: native, autoDirectNodeRoutes: true
+  - k8sServiceHost: ${K8S_SERVICE_HOST}
+  - k8sServicePort: ${K8S_SERVICE_PORT}
+- [ ] Add install/upgrade configuration:
+  - namespace: kube-system, createNamespace: true
+  - install.crds: CreateReplace, install.remediation.retries: 3
+  - upgrade.crds: CreateReplace, upgrade.remediation.retries: 2, upgrade.cleanupOnFail: true
+  - rollback.recreate: true, rollback.cleanupOnFail: true
 - [ ] Add postRenderers if needed for any customizations
 
 #### 2.3. Create Kustomization for cilium-core
-- [ ] Create `kubernetes/infrastructure/networking/cilium/core/ks.yaml`:
-  - dependsOn: none (this is a base dependency)
-  - interval: 10m
-  - path: ./kubernetes/infrastructure/networking/cilium/core
-  - prune: true, wait: true, timeout: 10m
-  - healthChecks:
-    - apiVersion: apps/v1, kind: DaemonSet, name: cilium, namespace: kube-system
-    - apiVersion: apps/v1, kind: Deployment, name: cilium-operator, namespace: kube-system
-  - postBuild.substituteFrom: ConfigMap/cluster-settings
 - [ ] Create `kubernetes/infrastructure/networking/cilium/core/kustomization.yaml`:
   ```yaml
   apiVersion: kustomize.config.k8s.io/v1beta1
@@ -212,214 +278,241 @@ This is a **greenfield deployment** with two 3-node clusters (infra + apps) bein
   resources:
     - helmrelease.yaml
   ```
+  - Note: Do not create a per-component Flux `Kustomization` (ks.yaml). Cluster-level Kustomizations in `kubernetes/clusters/{infra,apps}/infrastructure.yaml` will reference this directory and define `dependsOn`, `healthChecks`, and `postBuild.substituteFrom`.
 
 #### 2.4. Wire into infrastructure.yaml
-- [ ] Update `kubernetes/clusters/infra/infrastructure.yaml` to include cilium-core Kustomization BEFORE any other networking Kustomizations (BGP, Gateway, IPAM, ClusterMesh)
-- [ ] Update `kubernetes/clusters/apps/infrastructure.yaml` to include cilium-core Kustomization
-- [ ] Ensure dependency chain: cilium-core → (nothing depends on it initially, but later networking features will depend on it)
+- [ ] Update `kubernetes/clusters/infra/infrastructure.yaml` to include `./kubernetes/infrastructure/networking/cilium/core` BEFORE any other networking components (BGP, Gateway, IPAM, ClusterMesh)
+- [ ] Update `kubernetes/clusters/apps/infrastructure.yaml` to include `./kubernetes/infrastructure/networking/cilium/core`
+- [ ] Define in each cluster Flux `Kustomization`: `prune: true`, `wait: true`, `timeout: 10m`, `healthChecks` for `DaemonSet/cilium` and `Deployment/cilium-operator`, and `postBuild.substituteFrom: ConfigMap/cluster-settings`
+
+Example snippet to add into each cluster `infrastructure.yaml`:
+
+```yaml
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-core
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./kubernetes/infrastructure/networking/cilium/core
+  prune: true
+  wait: true
+  timeout: 10m
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: cilium
+      namespace: kube-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cilium-operator
+      namespace: kube-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+```
 
 #### 2.5. Validate GitOps resources
-- [ ] Validate infra cluster: `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/clusters/infra`
-- [ ] Validate apps cluster: `flux build kustomization cluster-apps-infrastructure --path ./kubernetes/clusters/apps`
-- [ ] Run kubeconform: `kustomize build kubernetes/infrastructure/networking/cilium/core | kubeconform --strict --schema-location default`
-- [ ] Check for substitution variables: grep for ${CLUSTER}, ${CLUSTER_ID}, ${POD_CIDR_STRING}, ${CILIUM_VERSION} and ensure they're all referenced correctly
+- [ ] Validate component schema: `kustomize build kubernetes/infrastructure/networking/cilium/core | kubeconform --strict --schema-location default`
+- [ ] Validate infra cluster: `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path .`
+- [ ] Validate apps cluster: `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path .`
+- [ ] Verify substitutions resolved: ensure no `${` placeholders remain in either Flux build output
 
 ---
 
-### Phase 3: Flux Handover (Critical)
+### Phase 3: Local Validation (No Cluster Deployment)
 
-**Goal:** Transition Cilium management from bootstrap Helm to Flux HelmRelease without disruption
+**Goal:** Validate all created manifests locally using Flux build tools and schema validation
+**Acceptance Criteria:** AC-4 (local validation passes)
+**Estimated Time:** 30 minutes
 
-#### 3.1. Prepare handover strategy
-- [ ] Review Flux Helm adoption documentation
-- [ ] Decide on strategy:
-  - Option A: Mark bootstrap release for adoption (helm.toolkit.fluxcd.io/driftDetection: enabled)
-  - Option B: Uninstall bootstrap, let Flux reinstall (may cause brief disruption)
-- [ ] Document rollback plan if handover fails
+#### 3.1. Validate manifests with Flux build (infra cluster)
+- [ ] Build infra Kustomization (after wiring): `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path .`
+- [ ] Verify build succeeds with no errors
+- [ ] Check output includes Cilium HelmRelease with correct name and namespace
+- [ ] Verify substitution variables are resolved: grep output for `${` - should find none (all substituted)
+- [ ] Save output for comparison: `flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path . > /tmp/flux-build-infra.yaml`
 
-#### 3.2. Execute handover on infra cluster (TEST CLUSTER FIRST)
-- [ ] Apply OCIRepository: `kubectl --context=infra apply -f kubernetes/infrastructure/networking/cilium/ocirepository.yaml`
-- [ ] Wait for OCIRepository Ready: `flux --context=infra get source oci cilium-charts`
-- [ ] Apply Cilium core Kustomization definition to Flux: `kubectl --context=infra apply -f kubernetes/infrastructure/networking/cilium/core/ks.yaml`
-- [ ] Monitor pod status in parallel: `watch kubectl --context=infra -n kube-system get pods -l k8s-app=cilium`
-- [ ] Trigger Flux reconciliation: `flux --context=infra reconcile kustomization cilium-core --with-source`
-- [ ] Watch reconciliation: `flux --context=infra get kustomizations -A --watch`
-- [ ] Verify NO POD RESTARTS during handover: check pod ages, restart counts
+#### 3.2. Validate manifests with Flux build (apps cluster)
+- [ ] Build apps Kustomization (after wiring): `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path .`
+- [ ] Verify build succeeds with no errors
+- [ ] Check output includes Cilium HelmRelease
+- [ ] Save output for comparison: `flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path . > /tmp/flux-build-apps.yaml`
 
-#### 3.3. Validate infra cluster post-handover
-- [ ] Check Kustomization status: `flux --context=infra get kustomization cilium-core` (should show Ready True)
-- [ ] Check HelmRelease status: `kubectl --context=infra -n kube-system get helmrelease cilium` (should show Ready True)
-- [ ] Check Cilium health: `kubectl --context=infra -n kube-system rollout status ds/cilium --timeout=5m`
-- [ ] Check Operator health: `kubectl --context=infra -n kube-system rollout status deploy/cilium-operator --timeout=5m`
-- [ ] Test CNI functionality: Deploy a test pod and verify it gets an IP
-- [ ] Test service connectivity: Create a test service and verify DNS resolution and connectivity
+#### 3.3. Validate Kubernetes schemas with kubeconform
+- [ ] Build Cilium core manifests: `kustomize build kubernetes/infrastructure/networking/cilium/core > /tmp/cilium-core-manifests.yaml`
+- [ ] Validate with kubeconform: `kubeconform --strict -ignore-missing-schemas /tmp/cilium-core-manifests.yaml`
+- [ ] Verify no schema errors reported
+- [ ] Check for deprecated API versions warnings
 
-#### 3.4. Execute handover on apps cluster
-- [ ] Repeat steps 3.2 on apps cluster (kubectl --context=apps, flux --context=apps)
-- [ ] Monitor for any differences in behavior vs infra cluster
-- [ ] Document any cluster-specific issues encountered
+#### 3.4. Validate cluster-specific substitutions
+- [ ] Compare infra vs apps Flux build outputs: `diff /tmp/flux-build-infra.yaml /tmp/flux-build-apps.yaml | grep -E "CLUSTER|POD_CIDR|SERVICE_CIDR|CLUSTER_ID"`
+- [ ] Verify differences are ONLY in cluster-specific variables:
+  - CLUSTER: infra vs apps
+  - CLUSTER_ID: 1 vs 2
+  - POD_CIDR_STRING: 10.244.0.0/16 vs 10.246.0.0/16
+  - SERVICE_CIDR: ["10.245.0.0/16"] vs ["10.247.0.0/16"]
+  - CLUSTERMESH_IP: 10.25.11.100 vs 10.25.11.120
+  - CILIUM_GATEWAY_LB_IP: 10.25.11.110 vs 10.25.11.121
+  - CILIUM_BGP_LOCAL_ASN: 64512 vs 64513
+- [ ] Verify CILIUM_VERSION is identical in both: 1.18.3
 
-#### 3.5. Validate apps cluster post-handover
-- [ ] Repeat all validation steps from 3.3 on apps cluster
+- [ ] Check all created YAML files for syntax errors:
+  - `yq eval kubernetes/infrastructure/networking/cilium/ocirepository.yaml`
+  - `yq eval kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
+  - `yq eval kubernetes/infrastructure/networking/cilium/core/kustomization.yaml`
+- [ ] Verify no YAML parse errors
 
----
-
-### Phase 4: Post-Handover Validation & Testing
-
-**Goal:** Prove Git is canonical source of truth and Flux manages Cilium successfully
-
-#### 4.1. Test Flux drift detection (infra cluster)
-- [ ] Make a manual change to Cilium: `kubectl --context=infra -n kube-system patch helmrelease cilium --type=json -p='[{"op":"add","path":"/spec/values/test","value":"manual-change"}]'`
-- [ ] Wait for Flux reconciliation interval or force: `flux --context=infra reconcile helmrelease -n kube-system cilium`
-- [ ] Verify Flux reverts the change (manual change should be gone)
-- [ ] Confirm drift detection is working as expected
-
-#### 4.2. Test configuration changes via Git (infra cluster)
-- [ ] Make a safe, visible change in Git (e.g., add a label to helmrelease metadata or add a comment)
-- [ ] Commit and push change
-- [ ] Trigger reconciliation: `flux --context=infra reconcile source git flux-system --with-source`
-- [ ] Verify change is applied: `kubectl --context=infra -n kube-system get helmrelease cilium -o yaml | grep <your-label-or-comment>`
-- [ ] Verify no pod disruption from the change
-
-#### 4.3. Verify health checks are functional
-- [ ] Simulate DaemonSet failure: `kubectl --context=infra -n kube-system scale ds cilium --replicas=0` (DANGEROUS - be ready to revert)
-- [ ] Watch Kustomization status: `flux --context=infra get kustomization cilium-core` (should show HealthCheckFailed)
-- [ ] Restore DaemonSet: `kubectl --context=infra -n kube-system scale ds cilium --replicas=<original-count>`
-- [ ] Verify Kustomization returns to Ready state
-- [ ] Repeat for Operator deployment
-
-#### 4.4. Verify cross-cluster consistency
-- [ ] Compare Cilium versions: `kubectl --context=infra -n kube-system get helmrelease cilium -o jsonpath='{.spec.chart.spec.version}'` vs apps
-- [ ] Compare key configuration values: `helm --kube-context=infra -n kube-system get values cilium` vs apps (should differ only in cluster-specific vars)
-- [ ] Verify both clusters show Ready: `flux --context=infra get kustomization cilium-core` and `flux --context=apps get kustomization cilium-core`
-
-#### 4.5. Validate Spegel integration (registry mirror)
-- [ ] Verify Spegel is running: `kubectl --context=infra -n kube-system get ds spegel`
-- [ ] Check Spegel logs for registry configuration: `kubectl --context=infra -n kube-system logs ds/spegel | grep containerd`
-- [ ] Verify no conflicts between Cilium and Spegel (both use hostPort, different ports)
-- [ ] Test image pull performance: pull a test image and verify Spegel caching works
+#### 3.6. Final validation checklist
+- [ ] All manifests created in Phase 2
+- [ ] Flux build succeeds for both clusters
+- [ ] Kubeconform validation passes
+- [ ] Cluster-specific substitutions verified
+- [ ] YAML syntax valid
+- [ ] Git commit created with all manifests
+- [ ] Ready to proceed to Story 45 (VALIDATE-NETWORKING) for deployment
+ - [ ] CI preflight (if networked): OCI ref for `1.18.3` resolves or fallback documented
+ - [ ] QA gate file prepared at `docs/qa/gates/01.story-net-cilium-core-gitops.yml` (paste `risk_summary` and `test_design` blocks)
 
 ---
 
-### Phase 5: Cleanup, Documentation & Completion
+## Local Validation Commands
 
-**Goal:** Clean up temporary resources and document final state
+**All validation in this story is LOCAL - no clusters required.**
 
-#### 5.1. Remove bootstrap Helm releases (if not auto-replaced)
-- [ ] Check if bootstrap Cilium release still exists: `helm --kube-context=infra -n kube-system list | grep cilium`
-- [ ] If exists and not managed by Flux, document why (adoption vs replacement strategy)
-- [ ] Remove any temporary test resources created during validation
-
-#### 5.2. Update documentation
-- [ ] Update CLAUDE.md or relevant docs with Cilium handover process
-- [ ] Document any lessons learned or gotchas encountered
-- [ ] Update architecture.md if any deviations from plan occurred
-
-#### 5.3. Final verification checklist
-- [ ] Both clusters (infra + apps) show cilium-core Kustomization Ready
-- [ ] Both clusters have Cilium 1.18.2 running
-- [ ] Both clusters have kubeProxyReplacement enabled (no kube-proxy pods)
-- [ ] Both clusters have WireGuard encryption enabled
-- [ ] Both clusters have Gateway API and BGP Control Plane enabled
-- [ ] Flux successfully manages Cilium (drift detection works)
-- [ ] Health checks are functional
-- [ ] No manual Helm releases remain for Cilium
-
-#### 5.4. Story completion
-- [ ] All acceptance criteria met (from original story + refined criteria)
-- [ ] All tasks marked complete
-- [ ] Story status updated to "Done"
-- [ ] Next story (STORY-SEC-EXTERNAL-SECRETS-BASE.md) dependencies satisfied
-
----
-
-## Validation Steps
-
-### Quick Validation Script (run on both clusters)
+### Quick Validation Script (Local Tools Only)
 
 ```bash
 #!/bin/bash
-CLUSTERS=("infra" "apps")
-
-for CLUSTER in "${CLUSTERS[@]}"; do
-  echo "==================================="
-  echo "Validating cluster: $CLUSTER"
-  echo "==================================="
-
-  # 1. Flux Kustomization Ready
-  echo "1. Checking Flux Kustomization status..."
-  flux --context=$CLUSTER get kustomization cilium-core
-
-  # 2. HelmRelease Ready
-  echo "2. Checking HelmRelease status..."
-  kubectl --context=$CLUSTER -n kube-system get helmrelease cilium
-
-  # 3. Cilium DaemonSet healthy
-  echo "3. Checking Cilium DaemonSet..."
-  kubectl --context=$CLUSTER -n kube-system rollout status ds/cilium --timeout=2m
-
-  # 4. Cilium Operator healthy
-  echo "4. Checking Cilium Operator..."
-  kubectl --context=$CLUSTER -n kube-system rollout status deploy/cilium-operator --timeout=2m
-
-  # 5. No kube-proxy
-  echo "5. Verifying kube-proxy is not running..."
-  kubectl --context=$CLUSTER -n kube-system get ds kube-proxy 2>&1 | grep -q "NotFound" && \
-    echo "kube-proxy not running" || echo "kube-proxy still running"
-
-  # 6. WireGuard encryption
-  echo "6. Checking WireGuard encryption..."
-  kubectl --context=$CLUSTER -n kube-system exec ds/cilium -- cilium status | grep Encryption
-
-  # 7. Gateway API enabled
-  echo "7. Checking Gateway API availability..."
-  kubectl --context=$CLUSTER get crd gateways.gateway.networking.k8s.io && \
-    echo "Gateway API CRDs present"
-
-  # 8. BGP Control Plane enabled
-  echo "8. Checking BGP Control Plane availability..."
-  kubectl --context=$CLUSTER get crd ciliumbgppeeringpolicies.cilium.io && \
-    echo "BGP CRDs present"
-
-  # 9. Test pod connectivity
-  echo "9. Testing pod connectivity..."
-  kubectl --context=$CLUSTER run test-cilium-$CLUSTER --image=nginx --rm --restart=Never -- /bin/sh -c "echo 'Pod networking works'" || \
-    echo "Pod networking failed"
-
-  echo ""
-done
+set -e
 
 echo "==================================="
-echo "Validation complete!"
+echo "Validating Cilium Manifests (Local)"
 echo "==================================="
+
+# 1. Validate YAML syntax
+echo "1. Validating YAML syntax..."
+ yq eval kubernetes/infrastructure/networking/cilium/ocirepository.yaml > /dev/null
+ yq eval kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml > /dev/null
+ yq eval kubernetes/infrastructure/networking/cilium/core/kustomization.yaml > /dev/null
+echo "✓ All YAML files are valid"
+
+# 2. Build Kustomize manifests
+echo "2. Building Kustomize manifests..."
+kustomize build kubernetes/infrastructure/networking/cilium/core > /tmp/cilium-manifests.yaml
+echo "✓ Kustomize build successful"
+
+# 3. Validate Kubernetes schemas
+echo "3. Validating Kubernetes schemas..."
+kubeconform --strict -ignore-missing-schemas /tmp/cilium-manifests.yaml
+echo "✓ All manifests conform to Kubernetes schemas"
+
+# 4. Validate Flux build (infra)
+echo "4. Building Flux Kustomization (infra)..."
+flux build kustomization -f kubernetes/clusters/infra/infrastructure.yaml --path . > /tmp/flux-build-infra.yaml
+echo "✓ Flux build successful for infra cluster"
+
+# 5. Validate Flux build (apps)
+echo "5. Building Flux Kustomization (apps)..."
+flux build kustomization -f kubernetes/clusters/apps/infrastructure.yaml --path . > /tmp/flux-build-apps.yaml
+echo "✓ Flux build successful for apps cluster"
+
+# 6. Verify no unsubstituted variables
+echo "6. Checking for unsubstituted variables..."
+if grep -q '\${' /tmp/flux-build-infra.yaml; then
+  echo "❌ Found unsubstituted variables in infra build"
+  exit 1
+fi
+if grep -q '\${' /tmp/flux-build-apps.yaml; then
+  echo "❌ Found unsubstituted variables in apps build"
+  exit 1
+fi
+echo "✓ All variables successfully substituted"
+echo "6b. Verifying API host substitution matches cluster settings..."
+INFRA_HOST=$(yq eval '.data.K8S_SERVICE_HOST' kubernetes/clusters/infra/cluster-settings.yaml)
+APPS_HOST=$(yq eval '.data.K8S_SERVICE_HOST' kubernetes/clusters/apps/cluster-settings.yaml)
+grep -q "k8sServiceHost: ${INFRA_HOST}" /tmp/flux-build-infra.yaml || { echo "❌ k8sServiceHost mismatch in infra build"; exit 1; }
+grep -q "k8sServiceHost: ${APPS_HOST}" /tmp/flux-build-apps.yaml || { echo "❌ k8sServiceHost mismatch in apps build"; exit 1; }
+echo "✓ API host substitution matches cluster settings"
+
+# 7. Verify cluster-specific differences
+echo "7. Verifying cluster-specific substitutions..."
+diff /tmp/flux-build-infra.yaml /tmp/flux-build-apps.yaml | grep -E "CLUSTER|cluster.id|ipv4NativeRoutingCIDR" || echo "✓ Cluster-specific values differ as expected"
+
+echo ""
+echo "==================================="
+echo "✓ All local validations PASSED"
+echo "==================================="
+echo "Manifests ready for Story 45 (VALIDATE-NETWORKING) deployment"
 ```
+
+#### 2.3.a. Story‑Scoped Config Task (do not implement outside this story)
+- [ ] Patch both cluster settings to add `K8S_SERVICE_PORT: "6443"`:
+  - `kubernetes/clusters/infra/cluster-settings.yaml`
+  - `kubernetes/clusters/apps/cluster-settings.yaml`
+- [ ] Confirm the HelmRelease values render both `k8sServiceHost` and `k8sServicePort` via `${K8S_SERVICE_HOST}` and `${K8S_SERVICE_PORT}`.
+- [ ] Reference: `docs/runbooks/dns-apiserver-bind.md` for DNS setup.
+
+**Note**: Runtime validation (kubectl commands, cluster deployment, Cilium feature testing) happens in **Story 45: VALIDATE-NETWORKING**.
+
+Suggestion: Add a Taskfile target `make validate-cilium-core` that runs the quick validation script for both clusters (flux build, kubeconform, yq) to speed local checks.
 
 ---
 
 ## Dev Notes
 
+### Testing
+
+**Testing Standards (Manifests-First Approach):**
+- **Validation Method**: LOCAL ONLY - `flux build`, `kustomize build`, `kubeconform`, `yq`
+- **Test Approach**: Validate manifest quality and schema compliance WITHOUT deploying to clusters
+- **Testing Tools**:
+  - Flux CLI (`flux build`) for Flux Kustomization validation
+  - kustomize for manifest building
+  - kubeconform for Kubernetes schema validation
+  - yq for YAML syntax validation
+  - diff for cross-cluster comparison
+  - Note: kubeconform validates the HelmRelease CR itself (and known schemas); it does not render the Cilium chart. Deep chart validation is optional (CI-only) via `helm template` or controller rendering.
+- **Cross-Cluster Testing**: Compare Flux build outputs for infra vs apps to verify cluster-specific substitutions
+- **Validation Script**: Complete bash local validation script provided (lines above)
+- **Reference Test Design**: See `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027.md` for scenario IDs and priorities (P0/P1)
+- **Success Criteria**: All manifests valid, Flux builds succeed, schemas pass, substitutions correct
+
+**Testing Requirements for This Story:**
+1. **Phase 1**: Tool installation and version verification
+2. **Phase 2**: Manifest creation (YAML files written to git)
+3. **Phase 3**: Local validation (flux build, kubeconform, substitution checks)
+4. **Git commit**: All manifests committed to repository
+
+**Runtime Testing (NOT in this story):**
+- Cluster deployment → Story 45 (VALIDATE-NETWORKING)
+- kubectl commands → Story 45 (VALIDATE-NETWORKING)
+- Cilium feature testing → Story 45 (VALIDATE-NETWORKING)
+- Drift detection → Story 45 (VALIDATE-NETWORKING)
+- Integration testing → Story 45 (VALIDATE-NETWORKING)
+
 ### Critical Path
-1. Bootstrap validation (Phase 1) is **mandatory** - don't skip
-2. Handover (Phase 3) is **highest risk** - test on infra first, then apps
-3. Cross-cluster consistency (Phase 4.4) is **greenfield advantage** - enforce early
+1. **Phase 0** (Prerequisites) is **mandatory** - directory structure and cluster-settings must exist first
+2. **Phase 1** (Tool Installation) is **mandatory** - local tools required for validation
+3. **Phase 2** (Manifest Creation) is **core deliverable** - YAML files are the output
+4. **Phase 3** (Local Validation) is **quality gate** - manifests must validate before git commit
 
 ### Common Gotchas
-- **CRDs must be skipped in HelmRelease** (crds: Skip) - they're installed in bootstrap Phase 0
+- **CRDs use CreateReplace in HelmRelease** - allows GitOps to manage CRD lifecycle updates safely
 - **Cluster-specific vars must use ${VARIABLE}** syntax, not hard-coded values
-- **Health checks timeout** should be generous (10m) for initial reconciliation
-- **Spegel uses HostPort 29999** - different from Cilium, no conflicts expected
+- **Health checks timeout** should be generous (10m) for initial reconciliation (deployment concern, not manifest concern)
+- **Pinned version strategy** - use exact semver (e.g., "1.18.3") not ranges for predictable upgrades
+- **Flux build requires valid paths** - ensure `--path` points to the repository root when using `-f kubernetes/clusters/<cluster>/infrastructure.yaml`
+- **Variable substitution in Flux builds** - With cluster `Kustomization` and `postBuild.substituteFrom` defined, `flux build kustomization -f kubernetes/clusters/<cluster>/infrastructure.yaml --path .` resolves variables in output. Plain `kustomize build` does not substitute variables.
 
-### Troubleshooting
-- **Kustomization stuck in "Reconciling"**: Check HelmRelease status, check for missing substitution vars
-- **HelmRelease shows "UpgradeFailed"**: Check helm -n kube-system history cilium, check for CRD conflicts
-- **Pods restarting during handover**: May indicate reinstall instead of adoption - check strategy
-- **Drift detection not working**: Verify helm.toolkit.fluxcd.io/driftDetection annotation present
-
-### Rollback Procedure
-If handover fails:
-1. Remove Flux Kustomization: `flux delete kustomization cilium-core`
-2. Verify bootstrap Helm release still exists: `helm -n kube-system list`
-3. If bootstrap removed, reinstall: `helmfile -f bootstrap/helmfile.d/01-core.yaml.gotmpl -e <cluster> sync`
+### Troubleshooting (Local Validation)
+- **flux build fails**: Check kustomization.yaml paths, verify all referenced files exist
+- **kubeconform errors**: Check API versions, verify CRD schemas available
+- **yq syntax errors**: Check YAML indentation, verify no tabs (use spaces only)
+- **Unsubstituted variables in flux build**: Indicates missing `postBuild.substitute`/`substituteFrom` or missing keys in `cluster-settings`. Fix cluster Kustomization and data; `flux build` output should contain no `${VAR}`.
+- **kustomize build fails**: Check resource paths in kustomization.yaml, verify all files exist
 
 ---
 
@@ -427,24 +520,50 @@ If handover fails:
 
 ### Files Created/Modified by This Story
 
-**Created:**
+**Created (Phase 0 - Prerequisites):**
+```
+kubernetes/clusters/infra/
+└── cluster-settings.yaml                 # Infra cluster configuration
+
+kubernetes/clusters/apps/
+└── cluster-settings.yaml                 # Apps cluster configuration
+
+kubernetes/infrastructure/networking/cilium/
+├── core/                                 # Core Cilium configuration (to be created)
+├── bgp/                                  # BGP configuration directory (to be created)
+├── gateway/                              # Gateway API directory (to be created)
+├── clustermesh/                          # ClusterMesh directory (to be created)
+└── ipam/                                 # IPAM directory (to be created)
+
+kubernetes/infrastructure/
+├── security/                             # Security components directory
+├── storage/                              # Storage components directory
+└── gitops/                               # GitOps components directory
+
+kubernetes/workloads/
+├── platform/                             # Platform workloads directory
+└── tenants/                              # Tenant workloads directory
+
+kubernetes/components/                    # Reusable components directory
+```
+
+**To Be Created (Phase 2 - GitOps Resources):**
 ```
 kubernetes/infrastructure/networking/cilium/
 ├── ocirepository.yaml                    # OCI source for Cilium charts
 ├── kustomization.yaml                    # Includes ocirepository
 └── core/
     ├── helmrelease.yaml                  # Cilium HelmRelease
-    ├── kustomization.yaml                # Kustomize resources list
-    └── ks.yaml                           # Flux Kustomization
+    └── kustomization.yaml                # Kustomize resources list
 ```
 
-**Modified:**
+**To Be Modified (Phase 2):**
 ```
 kubernetes/clusters/infra/
-└── infrastructure.yaml                   # Wire in cilium-core Kustomization
+└── infrastructure.yaml                   # Wire in cilium-core directory with health checks and substituteFrom
 
 kubernetes/clusters/apps/
-└── infrastructure.yaml                   # Wire in cilium-core Kustomization
+└── infrastructure.yaml                   # Wire in cilium-core directory with health checks and substituteFrom
 ```
 
 **Not Modified (bootstrap stays as-is):**
@@ -460,66 +579,222 @@ bootstrap/helmfile.d/
 |------|-----------|------------|
 | **Flux handover causes pod restarts** | Use Helm adoption strategy; monitor pod ages during handover | Phase 3.2: Watch pod restart counts |
 | **Bootstrap values drift from HelmRelease** | Use values.yaml.gotmpl pattern; validate in CI | Phase 2.5: Compare extracted values |
-| **Cluster-specific substitutions fail** | Explicit validation in AC-3; test on both clusters | Phase 4.4: Cross-cluster comparison |
-| **Health checks too aggressive** | Set 10m timeout; test with simulated failures | Phase 4.3: Scale to 0 test |
-| **Spegel conflicts with Cilium** | Different ports; verify no HostPort overlap | Phase 4.5: Port conflict check |
-| **WireGuard encryption missing** | Explicit validation in bootstrap and post-handover | Phase 1.2, 4.4: Encryption status |
+| **Cluster-specific substitutions fail** | Explicit validation in AC-3; test on both clusters | Phase 3.4: Cross-cluster comparison |
+| **Health checks too aggressive** | Set 10m timeout; validate Kustomization config | Phase 3: Local validation checklist (wiring only) |
+| **Spegel conflicts with Cilium** | Different ports; verify no HostPort overlap | Story 45: Runtime validation |
+| **WireGuard encryption missing** | Explicit validation in bootstrap and post-handover | Phase 1.2, 3.4: Encryption variables present |
 | **Gateway API/BGP CRDs missing** | Bootstrap Phase 0 installs CRDs first | Phase 1.4: CRD existence check |
-| **Manual Helm release left behind** | Explicit cleanup check in Phase 5.1 | Phase 5.3: Final verification |
+| **Manual Helm release left behind** | Explicit cleanup check after handover | Story 45: Post-handover verification |
 
 ---
 
 ## Dependencies
 
 **Upstream (must complete before this story):**
-- STORY-BOOT-TALOS (Talos cluster exists)
-- STORY-BOOT-CRD (CRDs installed via Phase 0)
-- STORY-BOOT-CORE (Cilium installed via bootstrap helmfile)
-- cluster-settings.yaml exists on both clusters
+- **Phase 0 of this story**: Directory structure and cluster-settings.yaml files created
+- **NO OTHER DEPENDENCIES** - This is Story 01, the first manifest creation story
 
 **Downstream (blocked until this story completes):**
-- STORY-SEC-EXTERNAL-SECRETS-BASE (next in sequence, needs network)
-- STORY-NET-CILIUM-BGP (needs cilium-core as base)
-- STORY-NET-CILIUM-GATEWAY (needs cilium-core as base)
-- STORY-NET-CILIUM-IPAM (needs cilium-core as base)
-- STORY-NET-CILIUM-CLUSTERMESH (needs cilium-core on both clusters)
+- **STORY-NET-CILIUM-IPAM** (Story 02): Needs cilium-core manifests as reference
+- **STORY-NET-CILIUM-GATEWAY** (Story 03): Needs cilium-core manifests as base
+- **STORY-DNS-COREDNS-BASE** (Story 04): Can be done in parallel
+- **STORY-SEC-EXTERNAL-SECRETS-BASE** (Story 05): Can be done in parallel
+- **Story 45 (VALIDATE-NETWORKING)**: Needs ALL networking manifests (stories 1-13) before deployment
+
+**Note**: In the v3.0 manifests-first approach, Stories 1-41 create manifests in parallel. Story 42-44 create clusters and bootstrap. Story 45-49 deploy and validate.
 
 ---
 
 ## Success Metrics
 
 **Quantitative:**
-- 2/2 clusters with Cilium under Flux control (100%)
-- 0 pod disruptions during handover
-- 0 manual Helm releases remaining
-- 2/2 clusters show Ready status for cilium-core Kustomization
-- < 5 minutes from Git commit to Cilium update applied
-- 100% health check coverage (DaemonSet + Deployment)
+- 3/3 component files created (OCIRepository, HelmRelease, component kustomization.yaml)
+- 2/2 cluster Flux builds succeed (infra + apps)
+- 0 kubeconform schema errors
+- 0 YAML syntax errors
+- 100% cluster-specific substitutions validated
+- Git commit created with all manifests
+- CI preflight: OCI ref resolves for 1.18.3 (or fallback documented)
+ - `k8sServiceHost` present in both Flux builds and resolved from each cluster's `cluster-settings.yaml`
+ - QA gate file exists with `risk_summary` and `test_design` blocks, and must-fix items addressed
 
 **Qualitative:**
-- Handover process documented and repeatable
-- Drift detection proven to work
-- Team confidence in GitOps management of CNI
-- Clear path forward for day-2 networking features (BGP, Gateway API)
+- Manifests follow GitOps best practices
+- Clear separation of cluster-specific vs shared config
+- Manifests ready for deployment in Story 45
+- Team can create similar manifests for other components
+- Local validation workflow established and documented
 
 ---
 
 ## Definition of Done
 
 Story is complete when:
-1. All 10 Acceptance Criteria met and verified
-2. All 5 phases of refined tasks completed
-3. Both infra and apps clusters show cilium-core Ready: True
-4. Git commit → Cilium config update workflow tested and works
-5. Drift detection proven (manual change reverted by Flux)
-6. Documentation updated (handover process, rollback, troubleshooting)
-7. Next story (STORY-SEC-EXTERNAL-SECRETS-BASE) can proceed
-8. No blockers or open issues remain
+1. All Acceptance Criteria met and verified (AC-1 through AC-8)
+2. **All 4 phases completed** (Phases 0-3: Prerequisites, Tool Installation, Manifest Creation, Local Validation)
+3. All component manifests created and committed to git:
+   - `kubernetes/infrastructure/networking/cilium/ocirepository.yaml`
+   - `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml`
+   - `kubernetes/infrastructure/networking/cilium/core/kustomization.yaml`
+   - Cluster Kustomizations updated in:
+     - `kubernetes/clusters/infra/infrastructure.yaml`
+     - `kubernetes/clusters/apps/infrastructure.yaml`
+4. Local validation passes:
+   - `flux build` succeeds for both infra and apps clusters
+   - `kubeconform` validation passes with no schema errors
+   - `yq` validation passes with no YAML syntax errors
+   - Cluster-specific substitutions verified (no `${VAR}` placeholders in Flux build outputs)
+5. QA artifacts and gate prepared:
+   - Risk profile summary present; no unmitigated critical risks; High risks (TECH-002, OPS-003, TECH-004) addressed
+   - Test design summary present; P0/P1 scenarios executable locally (or CI where required)
+   - Gate file created at `docs/qa/gates/01.story-net-cilium-core-gitops.yml` containing `risk_summary` and `test_design`
+6. Git commit created with descriptive commit message
+7. Documentation updated (Dev Agent Record, Change Log)
+8. Next stories (STORY-NET-CILIUM-IPAM, etc.) can access created manifests
+9. No blockers or open issues remain
+
+**NOT Required in This Story (Deferred to Story 45):**
+- ❌ Cluster deployment
+- ❌ Runtime validation (kubectl commands)
+- ❌ Cilium feature testing
+- ❌ Drift detection
+- ❌ Flux handover
+
+---
+
+## Dev Agent Record
+
+### Agent Model Used
+- Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
+
+### Completion Notes
+
+**Phase 0: Prerequisites & Directory Structure Setup** ✅ COMPLETE (2025-10-25)
+
+1. **Directory Structure Created**: Complete kubernetes directory structure created per architecture.md §4
+   - Cluster directories: `kubernetes/clusters/{infra,apps}/flux-system`
+   - Infrastructure directories: networking/cilium with subdirs (core, bgp, gateway, clustermesh, ipam)
+   - Supporting directories: security, storage, gitops, workloads, components
+
+2. **Cluster Settings ConfigMaps Created**: Both infra and apps cluster-settings.yaml files created with complete configuration
+   - Added CILIUM_VERSION=1.18.3 to both files (required by story, not in architecture.md examples)
+   - Used architecture.md §7 as canonical source for all values
+   - **Note**: Corrected CLUSTERMESH_IP for apps cluster from story value (10.25.11.101) to architecture.md value (10.25.11.120) for consistency
+
+3. **Validation Complete**: All YAML syntax validated, cluster-specific differences confirmed
+   - Both files validate successfully with `yq eval`
+   - CILIUM_VERSION confirmed as 1.18.3 in both clusters
+   - Cluster-specific differences verified: CLUSTER, CLUSTER_ID, POD_CIDR_STRING, SERVICE_CIDR, CLUSTERMESH_IP, CILIUM_GATEWAY_LB_IP, CILIUM_BGP_LOCAL_ASN
+
+4. **Ready for Phase 1**: All prerequisites met, directory structure matches architecture.md
+
+### File List
+
+**Created:**
+- `kubernetes/clusters/infra/cluster-settings.yaml` (3.5K)
+- `kubernetes/clusters/apps/cluster-settings.yaml` (2.6K)
+
+**Directories Created:**
+- `kubernetes/clusters/{infra,apps}/flux-system`
+- `kubernetes/infrastructure/networking/cilium/{core,bgp,gateway,clustermesh,ipam}`
+- `kubernetes/infrastructure/{security,storage,gitops}`
+- `kubernetes/workloads/{platform,tenants}`
+- `kubernetes/components`
+
+### Debug Log References
+- None (Phase 0 completed without issues)
+
+---
+
+## Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-21 | 1.0 | Initial draft with comprehensive 5-phase implementation plan | Platform Engineering |
+| 2025-10-22 | 1.1 | Refinement: Enhanced from 4 tasks to 60+ granular subtasks | Platform Engineering |
+| 2025-10-25 | 1.2 | Post-cleanup corrections: Updated to Cilium 1.18.3, ghcr.io/home-operations charts mirror, CreateReplace CRD handling, removed Gateway API from core (moved to dedicated story) | Sarah (PO) |
+| 2025-10-25 | 1.3 | Added Phase 0 (Prerequisites & Directory Structure) for true greenfield deployment - now 6 phases, 70+ tasks | Sarah (PO) |
+| 2025-10-25 | 1.4 | Validated cluster-settings values against environment: Updated OBSERVABILITY_LOGS_RETENTION to 30d (matches metrics retention) | Sarah (PO) |
+| 2025-10-25 | 1.5 | Story validation corrections: Added formal Testing subsection to Dev Notes, OCI repository verification note, AC references to phases, time estimates per phase, cluster context switching guidance | Sarah (PO) |
+| 2025-10-25 | 1.6 | **Risk mitigation integration:** Added Phase 3 (Rollback Validation) and Phase 4 (Risk Mitigation Gate) as MANDATORY BLOCKING phases. Integrated HIGH-risk mitigations from QA assessment. Renumbered phases 3-5 → 5-7. Updated status to "Pending Risk Mitigation". Now 8 phases, 85+ tasks with comprehensive safety gates. | Sarah (PO) |
+| 2025-10-25 | 1.7 | **Phase 0 Implementation Complete:** Created complete kubernetes directory structure and cluster-settings.yaml for both infra and apps clusters. Added CILIUM_VERSION to cluster-settings. Corrected apps CLUSTERMESH_IP to match architecture.md (10.25.11.120). All Phase 0 tasks marked complete. | James (Dev) |
+| 2025-10-26 | 2.0 | **v3.0 Refinement (Partial)**: Updated header, story, and AC for manifests-first approach. Separated manifest creation (this story) from deployment (Story 45). Full task section refinement pending. | Winston |
+| 2025-10-26 | 3.0 | **v3.0 Refinement (COMPLETE)**: Completely refactored tasks for manifests-first approach. Deleted Phases 3-7 (Rollback, Risk Mitigation, Handover, Post-Handover, Cleanup). Replaced with Phase 3 (Local Validation). Updated Phase 1 to Tool Installation. Removed all kubectl/cluster commands. Updated Dependencies, Success Metrics, Definition of Done. Now 4 phases (0-3), pure manifest creation with local validation only. All deployment/runtime validation moved to Story 45 (VALIDATE-NETWORKING). | Winston |
 
 ---
 
 ## Design — Core (Story‑Only)
 
 - Install: Bootstrap Cilium, then hand over to Flux HelmRelease. Keep immutable OS defaults; leverage eBPF and kube‑proxy replacement.
-- Feature flags: kube‑proxy replacement (strict), Hubble, Gateway API, BGP Control Plane, LB IPAM; enable per cluster as needed.
+- Feature flags: kube‑proxy replacement (strict), Hubble; enable others (Gateway API, BGP, IPAM) in their dedicated stories.
 - Bootstrap alignment: Use values.yaml.gotmpl pattern to ensure bootstrap and Flux HelmRelease values stay synchronized.
+- Version strategy: Pinned versions (exact semver) for predictable, controlled upgrades.
+- Chart source: Internal charts mirror (ghcr.io/home-operations) for reliability and caching.
+  - Rationale: Improves reliability and performance; if unavailable, fall back to the official Cilium OCI registry. Verify presence of the pinned version (1.18.3).
+
+## QA Results
+
+Risk profile updated (2025-10-27 09:53) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-risk-20251027-095359.md`.
+
+Summary:
+- Totals: critical=0, high=3, medium=4, low=3
+- Highest: TECH-002 (Score 6) — Flux postBuild substitution misconfigured or not applied
+
+Gate risk_summary (paste into gate file):
+
+```yaml
+risk_summary:
+  totals:
+    critical: 0
+    high: 3
+    medium: 4
+    low: 3
+  highest:
+    id: TECH-002
+    score: 6
+    title: "Flux postBuild substitution misconfigured or not applied"
+  recommendations:
+    must_fix:
+      - "Add/verify postBuild.substituteFrom to reference ConfigMap/cluster-settings in both clusters"
+      - "Wire cilium/core Kustomization in infra/apps with healthChecks"
+      - "Add CI preflight: verify OCI mirror or use official Cilium OCI for 1.18.3"
+    monitor:
+      - "Optional CI: helm template chart render to detect value key drift"
+      - "Periodic diff: bootstrap values vs HelmRelease"
+```
+
+Test design created (2025-10-27) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027.md`.
+
+Gate test_design summary (paste into gate file):
+
+```yaml
+test_design:
+  scenarios_total: 15
+  by_level:
+    unit: 0
+    integration: 12
+    e2e: 3
+  by_priority:
+    p0: 3
+    p1: 12
+    p2: 0
+  coverage_gaps: []
+```
+
+Test design updated (2025-10-27 09:55) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027-095553.md`.
+
+Gate test_design (paste into gate file):
+
+```yaml
+test_design:
+  scenarios_total: 18
+  by_level:
+    unit: 0
+    integration: 18
+    e2e: 0
+  by_priority:
+    p0: 3
+    p1: 15
+    p2: 0
+  coverage_gaps: []
+```

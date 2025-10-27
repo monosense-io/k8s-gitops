@@ -1,8 +1,8 @@
-# 18 — STORY-OBS-FLUENT-BIT-IMPLEMENT — Implement Cluster Log Shipping
+# 22 — STORY-OBS-FLUENT-BIT-IMPLEMENT — Implement Cluster Log Shipping
 
-Sequence: 18/41 | Prev: STORY-OBS-VICTORIA-LOGS-IMPLEMENT.md | Next: STORY-NET-CILIUM-BGP.md
+Sequence: 22/50 | Prev: STORY-OBS-VICTORIA-LOGS-IMPLEMENT.md | Next: STORY-DB-CNPG-OPERATOR.md
 Sprint: 4 | Lane: Observability
-Global Sequence: 18/41
+Global Sequence: 22/50
 
 Status: Draft
 Owner: Platform Engineering

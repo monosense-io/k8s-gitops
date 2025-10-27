@@ -1,8 +1,8 @@
-# 01 — STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
+# 42 — STORY-BOOT-TALOS — Phase −1 Talos Bring‑Up (fresh cluster)
 
-Sequence: 01/41 | Prev: — | Next: STORY-NET-CILIUM-CORE-GITOPS.md
+Sequence: 42/50 | Prev: STORY-GITOPS-SELF-MGMT-FLUX.md | Next: STORY-BOOT-CRDS.md
 Sprint: 1 | Lane: Bootstrap & Platform
-Global Sequence: 1/41
+Global Sequence: 42/50
 
 Status: Done
 Owner: Product → Platform Engineering

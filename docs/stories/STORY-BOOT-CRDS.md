@@ -1,16 +1,18 @@
-# 38 — STORY-BOOT-CRDS — Phase 0 CRD Bootstrap (infra + apps)
+# 43 — STORY-BOOT-CRDS — Create CRD Manifests & Bootstrap Configuration
 
-Sequence: 38/41 | Prev: STORY-BACKUP-VOLSYNC-APPS.md | Next: STORY-GITOPS-SELF-MGMT-FLUX.md
+Sequence: 43/50 | Prev: STORY-BOOT-TALOS.md | Next: STORY-BOOT-CORE.md
 Sprint: 7 | Lane: Bootstrap & Platform
-Global Sequence: 38/41
+Global Sequence: 43/50
 
-Status: Done
-Owner: Scrum Master → Platform Engineering
-Date: 2025-10-21
+Status: Draft (v3.0 Refinement)
+Owner: Platform Engineering
+Date: 2025-10-26 (v3.0 Refinement)
 Links: docs/architecture.md §11.2, bootstrap/helmfile.d/00-crds.yaml
 
 ## Story
-Install and validate all required CustomResourceDefinitions (CRDs) on both clusters (infra, apps) using the Phase 0 Helmfile pipeline. Ensure cert-manager, external-secrets, victoria‑metrics‑operator CRDs (bundle, incl. PrometheusRule compatibility), prometheus‑operator CRDs, and Gateway API CRDs are established before any workloads that depend on them. This guarantees PrometheusRule/ServiceMonitor/VM* resources and External Secrets can reconcile cleanly during Phase 1 and subsequent Flux syncs.
+As a Platform Engineer, I want to create CRD bootstrap manifests and helmfile configuration for both clusters (infra, apps), so that when Story 45 (VALIDATE-NETWORKING) deploys the bootstrap, all required CustomResourceDefinitions are ready for workload deployment.
+
+This story creates the **helmfile configuration** and validates it can template correctly. Actual deployment and validation happen in **Story 45 (VALIDATE-NETWORKING)**.
 
 ## Why / Outcome
 - Prevents race conditions during initial reconciliation.
@@ -18,127 +20,293 @@ Install and validate all required CustomResourceDefinitions (CRDs) on both clust
 - Aligns bootstrap flow with documented architecture and 1Password‑only secrets approach.
 
 ## Scope
-Clusters: infra, apps
-CRDs (exact versions per bootstrap/helmfile.d/00-crds.yaml):
-- cert-manager (v1.19.0) — Certificate, Issuer, ClusterIssuer, etc.
-- external-secrets (0.20.3) — ExternalSecret, (Cluster)SecretStore, etc.
-- victoria‑metrics‑operator CRD bundle (0.5.1) — VMAgent, VMRule, VMServiceScrape, VMPodScrape, VMProbe, VMNodeScrape, VMStaticScrape, VMAuth, VMUser, VMAlertmanagerConfig, VLAgent, VLSingle, VLCluster, etc.
-- prometheus‑operator CRDs (24.0.1) — PrometheusRule, ServiceMonitor, PodMonitor, Probe
-- Gateway API CRDs (v1.4.0) — GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant
 
-Namespaces to exist (both clusters):
-- external-secrets, cert-manager, observability, cnpg-system
+**This Story (Manifest Creation):**
+- Create/update `bootstrap/helmfile.d/00-crds.yaml` with CRD chart configurations
+- Configure CRD versions for both clusters (infra, apps):
+  - cert-manager (v1.19.0) — Certificate, Issuer, ClusterIssuer, etc.
+  - external-secrets (0.20.3) — ExternalSecret, (Cluster)SecretStore, etc.
+  - victoria‑metrics‑operator CRD bundle (0.5.1) — VMAgent, VMRule, VMServiceScrape, etc.
+  - prometheus‑operator CRDs (24.0.1) — PrometheusRule, ServiceMonitor, PodMonitor, Probe
+  - Gateway API CRDs (v1.4.0) — GatewayClass, Gateway, HTTPRoute, GRPCRoute, ReferenceGrant
+- Validate helmfile can template CRDs correctly (local validation only)
+- Create namespace definitions for: external-secrets, cert-manager, observability, cnpg-system
+
+**Deferred to Story 45 (VALIDATE-NETWORKING):**
+- Applying CRDs to clusters
+- Verifying CRDs are Established
+- Runtime validation and health checks
 
 ## Non-Goals
-- Installing operators/controllers (Phase 1). No changes to Flux Kustomizations or workloads.
-- Any data-plane or app deployment.
+- Deploying CRDs (moved to Story 45)
+- Installing operators/controllers (Story 44)
+- Any runtime validation or cluster access
 
 ## Acceptance Criteria
-1) CRDs are applied and established on both clusters (infra, apps):
-   - kubectl get crd | grep -E 'external-secrets|cert-manager|victoria|monitoring.coreos.com|gateway.networking.k8s.io'
-   - Condition Established=True for all CRDs in the explicit wait set (see QA Test Design / GVR list).
-2) Namespaces exist and are Active: external-secrets, cert-manager, observability, cnpg-system.
-3) Phase isolation: only CRDs were applied in this phase (yq filter enforced; audit shows zero non‑CRDs).
-4) PrometheusRule, ServiceMonitor, PodMonitor, VM* CRDs present; kustomize build + kubeconform on infra/apps shows no missing type errors.
-5) Commands/logs and CRD group counts are captured in Dev Notes.
+
+**Manifest Creation (This Story):**
+1) **Helmfile Configuration Exists**:
+   - `bootstrap/helmfile.d/00-crds.yaml` exists and is valid YAML
+   - Contains all required CRD charts with pinned versions
+   - Includes both infra and apps environment configurations
+
+2) **Helmfile Templates Successfully**:
+   - `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template` succeeds
+   - `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template` succeeds
+   - Templated output contains ONLY CustomResourceDefinition kinds (validated with yq filter)
+
+3) **CRD Content Validation**:
+   - Templated CRDs include all required API groups:
+     - cert-manager.io
+     - external-secrets.io
+     - operator.victoriametrics.com
+     - monitoring.coreos.com
+     - gateway.networking.k8s.io
+   - No duplicate CRD names across charts
+   - All CRDs have valid apiVersion, kind, metadata, spec
+
+4) **Namespace Manifests Created**:
+   - Namespace YAML files exist for: external-secrets, cert-manager, observability, cnpg-system
+   - Namespaces validate with `kubectl --dry-run=client`
+
+5) **Version Consistency**:
+   - All CRD chart versions match architecture.md specifications
+   - Versions are identical between infra and apps environments (except cluster-specific values)
+
+**Deferred to Story 45 (Deployment & Validation):**
+- CRDs applied to clusters
+- CRDs Established=True verification
+- Namespace Active status checks
+- Runtime validation
 
 ## Dependencies / Inputs
-- KUBECONFIG contexts for infra and apps set (docs/architecture.md §7).
-- bootstrap/helmfile.d/00-crds.yaml present and version‑pinned.
-- Internet egress to chart registries permitted.
 
-## Tasks / Subtasks (Taskfile is canonical)
-- [x] T0 — Preflight and Apply CRDs (AC: 1, 2)
-  - [x] `task bootstrap:phase:0 CLUSTER=infra` (applies prerequisites)
-  - [x] `task bootstrap:phase:1 CLUSTER=infra` (installs CRDs)
-  - [x] Repeat both for `apps`
-- [x] T1 — Establishment Checks (AC: 1, 3)
-  - [x] `scripts/validate-crd-waitset.sh infra` (validates Established condition)
-  - [x] `kubectl --context=infra get crd` (lists all CRDs)
-  - [x] Repeat both for `apps`
-- [x] T2 — Dry‑Run Verification (AC: 4, 5)
-  - [x] Deferred - kubernetes/clusters manifests require Phase 1+ infrastructure
-- [x] T3 — Artifact Capture (AC: 5)
-  - [x] Record group counts and key command outputs in Dev Notes
+**Upstream (must complete before this story):**
+- Story 42 (STORY-BOOT-TALOS): Clusters exist (for template validation context)
+- docs/architecture.md: CRD version specifications documented
 
-### Appendix: Underlying raw commands (reference only)
-- Infra CRDs apply
-  - `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template | yq ea 'select(.kind == "CustomResourceDefinition")' | kubectl --context=infra apply --server-side --force-conflicts -f -`
-  - `kubectl --context=infra apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml`
-- Apps CRDs apply
-  - `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template | yq ea 'select(.kind == "CustomResourceDefinition")' | kubectl --context=apps apply --server-side --force-conflicts -f -`
-  - `kubectl --context=apps apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml`
-- Validation (manual alternative)
-  - `kubectl --context=<ctx> wait --for=condition=Established crd/<name> --timeout=120s`
+**Required Tools:**
+- helmfile
+- yq
+- kubectl (for dry-run validation only, NO cluster access)
 
-## Validation Steps (CLI)
-- kubectl --context=infra get crd | grep victoriametrics
-- kubectl --context=apps get crd | grep monitoring.coreos.com
-- kubectl --context=infra get ns {external-secrets,cert-manager,observability,cnpg-system}
-- kubectl --context=apps get ns {external-secrets,cert-manager,observability,cnpg-system}
+**Required Access:**
+- None (this is pure manifest creation, no cluster access needed)
+
+## Tasks / Subtasks
+
+**T0 — Review Existing Configuration**
+- [ ] Review existing `bootstrap/helmfile.d/00-crds.yaml` (sample from old cluster)
+- [ ] Identify which parts can be reused vs. need updates
+- [ ] Document any version changes needed
+
+**T1 — Create/Update Helmfile Configuration (AC: 1, 2)**
+- [ ] Update `bootstrap/helmfile.d/00-crds.yaml` with correct CRD chart sources
+- [ ] Pin versions: cert-manager v1.19.0, external-secrets 0.20.3, victoria-metrics-operator 0.5.1, prometheus-operator 24.0.1
+- [ ] Configure both environments (infra, apps) with appropriate values
+- [ ] Add yq filter to ensure only CRDs are included: `select(.kind == "CustomResourceDefinition")`
+
+**T2 — Validate Helmfile Templates (AC: 2, 3)**
+- [ ] Run `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template` (NO cluster needed)
+- [ ] Run `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template` (NO cluster needed)
+- [ ] Verify output contains ONLY CustomResourceDefinition kinds:
+  ```bash
+  helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template | yq ea 'select(.kind != "CustomResourceDefinition")' | wc -l
+  # Should return 0
+  ```
+- [ ] Count CRDs per API group and verify all required groups present
+
+**T3 — Create Namespace Manifests (AC: 4)**
+- [ ] Create `bootstrap/namespaces/external-secrets.yaml`
+- [ ] Create `bootstrap/namespaces/cert-manager.yaml`
+- [ ] Create `bootstrap/namespaces/observability.yaml`
+- [ ] Create `bootstrap/namespaces/cnpg-system.yaml`
+- [ ] Validate namespace YAML: `kubectl --dry-run=client -f <file>`
+
+**T4 — Version Consistency Check (AC: 5)**
+- [ ] Compare versions in helmfile against architecture.md
+- [ ] Verify infra and apps environments use identical versions
+- [ ] Document any intentional version differences
+
+**T5 — Documentation**
+- [ ] Update this story's Dev Notes with template validation output
+- [ ] Document CRD counts per API group
+- [ ] Note any deviations from old cluster configuration
+
+### Appendix: Deployment Commands (MOVED to Story 45)
+
+**These commands are NOT part of this story. They are executed in Story 45 (VALIDATE-NETWORKING):**
+
+```bash
+# Deployment commands (Story 45 only):
+# - Apply CRDs via helmfile
+# - Verify CRDs Established
+# - Runtime validation
+```
+
+See Story 45 for actual deployment and validation procedures.
+
+## Validation Steps (Local - NO Cluster Access)
+
+**Helmfile Template Validation:**
+```bash
+# Validate infra environment templates correctly
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template > /tmp/crds-infra.yaml
+echo "Infra CRD count: $(yq ea 'select(.kind == "CustomResourceDefinition")' /tmp/crds-infra.yaml | grep -c '^---')"
+
+# Validate apps environment templates correctly
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template > /tmp/crds-apps.yaml
+echo "Apps CRD count: $(yq ea 'select(.kind == "CustomResourceDefinition")' /tmp/crds-apps.yaml | grep -c '^---')"
+
+# Verify NO non-CRD kinds
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template | yq ea 'select(.kind != "CustomResourceDefinition")' | wc -l
+# Should output: 0
+```
+
+**Namespace Manifest Validation:**
+```bash
+# Validate namespace files (dry-run, NO cluster access)
+kubectl --dry-run=client -f bootstrap/namespaces/external-secrets.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/cert-manager.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/observability.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/cnpg-system.yaml
+```
+
+**Runtime Validation (MOVED to Story 45):**
+```bash
+# These commands execute in Story 45, NOT this story:
+# - kubectl get crd
+# - kubectl get ns
+# - kubectl wait --for=condition=Established
+```
 
 ## Rollback
-- Not recommended to delete CRDs once applied (would orphan resources). If necessary in lab: kubectl delete crd <name> ...; ensure no dependent resources exist.
+N/A - This story only creates manifest files. No deployment occurs, so no rollback needed. Rollback procedures are in Story 45.
 
 ## Risks / Mitigations
-- Network egress blocked → pre‑flight check, retry with mirror registries.
-- Version skew between Phase 0 and phase 1 charts → align versions in 00‑crds.yaml and core helmfile.
-- Long CRD establishment → increase timeouts; re‑apply.
+
+**Manifest Creation Risks:**
+- **Helmfile syntax errors** → Validate with `helmfile template` before committing
+- **Version skew** → Pin all versions explicitly in helmfile, verify against architecture.md
+- **Missing CRD groups** → Validate templated output includes all required API groups
+
+**Deployment Risks (Story 45):**
+- Network egress blocked → Covered in Story 45
+- Long CRD establishment → Covered in Story 45
+- CRD conflicts → Covered in Story 45
 
 ## Definition of Done
-- All Acceptance Criteria met on both clusters.
-- Dev Notes include command logs and CRD counts.
-- Architecture tracked versions match applied CRDs.
+
+**Manifest Creation Complete:**
+- [ ] `bootstrap/helmfile.d/00-crds.yaml` created/updated with all CRD charts
+- [ ] Helmfile templates successfully for both infra and apps environments
+- [ ] All namespace manifests created in `bootstrap/namespaces/`
+- [ ] Local validation passes (helmfile template, kubectl dry-run)
+- [ ] CRD counts documented in Dev Notes
+- [ ] All versions match architecture.md specifications
+- [ ] Manifests committed to git
+- [ ] Story 45 (VALIDATE-NETWORKING) can proceed with deployment
+
+**NOT Part of DoD (Moved to Story 45):**
+- ❌ CRDs applied to clusters
+- ❌ CRDs Established verification
+- ❌ Runtime validation
 
 ## Architect Handoff
-- Architecture (docs/architecture.md)
-  - Document Phase 0 as CRDs‑only with explicit kinds audit; point to `bootstrap/helmfile.d/00-crds.yaml` and Taskfile phases.
-  - Specify explicit CRD wait set as normative (GVR list in this story / QA doc) and reference in Architecture.
-- PRD (docs/prd.md)
-  - Add NFRs: phase isolation (no controllers in Phase 0), idempotent CRD re‑apply, dry‑run validation with kubeconform before Phase 1.
-  - Add acceptance: CI dry‑run step present (see Automation Align story) and passes.
+
+- **Architecture (docs/architecture.md)**
+  - Update to clarify this story (43) creates CRD bootstrap manifests in Sprint 7 (after all other manifests in stories 1-41)
+  - Point to `bootstrap/helmfile.d/00-crds.yaml` as the source of truth for CRD versions
+  - Document that deployment and establishment validation happen in Story 45 (VALIDATE-NETWORKING)
+  - Note: CRDs are created in this story but NOT applied to clusters yet
+
+- **PRD (docs/prd.md)**
+  - Add NFR: All CRD manifests must validate locally (helmfile template) before Story 45 deployment
+  - Add NFR: CRD chart versions must match architecture.md specifications exactly
+  - Remove deployment-related NFRs (moved to Story 45)
+  - Note: Runtime validation criteria moved to Story 45
 
 ## Dev Notes
 
-### Execution Summary (2025-10-21)
+### v3.0 Manifests-First Approach
 
-**Phase 0+1 Execution:**
-- Infra cluster: `task bootstrap:phase:0 CLUSTER=infra` + `task bootstrap:phase:1 CLUSTER=infra` ✅
-- Apps cluster: `task bootstrap:phase:0 CLUSTER=apps` + `task bootstrap:phase:1 CLUSTER=apps` ✅
+**This Story Creates Manifests (NO Deployment)**:
+- Creates/updates `bootstrap/helmfile.d/00-crds.yaml`
+- Creates namespace manifests in `bootstrap/namespaces/`
+- Validates locally with `helmfile template` (NO cluster access needed)
+- Commits manifests to git
 
-**CRD Counts:**
-- Infra cluster: 77 CRDs (cert-manager, external-secrets, victoria-metrics-operator, prometheus-operator, cloudnative-pg, Gateway API)
-- Apps cluster: 77 CRDs (matching infra)
+**Deployment Happens in Story 45 (VALIDATE-NETWORKING)**:
+- Story 45 applies CRDs to both clusters
+- Story 45 verifies CRDs Established
+- Story 45 validates namespaces Active
+- See Story 45 for runtime validation evidence
 
-**Namespaces Created:**
-- external-secrets (Active)
-- flux-system (Active)
-- Note: observability and cnpg-system not created in Phase 0 (will be created by operators in Phase 1+)
+### Local Validation Commands (NO Cluster)
 
-**Establishment Validation:**
-```
-scripts/validate-crd-waitset.sh infra
-✓ prometheusrules.monitoring.coreos.com Established
-✓ servicemonitors.monitoring.coreos.com Established
-✓ podmonitors.monitoring.coreos.com Established
-✓ externalsecrets.external-secrets.io Established
-✓ secretstores.external-secrets.io Established
-✓ clustersecretstores.external-secrets.io Established
-✓ issuers.cert-manager.io Established
-✓ clusterissuers.cert-manager.io Established
-✓ certificates.cert-manager.io Established
-✓ gateways.gateway.networking.k8s.io Established
-✓ gatewayclasses.gateway.networking.k8s.io Established
-✓ httproutes.gateway.networking.k8s.io Established
-All required CRDs Established in context: infra
+**Template Validation (Infra Environment):**
+```bash
+# Validate helmfile templates correctly for infra cluster
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template > /tmp/crds-infra.yaml
+
+# Count CRDs (should be ~77)
+yq ea 'select(.kind == "CustomResourceDefinition")' /tmp/crds-infra.yaml | grep -c '^---'
+
+# Verify NO non-CRD kinds (should output 0)
+yq ea 'select(.kind != "CustomResourceDefinition")' /tmp/crds-infra.yaml | wc -l
+
+# List CRD groups
+yq ea 'select(.kind == "CustomResourceDefinition") | .spec.group' /tmp/crds-infra.yaml | sort -u
 ```
 
-Apps cluster validation: identical results (all CRDs Established)
+**Expected CRD Groups:**
+- cert-manager.io
+- external-secrets.io
+- operator.victoriametrics.com
+- monitoring.coreos.com
+- gateway.networking.k8s.io
+- postgresql.cnpg.io (CloudNative-PG)
 
-**Bug Fixed:**
-- Taskfile bug: `phase:0`, `phase:1`, `phase:2`, `phase:3` tasks missing `CONTEXT` default
-- Fix: Added `CONTEXT: '{{.CONTEXT | default .CLUSTER}}'` to all phase task vars
-- File: `.taskfiles/bootstrap/Taskfile.yaml`
+**Template Validation (Apps Environment):**
+```bash
+# Validate apps environment (should match infra)
+helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template > /tmp/crds-apps.yaml
+yq ea 'select(.kind == "CustomResourceDefinition")' /tmp/crds-apps.yaml | grep -c '^---'
+```
+
+**Namespace Validation (NO Cluster):**
+```bash
+# Validate namespace manifests with kubectl dry-run (client-side only)
+kubectl --dry-run=client -f bootstrap/namespaces/external-secrets.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/cert-manager.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/observability.yaml
+kubectl --dry-run=client -f bootstrap/namespaces/cnpg-system.yaml
+```
+
+### Expected CRD Counts (from old cluster, to be validated)
+- **Total**: ~77 CRDs per cluster (infra and apps identical)
+- **cert-manager**: ~6 CRDs (Issuer, ClusterIssuer, Certificate, etc.)
+- **external-secrets**: ~8 CRDs (ExternalSecret, SecretStore, ClusterSecretStore, etc.)
+- **victoria-metrics-operator**: ~15 CRDs (VMAgent, VMAlert, VMAlertmanager, etc.)
+- **prometheus-operator**: ~8 CRDs (ServiceMonitor, PodMonitor, PrometheusRule, etc.)
+- **Gateway API**: ~10 CRDs (Gateway, GatewayClass, HTTPRoute, etc.)
+- **CloudNative-PG**: ~10 CRDs (Cluster, Pooler, Backup, etc.)
+
+### Manifest Validation Checklist
+- [ ] `bootstrap/helmfile.d/00-crds.yaml` exists and is valid YAML
+- [ ] Helmfile templates successfully for both infra and apps
+- [ ] Output contains ONLY CustomResourceDefinition kinds
+- [ ] All expected CRD groups present
+- [ ] CRD counts match expectations (~77 per cluster)
+- [ ] Namespace manifests validate with kubectl dry-run
+- [ ] All versions match architecture.md specifications
+- [ ] Manifests committed to git
+
+**Runtime Validation (MOVED TO STORY 45):**
+- CRDs applied to clusters → Story 45
+- CRDs Established verification → Story 45
+- Namespace Active status → Story 45
+- API discovery checks → Story 45
 
 *** End of Story ***
 
@@ -146,178 +314,254 @@ Apps cluster validation: identical results (all CRDs Established)
 
 ## PO Validation (docs/stories/STORY-BOOT-CRDS.md)
 
-Status: PASS — Final, Ready for Dev
-Date: 2025-10-21
+**v3.0 Refinement Note**: This story has been updated for the manifests-first approach. Original PO validation was for v2.x (bootstrap-first). The v3.0 scope focuses on manifest creation only.
 
-Validation Summary
-- Scope matches architecture (Section 11.2) and bootstrap plan (Phase 0). Versions pinned to 00-crds.yaml. Namespaces aligned (observability; cnpg-system). 1Password-only approach unaffected by CRDs.
-- QA Test Design and Risk Assessment integrated; explicit GVR wait set defined; acceptance criteria reflect phase isolation and audit logging.
+**Status**: Draft (v3.0 Refinement)
+**Date**: 2025-10-26 (v3.0 Refinement)
 
-Minor Clarifications (addressed in this story)
-- Pinned CRD versions to exact values from bootstrap/helmfile.d/00-crds.yaml to avoid drift.
-- Added preferred Taskfile entrypoints.
+**v3.0 Validation Summary**:
+- Story now creates CRD bootstrap manifests ONLY (no deployment)
+- Helmfile configuration created/updated in `bootstrap/helmfile.d/00-crds.yaml`
+- Namespace manifests created in `bootstrap/namespaces/`
+- Local validation with `helmfile template` and `kubectl --dry-run=client`
+- Deployment and runtime validation moved to Story 45 (VALIDATE-NETWORKING)
 
-Entry/Exit Criteria
-- Entry: kube contexts available; network egress open; namespaces present or created.
-- Exit: CRDs Established on both clusters; dry-run kustomize build has no missing types; Dev Notes include command logs and CRD counts.
+**Entry Criteria (v3.0)**:
+- Tools installed: helmfile, yq, kubectl
+- Story 42 (STORY-BOOT-TALOS) complete (but clusters NOT created yet in v3.0)
+- Access to `docs/architecture.md` for version specifications
 
-Dependencies
-- bootstrap/helmfile.d/00-crds.yaml present; yq + helmfile available.
+**Exit Criteria (v3.0)**:
+- `bootstrap/helmfile.d/00-crds.yaml` exists and templates successfully
+- All namespace manifests created and validate with `kubectl --dry-run=client`
+- CRD counts documented in Dev Notes
+- Manifests committed to git
+- Story 45 ready to proceed with deployment
 
-Approval
-- Approved for implementation in Sprint 0 as the first story. Proceed to Dev.
+**Dependencies (v3.0)**:
+- bootstrap/helmfile.d/00-crds.yaml (to be created/updated)
+- docs/architecture.md (for version specifications)
+- yq, helmfile, kubectl (for local validation)
 
----
-
-## PO Correct-Course Review
-
-Critical
-- Enforce explicit CRD wait set: list exact CRD names to `kubectl wait --for=condition=Established` (e.g., `prometheusrules.monitoring.coreos.com`, `servicemonitors.monitoring.coreos.com`, `podmonitors.monitoring.coreos.com`, `gateways.gateway.networking.k8s.io`, `gatewayclasses.gateway.networking.k8s.io`, `httproutes.gateway.networking.k8s.io`, key `operator.victoriametrics.com/*` CRDs, `externalsecrets.external-secrets.io`, `clustersecretstores.external-secrets.io`, `issuers.cert-manager.io`, `clusterissuers.cert-manager.io`, `certificates.cert-manager.io`). Avoid relying only on greps.
-- Assert idempotency and phase isolation: this story must not apply any non‑CRD manifests; ensure Flux (if present) is paused for any Kustomizations that would otherwise fail on missing CRDs, or run this before Phase 1. Capture this in Preconditions.
-- Namespaces pre-creation as a task, not a note: move “ensure namespaces exist” to an explicit task with concrete command and acceptance check (Status=Active) for external-secrets, cert‑manager, observability, cnpg-system.
-
-Should‑Fix
-- Prefer Taskfile shims for repeatability: document that `task bootstrap:infra-crds` and `task bootstrap:apps-crds` are the canonical entrypoints (wrap the helmfile+yq pipeline). Keep raw commands as fallback.
-- Gateway API CRDs check-before-apply: add a short-circuit (skip apply if CRDs already present) to reduce churn on re-runs.
-- Version lock note: state that any version bump in `bootstrap/helmfile.d/00-crds.yaml` requires updating this story’s version bullets and running in both clusters.
-- Validation depth: add `kubectl api-resources | grep -E 'monitoring.coreos.com|operator.victoriametrics.com|gateway.networking.k8s.io'` to confirm API discovery, and run `kubeconform` against `kubernetes/clusters/{infra,apps}` as part of the acceptance.
-
-Nice‑to‑Have
-- Record metrics: capture counts per CRD group before/after (for audit) and attach to Dev Notes.
-- Add CI job stub: define a lightweight CI check to assert CRDs presence (non-blocking until infra is ready).
-- Include rollback note per CRD group: links to vendor docs warning against deleting CRDs with extant resources.
+**Approval (v3.0)**:
+- Pending v3.0 PO review after refinement complete
 
 ---
 
-## QA Risk Assessment (concise)
+## PO Correct-Course Review (v2.x — Archived)
 
-- R1 — Version skew (Phase 0 vs Phase 1): Prob=Medium, Impact=High. Mitigation: Pin versions (done), align core helmfile, run kubeconform dry‑run.
-- R2 — Partial CRD application: Prob=Medium, Impact=High. Mitigation: Explicit Established waits for enumerated GVRs, re‑apply idempotently.
-- R3 — API discovery lag: Prob=Medium, Impact=Medium. Mitigation: brief retry before validation; `api-resources` checks.
-- R4 — Missing namespaces: Prob=Low, Impact=Medium. Mitigation: T1 creates + waits Active.
-- R5 — Gateway API mismatch: Prob=Low, Impact=Medium. Mitigation: pin v1.4.0; short‑circuit if present.
-- R6 — Egress/outage during template: Prob=Medium, Impact=Medium. Mitigation: retry/backoff; use mirrors if needed.
-- R7 — Non‑CRDs applied accidentally: Prob=Low, Impact=High. Mitigation: mandatory yq filter; kinds audit.
+**Note**: This section reflects v2.x approach (deployment in this story). For v3.0, deployment tasks moved to Story 45.
+
+**Archived for reference** (these apply to Story 45 in v3.0):
+- Explicit CRD wait set for `kubectl wait --for=condition=Established`
+- Idempotency and phase isolation checks
+- Runtime namespace Active status validation
+- API discovery validation with `kubectl api-resources`
+- Kubeconform validation against cluster manifests
+
+**v3.0 Equivalent**:
+- This story: Create manifests, validate locally
+- Story 45: Apply manifests, runtime validation
 
 ---
 
-## QA Test Design — STORY-BOOT-CRDS
+## QA Risk Assessment (v3.0 — Manifest Creation Only)
 
-Scope
-- Validate Phase 0 CRD bootstrap on both clusters (infra, apps) yields only CRDs, establishes them reliably, and enables downstream manifests to validate (kubeconform).
+**Reviewer**: Quinn (Test Architect & Quality Advisor)
 
-Environments
-- kube contexts: `infra`, `apps` (pointing to the respective clusters).
+**v3.0 Scope**: This story creates manifests only (NO deployment). Deployment risks moved to Story 45.
 
-Test Data (versions pinned)
-- cert-manager v1.19.0, external-secrets 0.20.3, victoria-metrics-operator CRDs 0.5.1, prometheus-operator CRDs 24.0.1, Gateway API CRDs v1.4.0.
+**Manifest Creation Risks**:
 
-Preconditions
-- Tools: kubectl, helmfile, yq, kustomize, kubeconform available.
-- Network egress to chart registries.
-- Namespaces exist or will be created: external-secrets, cert-manager, observability, cnpg-system.
+- **R1 — Helmfile Template Failure**: Prob=Low, Impact=High
+  - Risk: `helmfile template` fails due to invalid chart references or syntax errors
+  - Mitigation: Validate helmfile YAML syntax before templating; use pinned chart versions from architecture.md
+  - Test: Run `helmfile template` for both infra and apps environments
 
-Explicit CRD Wait Set (GVRs)
-- monitoring.coreos.com: prometheusrules, servicemonitors, podmonitors, probes
-- operator.victoriametrics.com: vmagents, vmrules, vmservicescrapes, vmpodscrapes, vmprobes, vmnodescrapes, vmstaticscrapes, vmauths, vmusers, vmalertmanagerconfigs, vlsingles, vlclusters, vlagents (exact names per chart)
-- external-secrets.io: externalsecrets, secretstores, clustersecretstores
-- cert-manager.io: issuers, clusterissuers, certificates, certificaterequests, challenges, orders
-- gateway.networking.k8s.io: gatewayclasses, gateways, httproutes, grpcroutes, referencegrants
+- **R2 — Version Mismatch with Architecture**: Prob=Medium, Impact=Medium
+  - Risk: CRD chart versions in helmfile don't match architecture.md specifications
+  - Mitigation: Cross-reference all versions with architecture.md during creation; document version source
+  - Test: Manual verification of all chart versions against architecture.md
 
-Traceability (Acceptance → Tests)
-- A1 (CRDs applied/established) → TCRD-003/004/005/006
-- A2 (Namespaces exist) → TCRD-001
-- A3 (CRDs only in Phase 0) → TCRD-002
-- A4 (Downstream types present; dry-run OK) → TCRD-007/008
-- A5 (Command logs) → TCRD-012
+- **R3 — Non-CRD Resources in Template Output**: Prob=Low, Impact=High
+  - Risk: Helmfile templates include non-CRD resources (controllers, services, etc.)
+  - Mitigation: Use `yq` filter to verify ONLY CustomResourceDefinition kinds; document expected CRD count
+  - Test: Template output validation with `yq ea 'select(.kind != "CustomResourceDefinition")' | wc -l` (should be 0)
 
-Test Cases
-- TCRD-001 — Namespace pre-creation
-  - Steps: kubectl --context=<ctx> get ns; if missing, kubectl create ns; wait for Active.
-  - Expected: external-secrets, cert-manager, observability, cnpg-system are Active.
+- **R4 — Missing Required CRD Groups**: Prob=Medium, Impact=High
+  - Risk: Not all required CRD groups included in helmfile configuration
+  - Mitigation: List expected groups in Dev Notes; validate all groups present in template output
+  - Test: Extract CRD groups with `yq ea '.spec.group'` and compare against expected list
 
-- TCRD-002 — Helmfile template emits only CRDs
-  - Steps: helmfile -f bootstrap/helmfile.d/00-crds.yaml -e <ctx> template | yq ea 'select(.kind == "CustomResourceDefinition")' > /tmp/crds.yaml; diff against unfiltered output kinds.
-  - Expected: No kinds other than CustomResourceDefinition; non-CRD kinds count = 0.
+- **R5 — Namespace Manifest Validation Failure**: Prob=Low, Impact=Low
+  - Risk: Namespace YAML files have syntax errors
+  - Mitigation: Use `kubectl --dry-run=client` for validation (NO cluster access needed)
+  - Test: Validate all namespace files with kubectl dry-run
 
-- TCRD-003 — Apply CRDs (infra)
-  - Steps: Apply filtered CRDs; apply Gateway API CRDs v1.4.0 if not present.
-  - Expected: kubectl apply success; no conflicts; server-side apply accepted.
+- **R6 — Git Commit Issues**: Prob=Low, Impact=Medium
+  - Risk: Manifests not committed to git, blocking Story 45
+  - Mitigation: Explicit task to commit and push; verify files in remote repository
+  - Test: Check git status and remote branch
 
-- TCRD-004 — Wait Established (infra, explicit list)
-  - Steps: For each GVR in wait set, kubectl --context=infra wait --for=condition=Established crd/<gvr> --timeout=120s.
-  - Expected: All return success; failures logged.
+**Deployment Risks (MOVED TO STORY 45)**:
+- CRD Establishment failures → Story 45
+- API discovery lag → Story 45
+- Namespace Active status → Story 45
+- Partial CRD application → Story 45
+- Runtime idempotency → Story 45
 
-- TCRD-005 — Apply CRDs (apps)
-  - Steps: Same as TCRD-003 for apps cluster.
-  - Expected: Success.
+**Overall Risk Score (v3.0)**: 25/100 (Low - manifest creation only, no cluster impact)
 
-- TCRD-006 — Wait Established (apps, explicit list)
-  - Steps: Same as TCRD-004 for apps cluster.
-  - Expected: All return success; failures logged.
+---
 
-- TCRD-007 — API discovery checks
-  - Steps: kubectl --context=<ctx> api-resources | grep -E 'monitoring.coreos.com|operator.victoriametrics.com|gateway.networking.k8s.io'
-  - Expected: Groups and resources are listed for both clusters.
+## QA Test Design — STORY-BOOT-CRDS (v3.0)
 
-- TCRD-008 — Dry-run compile and schema check
-  - Steps: kustomize build kubernetes/clusters/<ctx> | kubeconform -strict -ignore-missing-schemas
-  - Expected: No "unknown type" or schema errors due to missing CRDs.
+**Designer**: Quinn (Test Architect)
 
-- TCRD-009 — Idempotency re-run
-  - Steps: Re-run TCRD-003/005 (apply) and waits.
-  - Expected: No changes; apply is idempotent; waits succeed quickly.
+**v3.0 Scope**: Validate CRD manifest creation and local validation (NO deployment to clusters).
 
-- TCRD-010 — Partial failure recovery (simulated)
-  - Steps: Temporarily delete one non-critical CRD (in a lab) and re-apply Phase 0; DO NOT perform in shared env.
-  - Expected: CRD restored; Established condition returns.
+**Test Strategy Overview**:
+- Focus: Manifest quality, helmfile templating, local validation
+- NO cluster access required
+- All tests run locally without runtime dependencies
+- Deployment testing moved to Story 45 (VALIDATE-NETWORKING)
 
-- TCRD-011 — Gateway API present short-circuit
-  - Steps: If crd/gatewayclasses.gateway.networking.k8s.io exists, skip re-applying standard-install.yaml.
-  - Expected: No re-apply churn; test passes; documented.
+**Environments**:
+- Local workstation with tools: helmfile, yq, kubectl
+- NO cluster contexts needed (validation is local-only)
 
-- TCRD-012 — Artifacts capture
-  - Steps: Record `kubectl get crd -A | wc -l`, grouped counts per API group; store in Dev Notes.
-  - Expected: Counts recorded and attached.
+**Test Data (versions pinned)**:
+- cert-manager v1.19.0
+- external-secrets 0.20.3
+- victoria-metrics-operator CRDs 0.5.1
+- prometheus-operator CRDs 24.0.1
+- Gateway API CRDs v1.4.0
+- CloudNative-PG CRDs (version from architecture.md)
 
-Negative Tests
-- NGT-001 — Non-CRD detection
-  - Steps: Intentionally inspect unfiltered helmfile output and ensure the pipeline’s yq filter blocks non‑CRDs.
-  - Expected: Guard works; only CRDs proceed.
+**Preconditions**:
+- Tools installed: kubectl, helmfile, yq
+- Story 42 (STORY-BOOT-TALOS) complete (documentation only, clusters NOT created)
+- Access to `docs/architecture.md` for version specifications
+- Git repository available for commits
 
-- NGT-002 — Missing namespaces
-  - Steps: Run apply without namespaces then re-run after creating them.
-  - Expected: First run warns/fails on namespace checks; second run succeeds.
+**Expected CRD Groups** (for validation):
+- cert-manager.io
+- external-secrets.io
+- operator.victoriametrics.com
+- monitoring.coreos.com
+- gateway.networking.k8s.io
+- postgresql.cnpg.io
 
-- NGT-003 — Version skew
-  - Steps: Build core helmfile with mismatched CRD versions in a dry-run env.
-  - Expected: Validation fails; mitigation path: align versions and re-run Phase 0.
+**Traceability (Acceptance → Tests)**:
+- AC1 (Helmfile configuration exists) → TCRD-001
+- AC2 (Helmfile templates successfully) → TCRD-002, TCRD-003
+- AC3 (CRD content validation) → TCRD-004, TCRD-005
+- AC4 (Namespace manifests created) → TCRD-006
+- AC5 (Version consistency) → TCRD-007
 
-Go/No‑Go
-- GO: All waits succeed and dry-run checks pass on infra and apps.
-- NO-GO: Any CRD wait fails or dry-run shows missing types; investigate and fix before Phase 1.
+**Test Cases (v3.0 — Local Validation Only)**:
 
-## Definition of Done
-- All Acceptance Criteria met on both clusters.
-- Namespaces Active: external-secrets, cert-manager, observability, cnpg-system.
-- CRDs present and Established=True for explicit wait set.
-- `kustomize build` + `kubeconform` pass for infra and apps (no missing types).
-- Dev Notes include commands, outputs, and CRD group counts.
+**TCRD-001 — Helmfile Configuration Exists**
+- **Priority**: P0 (critical)
+- **Steps**:
+  1. Verify `bootstrap/helmfile.d/00-crds.yaml` exists
+  2. Validate YAML syntax: `yamllint bootstrap/helmfile.d/00-crds.yaml`
+  3. Check file contains releases for all required CRD charts
+- **Expected**: File exists, valid YAML, all CRD charts present
+- **Test Type**: Functional
 
-## Dev Notes
-- Entry points:
-  - Phase 0 prerequisites: `task bootstrap:phase:0 CLUSTER=<infra|apps>`
-  - CRD install: `task bootstrap:phase:1 CLUSTER=<infra|apps>`
-- Helmfile CRDs-only path: `bootstrap/helmfile.d/00-crds.yaml` (filtered to kind=CustomResourceDefinition via yq in Taskfile).
-- Gateway API CRDs v1.4.0 applied explicitly; short‑circuit if already present.
-- Required namespaces: external-secrets, cert-manager, observability, cnpg-system.
-- Tools: kubectl, helmfile, yq, kustomize, kubeconform.
+**TCRD-002 — Helmfile Templates Successfully (Infra)**
+- **Priority**: P0 (critical)
+- **Steps**:
+  1. Run `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e infra template > /tmp/crds-infra.yaml`
+  2. Verify command exits with status 0
+  3. Verify output file is not empty
+- **Expected**: Template succeeds, output contains CRD YAML
+- **Test Type**: Functional
 
-### Testing
-- Use `task bootstrap:validate:crds CONTEXT=<ctx>` to assert CRD presence and establishment.
-- Dry‑run downstream manifests:
-  - `kustomize build kubernetes/clusters/<ctx> | kubeconform -strict -ignore-missing-schemas`.
-- Capture counts per API group and attach to Dev Notes.
+**TCRD-003 — Helmfile Templates Successfully (Apps)**
+- **Priority**: P0 (critical)
+- **Steps**:
+  1. Run `helmfile -f bootstrap/helmfile.d/00-crds.yaml -e apps template > /tmp/crds-apps.yaml`
+  2. Verify command exits with status 0
+  3. Verify output matches infra output (identical CRDs)
+- **Expected**: Template succeeds, apps = infra CRDs
+- **Test Type**: Functional
+
+**TCRD-004 — Template Output Contains ONLY CRDs**
+- **Priority**: P0 (critical)
+- **Steps**:
+  1. Filter template output: `yq ea 'select(.kind != "CustomResourceDefinition")' /tmp/crds-infra.yaml`
+  2. Count non-CRD kinds: `wc -l`
+- **Expected**: Count = 0 (no non-CRD resources)
+- **Test Type**: Functional, Negative
+
+**TCRD-005 — All Required CRD Groups Present**
+- **Priority**: P0 (critical)
+- **Steps**:
+  1. Extract CRD groups: `yq ea 'select(.kind == "CustomResourceDefinition") | .spec.group' /tmp/crds-infra.yaml | sort -u`
+  2. Compare against expected groups list (see Preconditions)
+- **Expected**: All 6 expected groups present
+- **Test Type**: Functional
+
+**TCRD-006 — Namespace Manifests Validate**
+- **Priority**: P1 (high)
+- **Steps**:
+  1. Validate external-secrets: `kubectl --dry-run=client -f bootstrap/namespaces/external-secrets.yaml`
+  2. Validate cert-manager: `kubectl --dry-run=client -f bootstrap/namespaces/cert-manager.yaml`
+  3. Validate observability: `kubectl --dry-run=client -f bootstrap/namespaces/observability.yaml`
+  4. Validate cnpg-system: `kubectl --dry-run=client -f bootstrap/namespaces/cnpg-system.yaml`
+- **Expected**: All commands succeed with dry-run validation
+- **Test Type**: Functional
+
+**TCRD-007 — Version Consistency Check**
+- **Priority**: P1 (high)
+- **Steps**:
+  1. Extract chart versions from helmfile.d/00-crds.yaml
+  2. Compare against versions in docs/architecture.md
+  3. Verify infra and apps environments use identical versions
+- **Expected**: All versions match architecture.md exactly
+- **Test Type**: Functional
+
+**TCRD-008 — CRD Count Validation**
+- **Priority**: P2 (medium)
+- **Steps**:
+  1. Count total CRDs: `yq ea 'select(.kind == "CustomResourceDefinition")' /tmp/crds-infra.yaml | grep -c '^---'`
+  2. Compare against expected count (~77 CRDs)
+- **Expected**: Count matches expected (~77 ± 5 depending on chart versions)
+- **Test Type**: Functional
+
+**Negative Tests**:
+
+**NGT-001 — Non-CRD Detection**
+- **Priority**: P0 (critical)
+- **Steps**: Intentionally inspect unfiltered helmfile output for non-CRD resources
+- **Expected**: yq filter successfully blocks all non-CRD kinds
+- **Test Type**: Negative
+
+**NGT-002 — Invalid Helmfile Syntax**
+- **Priority**: P1 (high)
+- **Steps**: Introduce syntax error in helmfile, attempt to template
+- **Expected**: Helmfile template command fails with clear error message
+- **Test Type**: Negative
+
+**NGT-003 — Version Mismatch Detection**
+- **Priority**: P2 (medium)
+- **Steps**: Manually check for version mismatches between helmfile and architecture.md
+- **Expected**: Any mismatch detected and documented
+- **Test Type**: Negative
+
+**Go/No-Go Criteria (v3.0)**:
+- **GO**: All P0 tests pass, manifests committed to git, Story 45 can proceed
+- **NO-GO**: Any P0 test fails, helmfile templating broken, CRD groups missing
+
+**Runtime Validation Tests (MOVED TO STORY 45)**:
+- CRD apply and Established validation → Story 45
+- API discovery checks → Story 45
+- Namespace Active status → Story 45
+- Idempotency testing → Story 45
+
+---
 
 ## Change Log
 | Date       | Version | Description                          | Author |
@@ -326,6 +570,7 @@ Go/No‑Go
 | 2025-10-21 | 1.1     | Tasks→checkboxes; DoD, notes, tests  | SM     |
 | 2025-10-21 | 1.2     | Approved for Dev                     | SM     |
 | 2025-10-21 | 1.3     | Implemented explicit CRD waits + helper script; set to Review pending cluster run | Dev (James) |
+| 2025-10-26 | 2.0     | **v3.0 Refinement**: Separated manifest creation from deployment. Deployment moved to Story 45. Updated AC, tasks, validation, QA sections for manifests-first approach. | Winston |
 | 2025-10-21 | 1.4     | Executed Phase 0+1 on both clusters; fixed Taskfile bug; 77 CRDs Established; Ready for QA | Dev (James) |
 
 ## Dev Agent Record

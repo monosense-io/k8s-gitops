@@ -1,8 +1,0 @@
----
-apiVersion: kustomize.config.k8s.io/v1alpha1
-kind: Component
-resources:
-  - cilium-pdb.yaml
-  - rook-ceph-mon-pdb.yaml
-  - rook-ceph-mgr-pdb.yaml
-  - victoria-metrics-pdb.yaml

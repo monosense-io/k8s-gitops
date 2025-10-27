@@ -1,8 +1,8 @@
-# 41 — STORY-BOOT-AUTOMATION-ALIGN — Canonicalize Bootstrap via Taskfiles
+# 50 — STORY-BOOT-AUTOMATION-ALIGN — Canonicalize Bootstrap via Taskfiles
 
-Sequence: 41/41 | Prev: STORY-BOOT-CORE.md | Next: —
+Sequence: 50/50 | Prev: STORY-VALIDATE-MESSAGING-TENANCY.md | Next: —
 Sprint: 7 | Lane: Bootstrap & Platform
-Global Sequence: 41/41
+Global Sequence: 50/50
 
 Status: Draft
 Owner: Product → Platform Engineering

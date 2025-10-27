@@ -36,7 +36,7 @@ Owner: QA (Quinn)
 - PERF-001: Start with documented resource requests; monitor pods for throttling/restarts; tune in day‑2 via Flux.
 - SEC-003: Add `kubectl rollout status` for cert-manager/webhook (already in story AC); ensure CRDs came from Phase 0.
 - OPS-001: Confirm Service CIDR/clusterIP from cluster-settings; ensure no collision with Talos defaults.
-- TECH-003: Use known-good Cilium version (1.18.2); verify `cilium status` after rollout.
+- TECH-003: Use known-good Cilium version (1.18.3); verify `cilium status` after rollout.
 
 ## Risk-Based Testing Strategy
 - Priority 1 (High risks)

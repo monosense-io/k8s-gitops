@@ -46,7 +46,7 @@ tasks:
       - |
         {{if eq .DRY_RUN "true"}}
         echo "  → [DRY-RUN] Would bootstrap Cilium via Helm using:"
-        echo "     helm upgrade --install cilium cilium/cilium -n kube-system -f bootstrap/clusters/{{.CLUSTER}}/cilium-values.yaml --version 1.18.2"
+        echo "     helm upgrade --install cilium cilium/cilium -n kube-system -f bootstrap/clusters/{{.CLUSTER}}/cilium-values.yaml --version 1.18.3"
         echo "  → [DRY-RUN] Would install Flux controllers and apply flux-system kustomization"
         echo "  → [DRY-RUN] Would reconcile cluster root and wait for controllers"
         {{else}}
@@ -57,7 +57,7 @@ tasks:
           --kube-context {{.CONTEXT}} \
           --namespace kube-system \
           --create-namespace \
-          --version 1.18.2 \
+          --version 1.18.3 \
           -f {{.BOOTSTRAP_DIR}}/clusters/{{.CLUSTER}}/cilium-values.yaml
         echo "  → Waiting for Cilium DaemonSet to be Ready..."
         kubectl --context={{.CONTEXT}} -n kube-system rollout status daemonset/cilium --timeout=5m
