@@ -1,0 +1,9 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: infra-pool
+spec:
+  blocks:
+    - start: "10.25.11.100"
+      stop: "10.25.11.119"
+  serviceSelector: {}

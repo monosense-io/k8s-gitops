@@ -4,10 +4,11 @@ Sequence: 03/50 | Prev: STORY-NET-CILIUM-IPAM.md | Next: STORY-DNS-COREDNS-BASE.
 Sprint: 1 | Lane: Networking
 Global Sequence: 03/50
 
-Status: Draft (v3.0 Refinement)
+## Status
+Approved
 Owner: Platform Engineering
 Date: 2025-10-26 (v3.0 Refinement)
-Links: docs/architecture.md §9; kubernetes/infrastructure/networking/cilium/gateway/
+Links: docs/architecture.md §10 Networking (Cilium); kubernetes/infrastructure/networking/cilium/gateway/
 
 ---
 
@@ -56,13 +57,13 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
    - `kubernetes/infrastructure/networking/cilium/gateway/gateway.yaml` exists
    - Gateway name: `cluster-gateway` in `kube-system` namespace
    - References GatewayClass `cilium`
-   - Specifies LoadBalancer IP via annotation: `${CILIUM_GATEWAY_LB_IP}`
+   - Specifies LoadBalancer IP via `spec.addresses[0].value: ${CILIUM_GATEWAY_LB_IP}`
    - Listeners configured for HTTP (80) and HTTPS (443)
    - TLS certificate reference configured
 
 3. **Certificate Manifests Created:**
    - Wildcard certificate manifest exists
-   - References cert-manager ClusterIssuer
+   - References cert-manager ClusterIssuer `letsencrypt-production` (from Story 06)
    - Certificate namespace: `kube-system`
    - DNS names include wildcard (e.g., `*.${SECRET_DOMAIN}`)
 
@@ -72,17 +73,18 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
    - Apps gateway uses `10.25.11.121` (from cluster-settings)
    - Certificate domains use `${SECRET_DOMAIN}` substitution
 
-5. **Kustomization Created:**
-   - `kubernetes/infrastructure/networking/cilium/gateway/ks.yaml` exists
-   - References all gateway manifests
-   - Includes dependency on cilium-core and cert-manager
-   - `kubernetes/infrastructure/networking/cilium/gateway/kustomization.yaml` glue file exists
+5. **Kustomization Created (Cluster-Level):**
+   - Cluster-level Flux `Kustomization` named `cilium-gateway` is added in:
+     - `kubernetes/clusters/infra/infrastructure.yaml` → path `./kubernetes/infrastructure/networking/cilium/gateway`
+     - `kubernetes/clusters/apps/infrastructure.yaml` → path `./kubernetes/infrastructure/networking/cilium/gateway`
+   - Includes `dependsOn: [ { name: cilium-core }, { name: cilium-ipam } ]`
+   - `kubernetes/infrastructure/networking/cilium/gateway/kustomization.yaml` glue file exists and lists gateway manifests
 
 6. **Local Validation Passes:**
-   - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure` succeeds
-   - `flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure` succeeds
+   - `flux build -f kubernetes/clusters/infra/infrastructure.yaml --path .` succeeds
+   - `flux build -f kubernetes/clusters/apps/infrastructure.yaml --path .` succeeds
    - Output shows correct IP substitution for each cluster
-   - `kubeconform --strict` validates Gateway API manifests
+   - `kubeconform --strict -ignore-missing-schemas` validates Gateway API manifests
 
 **Deferred to Story 45 (Deployment & Validation):**
 - ❌ Gateway API CRDs installed (handled in Story 43)
@@ -112,7 +114,7 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 
 ---
 
-## Implementation Tasks
+## Tasks / Subtasks
 
 ### T1: Verify Prerequisites (Local Validation Only)
 
@@ -226,9 +228,12 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 
 ---
 
-### T3: Create Flux Kustomization
+### T3: Create Flux Kustomization (Cluster-Level)
 
-- [ ] Create `ks.yaml`:
+- [ ] Add `Kustomization` entries to cluster files (no `ks.yaml` in the component directory):
+  - File: `kubernetes/clusters/infra/infrastructure.yaml`
+  - File: `kubernetes/clusters/apps/infrastructure.yaml`
+  - Example snippet to append (adjust path per cluster):
   ```yaml
   ---
   apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -247,10 +252,9 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
     prune: true
     wait: true
     dependsOn:
+    - name: cilium-core
     - name: cilium-ipam
-    - name: cert-manager-issuers
     postBuild:
-      substitute: {}
       substituteFrom:
       - kind: ConfigMap
         name: cluster-settings
@@ -258,7 +262,6 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
     - apiVersion: gateway.networking.k8s.io/v1
       kind: GatewayClass
       name: cilium
-      namespace: ""
     - apiVersion: gateway.networking.k8s.io/v1
       kind: Gateway
       name: cluster-gateway
@@ -271,7 +274,7 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 
 - [ ] Validate manifest syntax:
   ```bash
-  kubectl --dry-run=client -f kubernetes/infrastructure/networking/cilium/gateway/
+  kubectl apply --dry-run=client -f kubernetes/infrastructure/networking/cilium/gateway/
   ```
 
 - [ ] Validate with kustomize:
@@ -282,39 +285,153 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 - [ ] Validate Flux builds for both clusters:
   ```bash
   # Infra cluster (should substitute 10.25.11.110)
-  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+  flux build -f kubernetes/clusters/infra/infrastructure.yaml --path . | \
     yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
   # Expected: 10.25.11.110
 
   # Apps cluster (should substitute 10.25.11.121)
-  flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure | \
+  flux build -f kubernetes/clusters/apps/infrastructure.yaml --path . | \
     yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
   # Expected: 10.25.11.121
   ```
 
 - [ ] Validate Gateway API schemas with kubeconform:
   ```bash
-  kubeconform --strict kubernetes/infrastructure/networking/cilium/gateway/*.yaml
+  kubeconform --strict -ignore-missing-schemas kubernetes/infrastructure/networking/cilium/gateway/*.yaml
   ```
 
 - [ ] Verify certificate domain substitution:
   ```bash
-  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+  flux build -f kubernetes/clusters/infra/infrastructure.yaml --path . | \
     yq 'select(.kind == "Certificate") | .spec.dnsNames'
   # Expected: ["*.monosense.io", "monosense.io"] (or actual SECRET_DOMAIN)
   ```
 
 ---
 
-### T5: Update Infrastructure Kustomization
+### T5: Cluster Kustomization Updates
 
-- [ ] Update `kubernetes/infrastructure/networking/cilium/kustomization.yaml`:
-  ```yaml
-  resources:
-  - core/ks.yaml
-  - ipam/ks.yaml
-  - gateway/ks.yaml  # ADD THIS LINE
+- [ ] Ensure `cilium-gateway` Kustomization is present in both cluster files and depends on `cilium-core` and `cilium-ipam`.
+- [ ] No changes are required to `kubernetes/infrastructure/networking/cilium/kustomization.yaml` (aggregator not used for cluster-level Kustomizations).
+
+---
+
+## Dev Notes
+
+- Source of truth for networking and gateway: `docs/architecture.md` §10 (Networking — Cilium) and Cluster Settings ConfigMaps:
+  - `kubernetes/clusters/infra/cluster-settings.yaml` → `CILIUM_GATEWAY_LB_IP: 10.25.11.110`
+  - `kubernetes/clusters/apps/cluster-settings.yaml` → `CILIUM_GATEWAY_LB_IP: 10.25.11.121`
+- Repository layout:
+  - Component manifests: `kubernetes/infrastructure/networking/cilium/gateway/`
+  - Cluster-level wiring: `kubernetes/clusters/{infra,apps}/infrastructure.yaml` (`Kustomization` named `cilium-gateway`)
+- Controller and API:
+  - GatewayClass `controllerName: io.cilium/gateway-controller`
+  - Gateway IP configured via `spec.addresses[0].value`
+- Dependencies (manifests-first):
+  - Story 01: Cilium core manifests (Gateway API controller enabled in bootstrap)
+  - Story 02: IPAM pools
+  - Story 06: cert-manager issuers (`letsencrypt-production`)
+
+### Testing
+
+- Flux dry-runs (per cluster):
+  ```bash
+  flux build -f kubernetes/clusters/infra/infrastructure.yaml --path . \
+    | yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
+  flux build -f kubernetes/clusters/apps/infrastructure.yaml --path . \
+    | yq 'select(.kind == "Gateway") | .spec.addresses[0].value'
   ```
+- Schema validation (local):
+  ```bash
+  kubeconform --strict -ignore-missing-schemas kubernetes/infrastructure/networking/cilium/gateway/*.yaml
+  ```
+- Manifest syntax:
+  ```bash
+  kubectl apply --dry-run=client -f kubernetes/infrastructure/networking/cilium/gateway/
+  ```
+
+## Dev Agent Record
+
+### Agent Model Used
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+## QA Results
+
+### Risk Profile (2025-10-27)
+- Totals: 0 Critical, 1 High, 4 Medium, 3 Low
+- Highest: DEP-001 — Cert‑Manager dependency ordering for Certificate manifests (score 9)
+
+| ID       | Category | Description                                                                                                         | Prob. | Impact | Score | Priority |
+|----------|----------|---------------------------------------------------------------------------------------------------------------------|-------|--------|-------|----------|
+| DEP-001  | OPS      | Certificate depends on ClusterIssuer; if cert-manager CRDs/issuers aren’t applied first, reconciliation will fail   | High (3) | High (3) | 9 | High |
+| WIRE-001 | OPS      | Missing or incorrect cluster‑level `cilium-gateway` Kustomization/dependsOn                                         | Medium (2) | Medium (2) | 4 | Medium |
+| API-001  | TECH     | Using `spec.addresses` requires Gateway API v1/Cilium compatibility                                                  | Low (1) | Medium (2) | 2 | Low |
+| SUB-001  | TECH     | `${CILIUM_GATEWAY_LB_IP}` substitution missing/wrong                                                                | Medium (2) | Medium (2) | 4 | Medium |
+| IPAM-001 | TECH     | Gateway IP outside IPAM pool range                                                                                  | Low (1) | Medium (2) | 2 | Low |
+| SCHEMA-001| OPS     | Local schema validation without CRDs can mislead                                                                     | Medium (2) | Low (1) | 2 | Low |
+| SEC-001  | SEC      | Wildcard TLS secret in `kube-system` broadens blast radius                                                          | Low (1) | Medium (2) | 2 | Low |
+| NET-001  | OPS      | Gateway exposed before BGP reachability validated                                                                    | Medium (2) | Medium (2) | 4 | Medium |
+
+Recommendations
+- Must‑fix before deployment: add cluster‑level `cilium-gateway` Kustomizations with dependsOn; ensure cert‑manager issuers are present before reconciling Certificate.
+- Monitor: Gateway API schema compatibility with Cilium; validate IP substitution from cluster‑settings.
+
+Gate Snippet (pasteable)
+```yaml
+risk_summary:
+  totals: { critical: 0, high: 1, medium: 4, low: 3 }
+  highest: { id: DEP-001, score: 9, title: Cert-Manager dependency ordering for Certificate manifests }
+  recommendations:
+    must_fix:
+      - Add cluster-level cilium-gateway Kustomization with dependsOn
+      - Ensure cert-manager issuers before reconciling Certificate
+    monitor:
+      - Verify Gateway API schema compatibility with Cilium
+      - Validate IP substitution from cluster-settings
+```
+
+### Test Design (2025-10-27)
+- Scenarios: 15 total — Unit 5, Integration 10, E2E 0
+- Priorities: P0: 5, P1: 8, P2: 2
+
+AC‑1: GatewayClass Manifest
+- 03.gateway-UNIT-001 (P0, Unit): gatewayclass.yaml exists; name=cilium.
+- 03.gateway-UNIT-002 (P0, Unit): controllerName=io.cilium/gateway-controller.
+
+AC‑2: Gateway Manifest
+- 03.gateway-UNIT-003 (P0, Unit): name=cluster-gateway, namespace=kube-system.
+- 03.gateway-UNIT-004 (P0, Unit): gatewayClassName=cilium; addresses[0].type=IPAddress.
+- 03.gateway-UNIT-005 (P1, Unit): listeners HTTP:80 and HTTPS:443; allowedRoutes.namespaces.from=All.
+- 03.gateway-INT-001 (P0, Integration): tls.certificateRefs points to Secret wildcard-tls in kube-system (via kustomize/flux build).
+
+AC‑3: Certificate Manifest
+- 03.gateway-UNIT-006 (P0, Unit): certificate.yaml present; namespace=kube-system; secretName=wildcard-tls.
+- 03.gateway-UNIT-007 (P1, Unit): issuerRef.kind=ClusterIssuer; name=letsencrypt-production.
+- 03.gateway-INT-002 (P1, Integration): Flux build renders dnsNames from SECRET_DOMAIN (no placeholders).
+
+AC‑4: Cluster‑Specific Substitution
+- 03.gateway-INT-003 (P0, Integration): Infra build ⇒ addresses[0].value=10.25.11.110.
+- 03.gateway-INT-004 (P0, Integration): Apps build ⇒ addresses[0].value=10.25.11.121.
+- 03.gateway-INT-005 (P1, Integration): Certificate dnsNames substituted for both clusters.
+
+AC‑5: Cluster‑Level Kustomization
+- 03.gateway-INT-006 (P0, Integration): `cilium-gateway` Kustomization appended in both clusters with dependsOn [cilium-core, cilium-ipam].
+- 03.gateway-INT-007 (P1, Integration): Health checks for GatewayClass/Gateway configured (optional, recommended).
+
+AC‑6: Local Validation
+- 03.gateway-INT-008 (P1, Integration): kustomize build | kubeconform --strict -ignore-missing-schemas passes.
+- 03.gateway-INT-009 (P0, Integration): Flux builds show no unresolved placeholders.
+- 03.gateway-INT-010 (P2, Integration): YAML structural lint (yq eval '.') passes on all gateway files.
+
+Recommended Execution Order
+1) P0 unit+integration: 001/003/004 and 003/004/006/009
+2) P1: 002/005/007 and 001/002/005/007/008
+3) P2: 010
 
 ---
 

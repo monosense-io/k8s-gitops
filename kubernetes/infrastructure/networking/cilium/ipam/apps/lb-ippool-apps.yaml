@@ -1,0 +1,9 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: apps-pool
+spec:
+  blocks:
+    - start: "10.25.11.120"
+      stop: "10.25.11.139"
+  serviceSelector: {}

@@ -4,9 +4,9 @@ Sequence: 04/50 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-SEC-EXTERNAL-S
 Sprint: 1 | Lane: Networking
 Global Sequence: 04/50
 
-Status: Draft (v3.0 Refinement)
+Status: Approved (v3.1 QA-Aligned)
 Owner: Platform Engineering
-Date: 2025-10-26 (v3.0 Refinement)
+Date: 2025-10-27 (v3.1 QA-Aligned)
 Links: docs/architecture.md §9; kubernetes/infrastructure/networking/coredns/
 
 ---
@@ -34,7 +34,8 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
 - Create PrometheusRule for DNS alerting
 - Create Kustomization for CoreDNS resources
 - Update cluster-settings with CoreDNS variables (if needed)
-- Local validation (flux build, helmfile template)
+ - Local validation (kustomize build; optional flux build); OCI chart preflight
+ - Add cluster-level Flux Kustomizations for CoreDNS in `kubernetes/clusters/{infra,apps}/infrastructure.yaml` with `dependsOn: cilium-core` and health checks
 
 **Deferred to Story 45 (Deployment & Validation):**
 - Deploying CoreDNS to clusters
@@ -60,20 +61,19 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
    - Security context hardened (non-root, read-only filesystem, capabilities dropped)
    - Health/ready probes configured (health: 8080, ready: 8181, metrics: 9153)
 
-2. **OCIRepository Manifest Created:**
+2. **OCIRepository Manifest Created (Preflighted):**
    - `kubernetes/infrastructure/networking/coredns/ocirepository.yaml` exists (or reuses existing)
    - References CoreDNS Helm chart from registry
    - Chart version: `1.38.0`
+   - URL set (no placeholder) and basic preflight succeeds (chart metadata fetch or Flux source reconcile)
 
 3. **PrometheusRule Manifest Created:**
    - `kubernetes/infrastructure/networking/coredns/prometheusrule.yaml` exists
    - Alert rules defined: CoreDNSAbsent, CoreDNSDown, CoreDNSHighErrorRate, CoreDNSLatencyHigh
 
 4. **Kustomization Created:**
-   - `kubernetes/infrastructure/networking/coredns/ks.yaml` exists
-   - References all CoreDNS manifests
-   - Includes dependency on cilium-core
-   - `kubernetes/infrastructure/networking/coredns/kustomization.yaml` glue file exists
+   - `kubernetes/infrastructure/networking/coredns/kustomization.yaml` glue file exists (references all CoreDNS manifests)
+   - Cluster-level Flux Kustomizations for CoreDNS added in `kubernetes/clusters/{infra,apps}/infrastructure.yaml` with `dependsOn: cilium-core` and healthCheck on HelmRelease/coredns
 
 5. **Cluster Settings Alignment:**
    - Cluster-settings include CoreDNS variables:
@@ -81,11 +81,12 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
      - Apps: `COREDNS_REPLICAS: "2"`, `COREDNS_CLUSTER_IP: "10.247.0.10"`
 
 6. **Local Validation Passes:**
-   - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure` succeeds
-   - `flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure` succeeds
-   - Output shows correct ClusterIP substitution for each cluster
-   - `helmfile template` renders CoreDNS chart successfully
-   - Security context verification shows hardened configuration
+  - `kubectl --dry-run=client -f kubernetes/infrastructure/networking/coredns/` succeeds
+  - `kustomize build kubernetes/infrastructure/networking/coredns` succeeds
+  - Flux build inspection (if available) or cross-check with cluster-settings shows correct ClusterIP/replicas substitution
+  - ClusterIP values belong to each cluster's Service CIDR
+  - OCI chart source preflight succeeds (reachable URL, chart metadata available)
+  - Security context verification shows hardened configuration
 
 **Deferred to Story 45 (Deployment & Validation):**
 - ❌ CoreDNS pods running and ready
@@ -112,9 +113,9 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
 
 ---
 
-## Implementation Tasks
+## Tasks / Subtasks
 
-### T1: Verify Prerequisites (Local Validation Only)
+### T1: Verify Prerequisites (Local Validation Only) (AC5, AC6)
 
 - [ ] Verify Story 01 complete (Cilium core manifests created):
   ```bash
@@ -130,16 +131,31 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
 - [ ] Check existing CoreDNS manifests (if any):
   ```bash
   ls -la kubernetes/infrastructure/networking/coredns/ 2>/dev/null || echo "Directory not found (will create)"
-  ls -la kubernetes/bases/coredns/ 2>/dev/null || echo "Directory not found (will create)"
   ```
 
 ---
 
-### T2: Create CoreDNS Manifests
+### T2: Create CoreDNS Manifests (AC1–AC4)
 
 - [ ] Create directory:
   ```bash
   mkdir -p kubernetes/infrastructure/networking/coredns
+  ```
+
+- [ ] Create `ocirepository.yaml` (chart source, aligns with Architecture §19 "Helm (OCI)"):
+  ```yaml
+  ---
+  apiVersion: source.toolkit.fluxcd.io/v1
+  kind: OCIRepository
+  metadata:
+    name: coredns-charts
+    namespace: flux-system
+  spec:
+    interval: 12h
+    # NOTE: Set the approved OCI registry URL for the CoreDNS chart in your environment (no placeholders allowed).
+    url: oci://<SET_APPROVED_REGISTRY>/coredns
+    ref:
+      semver: "1.38.0"
   ```
 
 - [ ] Create `helmrelease.yaml` with HA and security configuration:
@@ -157,8 +173,8 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
         chart: coredns
         version: 1.38.0
         sourceRef:
-          kind: HelmRepository
-          name: coredns
+          kind: OCIRepository
+          name: coredns-charts
           namespace: flux-system
     install:
       remediation:
@@ -225,7 +241,7 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
             prometheus.io/port: "9153"
 
       serviceMonitor:
-        enabled: true
+        enabled: false  # Enable in Observability story when Prometheus CRDs exist
   ```
 
 - [ ] Create `prometheusrule.yaml`:
@@ -290,11 +306,10 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
 
 ---
 
-### T3: Create Flux Kustomization
+### T3: Optional — Component Kustomization CR (AC4)
 
-- [ ] Create `ks.yaml`:
+- If your pattern uses component-scoped Flux Kustomizations checked into the component directory, you may create `kubernetes/infrastructure/networking/coredns/ks.yaml` (as a `Kustomization` manifest) similar to below. In this repo, cluster-level Kustomizations are preferred (see T5), so this step can be skipped.
   ```yaml
-  ---
   apiVersion: kustomize.toolkit.fluxcd.io/v1
   kind: Kustomization
   metadata:
@@ -302,8 +317,6 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
     namespace: flux-system
   spec:
     interval: 10m
-    retryInterval: 1m
-    timeout: 5m
     sourceRef:
       kind: GitRepository
       name: flux-system
@@ -313,22 +326,16 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
     dependsOn:
       - name: cilium-core
     postBuild:
-      substitute: {}
       substituteFrom:
         - kind: ConfigMap
           name: cluster-settings
-    healthChecks:
-      - apiVersion: helm.toolkit.fluxcd.io/v2
-        kind: HelmRelease
-        name: coredns
-        namespace: kube-system
   ```
 
 ---
 
-### T4: Local Validation (NO Cluster Access)
+### T4: Local Validation (NO Cluster Access) (AC6)
 
-- [ ] Validate manifest syntax:
+- [ ] Validate manifest syntax (kustomize):
   ```bash
   kubectl --dry-run=client -f kubernetes/infrastructure/networking/coredns/
   ```
@@ -338,53 +345,144 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
   kustomize build kubernetes/infrastructure/networking/coredns
   ```
 
-- [ ] Validate Flux builds for both clusters:
-  ```bash
-  # Infra cluster (should substitute 10.245.0.10)
-  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
-    yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.service.clusterIP'
-  # Expected: 10.245.0.10
+- [ ] Validate rendering and substitutions:
+  - Option A (Flux offline build; requires Flux CLI supporting postBuild substitutions without cluster access):
+    ```bash
+    # Build CoreDNS kustomization (same path for both clusters; values come from postBuild.substituteFrom)
+    flux build kustomization coredns --path ./kubernetes/infrastructure/networking/coredns | \
+      yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.service.clusterIP'
+    ```
+  - Option B (Path-only check when offline):
+    ```bash
+    # Render manifests; verify placeholders present and cross-check cluster-settings separately
+    kustomize build kubernetes/infrastructure/networking/coredns | \
+      yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.service.clusterIP'
+    # Then verify expected values in cluster settings
+    yq '.data.COREDNS_CLUSTER_IP' kubernetes/clusters/infra/cluster-settings.yaml  # expect 10.245.0.10
+    yq '.data.COREDNS_CLUSTER_IP' kubernetes/clusters/apps/cluster-settings.yaml  # expect 10.247.0.10
+    ```
 
-  # Apps cluster (should substitute 10.247.0.10)
-  flux build kustomization cluster-apps-infrastructure --path ./kubernetes/infrastructure | \
-    yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.service.clusterIP'
-  # Expected: 10.247.0.10
+- [ ] Validate ClusterIP-in-CIDR for each cluster (offline-friendly):
+  ```bash
+  # Infra
+  python3 - <<'PY'
+import ipaddress
+cidr = ipaddress.ip_network('10.245.0.0/16')
+ip = ipaddress.ip_address('10.245.0.10')
+assert ip in cidr, f"{ip} not in {cidr}"
+print("infra ClusterIP in CIDR")
+PY
+  # Apps
+  python3 - <<'PY'
+import ipaddress
+cidr = ipaddress.ip_network('10.247.0.0/16')
+ip = ipaddress.ip_address('10.247.0.10')
+assert ip in cidr, f"{ip} not in {cidr}"
+print("apps ClusterIP in CIDR")
+PY
+  ```
+
+- [ ] OCI chart preflight (one):
+  ```bash
+  # Option A (helm)
+  helm show chart oci://<SET_APPROVED_REGISTRY>/coredns --version 1.38.0
+  # Option B (flux)
+  flux reconcile source oci coredns-charts --with-source --timeout 2m
   ```
 
 - [ ] Verify replica count substitution:
   ```bash
-  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+  # Option A: Flux build (if available)
+  flux build kustomization coredns --path ./kubernetes/infrastructure/networking/coredns | \
     yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.replicaCount'
-  # Expected: 2
+  # Option B: Cross-check expected value in cluster settings
+  yq '.data.COREDNS_REPLICAS' kubernetes/clusters/infra/cluster-settings.yaml  # expect 2
   ```
 
 - [ ] Verify security context configuration:
   ```bash
-  flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure | \
+  kustomize build kubernetes/infrastructure/networking/coredns | \
     yq 'select(.kind == "HelmRelease" and .metadata.name == "coredns") | .spec.values.securityContext'
   # Expected: runAsNonRoot: true, readOnlyRootFilesystem: true, capabilities.drop: [ALL]
   ```
 
 ---
 
-### T5: Update Infrastructure Kustomization
+### T5: Wire Into Cluster Infrastructure (AC4)
 
-- [ ] Update `kubernetes/infrastructure/networking/kustomization.yaml` (or appropriate parent):
-  ```yaml
-  resources:
-    - cilium/
-    - coredns/ks.yaml  # ADD THIS LINE
-  ```
+- [ ] Add a Flux Kustomization entry for CoreDNS to each cluster file.
+
+  - File: `kubernetes/clusters/infra/infrastructure.yaml`
+    ```yaml
+    ---
+    apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: coredns
+      namespace: flux-system
+    spec:
+      interval: 10m
+      prune: true
+      wait: true
+      timeout: 5m
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+      path: ./kubernetes/infrastructure/networking/coredns
+      dependsOn:
+        - name: cilium-core
+      postBuild:
+        substituteFrom:
+          - kind: ConfigMap
+            name: cluster-settings
+      healthChecks:
+        - apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          name: coredns
+          namespace: kube-system
+    ```
+
+  - File: `kubernetes/clusters/apps/infrastructure.yaml`
+    ```yaml
+    ---
+    apiVersion: kustomize.toolkit.fluxcd.io/v1
+    kind: Kustomization
+    metadata:
+      name: coredns
+      namespace: flux-system
+    spec:
+      interval: 10m
+      prune: true
+      wait: true
+      timeout: 5m
+      sourceRef:
+        kind: GitRepository
+        name: flux-system
+      path: ./kubernetes/infrastructure/networking/coredns
+      dependsOn:
+        - name: cilium-core
+      postBuild:
+        substituteFrom:
+          - kind: ConfigMap
+            name: cluster-settings
+      healthChecks:
+        - apiVersion: helm.toolkit.fluxcd.io/v2
+          kind: HelmRelease
+          name: coredns
+          namespace: kube-system
+    ```
 
 ---
 
-### T6: Update Cluster Settings (If Needed)
+### T6: Update Cluster Settings (If Needed) (AC5)
 
 - [ ] Verify infra cluster-settings have CoreDNS variables:
   ```yaml
   # kubernetes/clusters/infra/cluster-settings.yaml
   COREDNS_REPLICAS: "2"
   COREDNS_CLUSTER_IP: "10.245.0.10"
+  # Optional (enable when Prometheus CRDs present):
+  # COREDNS_SERVICEMONITOR_ENABLED: "true"
   ```
 
 - [ ] Verify apps cluster-settings have CoreDNS variables:
@@ -392,6 +490,8 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
   # kubernetes/clusters/apps/cluster-settings.yaml
   COREDNS_REPLICAS: "2"
   COREDNS_CLUSTER_IP: "10.247.0.10"
+  # Optional (enable when Prometheus CRDs present):
+  # COREDNS_SERVICEMONITOR_ENABLED: "true"
   ```
 
 - [ ] If variables missing, add them to cluster-settings ConfigMaps
@@ -407,7 +507,7 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
 
   - Create HelmRelease with HA topology spread and PDB
   - Configure security hardening (non-root, read-only filesystem)
-  - Enable Prometheus metrics and ServiceMonitor
+  - Enable Prometheus metrics; include ServiceMonitor config (default disabled until CRDs present)
   - Create PrometheusRule for DNS alerting
   - Configure cluster-specific replicas and ClusterIP
   - Add health/ready probe configuration
@@ -470,15 +570,17 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
   - [ ] Security context hardened
   - [ ] Health/ready probes configured
   - [ ] Prometheus metrics enabled
-  - [ ] ServiceMonitor enabled
+  - [ ] ServiceMonitor configuration present and default disabled (enable when Prometheus CRDs are available)
 - [ ] PrometheusRule manifest created with alert rules
 - [ ] Kustomization glue file created
 - [ ] Flux Kustomization created with correct dependencies
 - [ ] Cluster-settings have CoreDNS variables (COREDNS_REPLICAS, COREDNS_CLUSTER_IP)
 - [ ] Local validation passes:
   - [ ] `kubectl --dry-run=client` succeeds
-  - [ ] `kustomize build` succeeds
-  - [ ] `flux build` shows correct ClusterIP substitution for both clusters
+  - [ ] `kustomize build` succeeds (syntax)
+  - [ ] `flux build` inspection or cross-check against cluster-settings shows correct ClusterIP and replica substitution
+  - [ ] ClusterIP belongs to Service CIDR for each cluster
+  - [ ] OCI chart source preflight succeeds
   - [ ] Security context configuration verified in rendered output
 - [ ] Infrastructure kustomization updated to include CoreDNS
 - [ ] Manifests committed to git
@@ -501,3 +603,112 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
 | Date       | Version | Description                          | Author  |
 |------------|---------|--------------------------------------|---------|
 | 2025-10-26 | 3.0     | **v3.0 Refinement**: Updated header, story, scope, AC, dependencies, tasks, DoD for manifests-first approach. Separated manifest creation from deployment (moved to Story 45). Tasks simplified to T1-T7 focusing on local validation only. Removed extensive runtime validation sections. | Platform Engineering |
+| 2025-10-27 | 3.1     | **v3.1 QA-Aligned**: Set Status to Approved; added OCI chart preflight; gated ServiceMonitor (default disabled until Prometheus CRDs present); added ClusterIP-in-CIDR checks; clarified cluster-level Flux wiring; linked QA risk and test design; added navigation tips. | Product Owner |
+
+---
+
+## Dev Notes
+
+- Sources of truth used in this story:
+  - docs/architecture.md §8 (Cluster Settings & Substitution), §19 (Workloads & Versions → CoreDNS 1.38.0), and bootstrap flow references.
+  - kubernetes/clusters/{infra,apps}/cluster-settings.yaml for `${COREDNS_CLUSTER_IP}` and `${COREDNS_REPLICAS}`.
+  - kubernetes/clusters/{infra,apps}/infrastructure.yaml for Flux wiring pattern (`dependsOn: cilium-core`, health checks).
+- Repository layout notes:
+  - CoreDNS manifests live under `kubernetes/infrastructure/networking/coredns/`.
+  - Cluster-level Flux Kustomizations are declared in `kubernetes/clusters/<cluster>/infrastructure.yaml` (no aggregate `kubernetes/infrastructure/networking/kustomization.yaml` exists).
+- Chart source:
+  - Architecture specifies Helm (OCI). This story creates `ocirepository.yaml` and points the HelmRelease `sourceRef` to it. Update the OCI URL to your approved registry prior to apply.
+
+- ServiceMonitor enablement:
+  - Default is disabled to avoid CRD timing issues. Enable in the observability story (after Prometheus CRDs exist) or via a documented cluster-settings toggle.
+
+### Navigation Tips
+
+- CoreDNS component directory: `kubernetes/infrastructure/networking/coredns/`
+- Cluster wiring locations (add these Kustomizations during implementation):
+  - `kubernetes/clusters/infra/infrastructure.yaml` (Kustomization `coredns`, dependsOn `cilium-core`)
+  - `kubernetes/clusters/apps/infrastructure.yaml` (Kustomization `coredns`, dependsOn `cilium-core`)
+
+### Testing
+
+- Validation methods to use locally:
+  - Syntax: `kubectl --dry-run=client -f kubernetes/infrastructure/networking/coredns/` and `kustomize build ...`.
+  - Render checks: `flux build kustomization coredns --path ./kubernetes/infrastructure/networking/coredns` (if available), or cross-check placeholders against values in cluster-settings using `yq`.
+- CI alignment:
+  - Ensure repo CI runs kubeconform/kustomize/flux build where applicable.
+  - Add unit render checks for CoreDNS HelmRelease fields (replicaCount, service.clusterIP, securityContext) using `yq` filters.
+
+---
+
+## Dev Agent Record
+
+### Agent Model Used
+
+<record model/version>
+
+### Debug Log References
+
+- See `.ai/debug-log.md` if applicable.
+
+### Completion Notes List
+
+-
+
+### File List
+
+- kubernetes/infrastructure/networking/coredns/ocirepository.yaml
+- kubernetes/infrastructure/networking/coredns/helmrelease.yaml
+- kubernetes/infrastructure/networking/coredns/prometheusrule.yaml
+- kubernetes/infrastructure/networking/coredns/kustomization.yaml
+- kubernetes/infrastructure/networking/coredns/ks.yaml
+- kubernetes/clusters/infra/infrastructure.yaml (updated)
+- kubernetes/clusters/apps/infrastructure.yaml (updated)
+
+---
+
+## QA Results
+
+Risk profile created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-risk-20251027.md
+
+```yaml
+# risk_summary
+risk_summary:
+  totals:
+    critical: 1
+    high: 2
+    medium: 2
+    low: 1
+  highest:
+    id: TECH-001-OCI-URL
+    score: 9
+    title: 'OCIRepository URL placeholder not set; Helm cannot fetch chart'
+  recommendations:
+    must_fix:
+      - 'Set approved OCI chart URL and verify reachability (preflight reconcile/show chart)'
+      - 'Gate/sequence ServiceMonitor and PrometheusRule until CRDs are installed or disable temporarily'
+      - 'Assert postBuild substitutions render replicaCount and clusterIP for both clusters'
+    monitor:
+      - 'Validate topologySpread label matches chart; confirm HA scheduling across nodes'
+      - 'Ensure replicaCount >= 2 with PDB minAvailable: 1 to avoid drain issues'
+      - 'CI check: ClusterIP belongs to Service CIDR and is unique'
+```
+
+Summary
+- Gate signal: CONCERNS (presence of High risks). Use `@qa *gate` to record decision after mitigations are staged.
+- Overall Story Risk Score: 48/100
+
+Test design created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-test-design-20251027.md
+
+```yaml
+test_design:
+  scenarios_total: 14
+  by_level:
+    unit: 0
+    integration: 14
+    e2e: 0
+  by_priority:
+    p0: 7
+    p1: 5
+    p2: 2
+  coverage_gaps: []
+```

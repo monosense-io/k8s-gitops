@@ -1,3 +1,4 @@
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -34,3 +35,25 @@ spec:
       kind: Deployment
       name: cilium-operator
       namespace: kube-system
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-ipam
+  namespace: flux-system
+spec:
+  interval: 10m
+  prune: true
+  wait: true
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./kubernetes/infrastructure/networking/cilium/ipam/infra
+  dependsOn:
+    - name: cilium-core
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
