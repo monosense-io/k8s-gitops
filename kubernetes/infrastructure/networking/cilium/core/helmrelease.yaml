@@ -1,0 +1,70 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: cilium
+      version: ${CILIUM_VERSION}
+      sourceRef:
+        kind: OCIRepository
+        name: cilium-charts
+        namespace: flux-system
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 2
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    cluster:
+      name: ${CLUSTER}
+      id: ${CLUSTER_ID}
+
+    # Networking
+    ipv4NativeRoutingCIDR: ${POD_CIDR_STRING}
+    routingMode: native
+    autoDirectNodeRoutes: true
+
+    # Kube-proxy replacement and encryption
+    kubeProxyReplacement: true
+    encryption:
+      enabled: true
+      type: wireguard
+      nodeEncryption: false
+
+    # Hubble observability
+    hubble:
+      enabled: true
+      relay:
+        enabled: true
+      ui:
+        enabled: false
+
+    # Metrics
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+
+    # CNI / IPAM
+    cni:
+      install: true
+      exclusive: true
+    ipam:
+      mode: kubernetes
+
+    # APIServer endpoint (substituted per-cluster)
+    k8sServiceHost: ${K8S_SERVICE_HOST}
+    k8sServicePort: ${K8S_SERVICE_PORT}
+

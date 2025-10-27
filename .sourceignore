@@ -1,0 +1,2 @@
+# Limit Flux source-controller artifact to Kubernetes content only
+.bmad-core/**

@@ -16,6 +16,7 @@ data:
   POD_CIDR_STRING: "10.246.0.0/16"
   SERVICE_CIDR: '["10.247.0.0/16"]'
   K8S_SERVICE_HOST: "apps-k8s.monosense.io"
+  K8S_SERVICE_PORT: "6443"
 
   # Cilium Configuration
   CILIUM_VERSION: "1.18.3"

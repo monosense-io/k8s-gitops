@@ -29,3 +29,13 @@ tasks:
   default:
     cmd: task --list
     silent: true
+
+  validate-cilium-core:
+    desc: Local validation for Cilium core manifests (no cluster required)
+    cmds:
+      - ./scripts/validate-cilium-core.sh
+    preconditions:
+      - which flux
+      - which kustomize
+      - which kubeconform
+      - which yq

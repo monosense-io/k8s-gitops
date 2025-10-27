@@ -1,0 +1,36 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-core
+  namespace: flux-system
+spec:
+  interval: 5m
+  prune: true
+  wait: true
+  timeout: 10m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./kubernetes/infrastructure/networking/cilium/core
+  postBuild:
+    substitute:
+      CLUSTER: "apps"
+      CLUSTER_ID: "2"
+      POD_CIDR_STRING: "10.246.0.0/16"
+      SERVICE_CIDR: "[\"10.247.0.0/16\"]"
+      CILIUM_VERSION: "1.18.3"
+      K8S_SERVICE_HOST: "apps-k8s.monosense.io"
+      K8S_SERVICE_PORT: "6443"
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: cilium
+      namespace: kube-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cilium-operator
+      namespace: kube-system
