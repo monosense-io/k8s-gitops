@@ -453,7 +453,7 @@ echo "Manifests ready for Story 45 (VALIDATE-NETWORKING) deployment"
   - `kubernetes/clusters/infra/cluster-settings.yaml`
   - `kubernetes/clusters/apps/cluster-settings.yaml`
 - [x] Confirm the HelmRelease values render both `k8sServiceHost` and `k8sServicePort` via `${K8S_SERVICE_HOST}` and `${K8S_SERVICE_PORT}`.
-- [ ] Reference: `docs/runbooks/dns-apiserver-bind.md` for DNS setup.
+ - [x] Reference: `docs/runbooks/dns-apiserver-bind.md` for DNS setup.
 
 **Note**: Runtime validation (kubectl commands, cluster deployment, Cilium feature testing) happens in **Story 45: VALIDATE-NETWORKING**.
 
