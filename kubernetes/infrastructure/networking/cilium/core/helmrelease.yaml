@@ -67,4 +67,3 @@ spec:
     # APIServer endpoint (substituted per-cluster)
     k8sServiceHost: ${K8S_SERVICE_HOST}
     k8sServicePort: ${K8S_SERVICE_PORT}
-

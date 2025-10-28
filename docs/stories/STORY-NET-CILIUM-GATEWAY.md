@@ -107,6 +107,8 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 - Cluster-settings ConfigMaps with `CILIUM_GATEWAY_LB_IP` and `SECRET_DOMAIN`
 - Tools: kubectl (for dry-run), flux CLI, kubeconform
 
+Note: As of 2025-10-27, `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml` does not declare `values.gatewayAPI.enabled: true`. Treat this as a should-fix before cluster-level validation stories; this story remains local-only.
+
 **NOT Required (v3.0):**
 - ❌ Cluster access (validation is local-only)
 - ❌ ClusterIssuer deployed (deployment in Story 45)
@@ -122,6 +124,13 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
   ```bash
   ls -la kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml
   # Confirm gatewayAPI.enabled: true in values
+  ```
+  If missing, prepare a minimal patch to align with prerequisites (apply in Story 01 or as a separate chore PR):
+  ```yaml
+  # kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml (values excerpt)
+  values:
+    gatewayAPI:
+      enabled: true
   ```
 
 - [ ] Verify Story 02 complete (IPAM pool manifests created):
@@ -327,6 +336,7 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 - Controller and API:
   - GatewayClass `controllerName: io.cilium/gateway-controller`
   - Gateway IP configured via `spec.addresses[0].value`
+  - Ensure Cilium HelmRelease sets `values.gatewayAPI.enabled: true` (prereq; separate chore if missing)
 - Dependencies (manifests-first):
   - Story 01: Cilium core manifests (Gateway API controller enabled in bootstrap)
   - Story 02: IPAM pools
@@ -360,7 +370,62 @@ This story creates the declarative Gateway API manifests (GatewayClass, Gateway,
 
 ### File List
 
+## PO Course Correction (2025-10-27, rev 2)
+
+- Critical
+  - Cert-manager dependency ordering for Certificate (DEP-001): Ensure `cilium-gateway` Kustomization depends on the cert-manager issuers Kustomization, or split `Certificate` into a Kustomization that depends on cert-manager. Prevents reconciliation failures when issuers/CRDs are not yet present.
+
+- Should-Fix
+  - Enable Cilium Gateway API controller by adding `values.gatewayAPI.enabled: true` to `kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml` (GAPI-001). This is a prereq from Story 01 and required for Gateway programming in validation stories.
+  - Core config mismatch: `.bmad-core/core-config.yaml` has `prdSharded: true` while `docs/prd/` is absent; reconcile to avoid process confusion.
+  - Append `cilium-gateway` Kustomization to both clusters with `dependsOn: [cilium-core, cilium-ipam]` and include optional healthChecks for GatewayClass/Gateway.
+
+- Nice-to-Have
+  - In `gateway.yaml`, `certificateRefs[].namespace: kube-system` is redundant since Gateway and Secret share a namespace; can be omitted for brevity.
+  - Clarify that `issuerRef` is a reference only; issuer manifests ship in Story 06 and are not required for this story’s local validations.
+
 ## QA Results
+
+### Risk Profile (2025-10-27, rev 2)
+- Totals: 1 Critical, 1 High, 3 Medium, 5 Low
+- Highest: DEP-001 — Cert‑Manager dependency ordering for Certificate manifests (score 9)
+
+| ID       | Category | Description                                                                                                         | Prob. | Impact | Score | Priority |
+|----------|----------|---------------------------------------------------------------------------------------------------------------------|-------|--------|-------|----------|
+| DEP-001  | OPS      | Certificate depends on ClusterIssuer; if cert-manager CRDs/issuers aren’t applied first, reconciliation will fail   | High (3) | High (3) | 9 | Critical |
+| GAPI-001 | TECH     | Cilium Gateway API controller not enabled (`values.gatewayAPI.enabled: true` missing); Gateway will not program     | Medium (2) | High (3) | 6 | High |
+| WIRE-001 | OPS      | Missing or incorrect cluster‑level `cilium-gateway` Kustomization/dependsOn                                         | Medium (2) | Medium (2) | 4 | Medium |
+| SUB-001  | TECH     | `${CILIUM_GATEWAY_LB_IP}` substitution missing/wrong                                                                | Medium (2) | Medium (2) | 4 | Medium |
+| NET-001  | OPS      | Gateway reconciled before BGP reachability validated                                                                 | Medium (2) | Medium (2) | 4 | Medium |
+| API-001  | TECH     | Using `spec.addresses` requires Gateway API v1/Cilium compatibility                                                  | Low (1) | Medium (2) | 2 | Low |
+| IPAM-001 | TECH     | Gateway IP outside IPAM pool range                                                                                  | Low (1) | Medium (2) | 2 | Low |
+| SCHEMA-001| OPS     | Local schema validation without CRDs can mislead                                                                     | Medium (2) | Low (1) | 2 | Low |
+| SEC-001  | SEC      | Wildcard TLS secret in `kube-system` broadens blast radius                                                          | Low (1) | Medium (2) | 2 | Low |
+| DOC-001  | OPS      | PRD sharding config mismatch (core-config vs repo layout)                                                           | Low (1) | Low (1) | 1 | Minimal |
+
+Gate Snippet (pasteable)
+```yaml
+risk_summary:
+  totals: { critical: 1, high: 1, medium: 3, low: 5 }
+  highest: { id: DEP-001, score: 9, title: Cert-Manager dependency ordering for Certificate manifests }
+  recommendations:
+    must_fix:
+      - Enable Cilium Gateway API controller (values.gatewayAPI.enabled: true)
+      - Add cluster-level cilium-gateway Kustomizations with dependsOn
+      - Ensure cert-manager issuers before reconciling Certificate
+    monitor:
+      - Validate IP substitution and IPAM pool alignment in CI
+      - Verify Gateway API schema compatibility with Cilium
+```
+
+Test Design Gate Snippet (pasteable)
+```yaml
+test_design:
+  scenarios_total: 20
+  by_level: { unit: 8, integration: 12, e2e: 0 }
+  by_priority: { p0: 7, p1: 9, p2: 4 }
+  coverage_gaps: []
+```
 
 ### Risk Profile (2025-10-27)
 - Totals: 0 Critical, 1 High, 4 Medium, 3 Low
@@ -395,43 +460,53 @@ risk_summary:
       - Validate IP substitution from cluster-settings
 ```
 
-### Test Design (2025-10-27)
-- Scenarios: 15 total — Unit 5, Integration 10, E2E 0
-- Priorities: P0: 5, P1: 8, P2: 2
+### Test Design (2025-10-27, rev 2)
+- Scenarios: 20 total — Unit 8, Integration 12, E2E 0 (runtime E2E in Story 45)
+- Priorities: P0: 7, P1: 9, P2: 4
 
 AC‑1: GatewayClass Manifest
 - 03.gateway-UNIT-001 (P0, Unit): gatewayclass.yaml exists; name=cilium.
 - 03.gateway-UNIT-002 (P0, Unit): controllerName=io.cilium/gateway-controller.
 
 AC‑2: Gateway Manifest
-- 03.gateway-UNIT-003 (P0, Unit): name=cluster-gateway, namespace=kube-system.
-- 03.gateway-UNIT-004 (P0, Unit): gatewayClassName=cilium; addresses[0].type=IPAddress.
-- 03.gateway-UNIT-005 (P1, Unit): listeners HTTP:80 and HTTPS:443; allowedRoutes.namespaces.from=All.
-- 03.gateway-INT-001 (P0, Integration): tls.certificateRefs points to Secret wildcard-tls in kube-system (via kustomize/flux build).
+- 03.GW-UNIT-003 (P0, Unit): name=cluster-gateway, namespace=kube-system.
+- 03.GW-UNIT-004 (P0, Unit): gatewayClassName=cilium.
+- 03.GW-UNIT-005 (P1, Unit): addresses[0].type=IPAddress; value present.
+- 03.GW-UNIT-006 (P1, Unit): listeners HTTP:80 and HTTPS:443; allowedRoutes.namespaces.from=All.
+- 03.GW-INT-001 (P0, Integration): tls.certificateRefs points to Secret wildcard-tls in kube-system (via render).
 
 AC‑3: Certificate Manifest
-- 03.gateway-UNIT-006 (P0, Unit): certificate.yaml present; namespace=kube-system; secretName=wildcard-tls.
-- 03.gateway-UNIT-007 (P1, Unit): issuerRef.kind=ClusterIssuer; name=letsencrypt-production.
-- 03.gateway-INT-002 (P1, Integration): Flux build renders dnsNames from SECRET_DOMAIN (no placeholders).
+- 03.GW-UNIT-007 (P0, Unit): certificate.yaml present; namespace=kube-system; secretName=wildcard-tls.
+- 03.GW-UNIT-008 (P1, Unit): issuerRef.kind=ClusterIssuer; name=letsencrypt-production.
+- 03.GW-INT-002 (P1, Integration): Flux build renders dnsNames from SECRET_DOMAIN (no placeholders).
 
 AC‑4: Cluster‑Specific Substitution
-- 03.gateway-INT-003 (P0, Integration): Infra build ⇒ addresses[0].value=10.25.11.110.
-- 03.gateway-INT-004 (P0, Integration): Apps build ⇒ addresses[0].value=10.25.11.121.
-- 03.gateway-INT-005 (P1, Integration): Certificate dnsNames substituted for both clusters.
+- 03.GW-INT-003 (P0, Integration): Infra build ⇒ addresses[0].value=10.25.11.110.
+- 03.GW-INT-004 (P0, Integration): Apps build ⇒ addresses[0].value=10.25.11.121.
+- 03.GW-INT-005 (P1, Integration): Certificate dnsNames substituted for both clusters.
+- 03.GW-INT-006 (P1, Integration): No unresolved placeholders in rendered output.
 
 AC‑5: Cluster‑Level Kustomization
-- 03.gateway-INT-006 (P0, Integration): `cilium-gateway` Kustomization appended in both clusters with dependsOn [cilium-core, cilium-ipam].
-- 03.gateway-INT-007 (P1, Integration): Health checks for GatewayClass/Gateway configured (optional, recommended).
+- 03.GW-INT-007 (P0, Integration): `cilium-gateway` Kustomization appended in both clusters with dependsOn [cilium-core, cilium-ipam].
+- 03.GW-INT-008 (P0, Integration): Present in apps cluster.
+- 03.GW-INT-009 (P1, Integration): dependsOn includes both names.
+- 03.GW-INT-010 (P1, Integration): Health checks for GatewayClass/Gateway configured (optional).
 
 AC‑6: Local Validation
-- 03.gateway-INT-008 (P1, Integration): kustomize build | kubeconform --strict -ignore-missing-schemas passes.
-- 03.gateway-INT-009 (P0, Integration): Flux builds show no unresolved placeholders.
-- 03.gateway-INT-010 (P2, Integration): YAML structural lint (yq eval '.') passes on all gateway files.
+- 03.GW-INT-011 (P1, Integration): kubectl dry-run succeeds.
+- 03.GW-INT-012 (P1, Integration): kustomize build succeeds.
+- 03.GW-INT-013 (P1, Integration): kubeconform --strict -ignore-missing-schemas passes.
+
+Risk‑Driven Assurance
+- 03.GW-INT-014 (P0, Integration): Cilium HelmRelease sets values.gatewayAPI.enabled: true.
+- 03.GW-INT-015 (P1, Integration): Rendered Gateway IP falls within IPAM pool per cluster.
+- 03.GW-INT-016 (P2, Integration): YAML structural lint on gateway files succeeds.
+- 03.GW-INT-017 (P2, Integration): certificateRefs[].namespace omitted or equals kube-system.
 
 Recommended Execution Order
-1) P0 unit+integration: 001/003/004 and 003/004/006/009
-2) P1: 002/005/007 and 001/002/005/007/008
-3) P2: 010
+1) P0 first: 001–005, 003–004, 007–008, 014
+2) P1 next: 006, 008–013, 015
+3) P2 last: 016–017
 
 ---
 
@@ -498,6 +573,7 @@ curl -H "Host: echo.monosense.io" http://10.25.11.110
   - [ ] `kustomize build` succeeds
   - [ ] `flux build` shows correct IP substitution for both clusters
   - [ ] `kubeconform --strict` validates Gateway API schemas
+  - [ ] Cilium HelmRelease includes `values.gatewayAPI.enabled: true` (or a tracking chore/PR is filed to add it in Story 01)
 - [ ] Infrastructure kustomization updated to include gateway
 - [ ] Manifests committed to git
 - [ ] Story 45 can proceed with deployment

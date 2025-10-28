@@ -45,6 +45,7 @@ data:
 
   # Domain Configuration
   SECRET_DOMAIN: "monosense.io"
+  LETSENCRYPT_EMAIL: "admin@monosense.io"
 
   # Rook-Ceph Configuration (apps cluster)
   ROOK_CEPH_NAMESPACE: "rook-ceph"

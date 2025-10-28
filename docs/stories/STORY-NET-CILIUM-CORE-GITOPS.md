@@ -764,13 +764,13 @@ Next: finalize Phase 3 `flux build` steps in CI with proper ignore rules; then m
 
 ## QA Results
 
-Risk profile updated (2025-10-27 09:53) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-risk-20251027-095359.md`.
+Risk profile (latest): docs/qa/assessments/01.story-net-cilium-core-gitops-risk-20251027-131354.md
 
-Summary:
+Summary
 - Totals: critical=0, high=3, medium=4, low=3
 - Highest: TECH-002 (Score 6) — Flux postBuild substitution misconfigured or not applied
 
-Gate risk_summary (paste into gate file):
+Gate risk_summary (pasteable)
 
 ```yaml
 risk_summary:
@@ -793,27 +793,9 @@ risk_summary:
       - "Periodic diff: bootstrap values vs HelmRelease"
 ```
 
-Test design created (2025-10-27) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027.md`.
+Test design (latest): docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027-131524.md
 
-Gate test_design summary (paste into gate file):
-
-```yaml
-test_design:
-  scenarios_total: 15
-  by_level:
-    unit: 0
-    integration: 12
-    e2e: 3
-  by_priority:
-    p0: 3
-    p1: 12
-    p2: 0
-  coverage_gaps: []
-```
-
-Test design updated (2025-10-27 09:55) — see `docs/qa/assessments/01.story-net-cilium-core-gitops-test-design-20251027-095553.md`.
-
-Gate test_design (paste into gate file):
+Gate test_design (pasteable)
 
 ```yaml
 test_design:

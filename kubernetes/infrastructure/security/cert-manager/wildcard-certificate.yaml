@@ -1,0 +1,29 @@
+---
+# Wildcard certificate for the primary domain handled by cert-manager.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-tls
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: wildcard-tls
+    app.kubernetes.io/component: tls
+spec:
+  secretName: wildcard-tls
+  duration: 2160h # 90 days
+  renewBefore: 360h # 15 days before expiry
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+    group: cert-manager.io
+  commonName: "*.${SECRET_DOMAIN}"
+  dnsNames:
+    - "*.${SECRET_DOMAIN}"
+    - "${SECRET_DOMAIN}"
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth

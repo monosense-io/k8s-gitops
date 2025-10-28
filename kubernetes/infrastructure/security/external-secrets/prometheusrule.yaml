@@ -1,0 +1,32 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: external-secrets
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/name: external-secrets
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: external-secrets.rules
+      interval: 30s
+      rules:
+        - alert: ExternalSecretsOperatorDown
+          expr: |
+            up{job="external-secrets"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: External Secrets Operator is down
+            description: External Secrets Operator has not reported metrics for 5 minutes.
+        - alert: SecretSyncFailed
+          expr: |
+            externalsecret_sync_calls_error > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: ExternalSecret sync failed
+            description: ExternalSecret {{ $labels.name }} in namespace {{ $labels.namespace }} failed to sync.

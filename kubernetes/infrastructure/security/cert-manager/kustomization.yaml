@@ -1,0 +1,8 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - clusterissuers.yaml
+  - externalsecret-cloudflare.yaml
+  - wildcard-certificate.yaml
+  - prometheusrule.yaml

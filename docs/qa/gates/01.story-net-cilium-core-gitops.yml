@@ -4,11 +4,9 @@ story_title: 'STORY-NET-CILIUM-CORE-GITOPS — Create Cilium GitOps Manifests'
 gate: 'PASS'
 status_reason: 'All manifest ACs satisfied locally; flux dry‑run and kubeconform passed. Deployment/OCI preflight deferred to Story 45/CI and does not block manifest readiness.'
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-27T00:00:00Z'
-waiver: { active: false }
-
+updated: '2025-10-27T12:02:40Z'
+waiver: {active: false}
 top_issues: []
-
 risk_summary:
   totals:
     critical: 0
@@ -27,7 +25,6 @@ risk_summary:
     monitor:
       - "Optional CI: helm template chart render to detect value key drift"
       - "Periodic diff: bootstrap values vs HelmRelease"
-
 test_design:
   scenarios_total: 18
   by_level:
@@ -39,7 +36,6 @@ test_design:
     p1: 15
     p2: 0
   coverage_gaps: []
-
 quality_score: 95
 evidence:
   tests_reviewed: 0
@@ -47,13 +43,11 @@ evidence:
   trace:
     ac_covered: [1, 2, 3, 4, 5, 6, 8]
     ac_gaps: [7]
-
 nfr_validation:
-  security: { status: PASS, notes: 'WireGuard encryption configured; kube‑proxy replacement aligns with Cilium best practices.' }
-  performance: { status: PASS, notes: 'Native routing, ServiceMonitor enabled; no heavy templates.' }
-  reliability: { status: PASS, notes: 'Health checks defined; retries/CRD CreateReplace set.' }
-  maintainability: { status: PASS, notes: 'Pinned versions; cluster substitution pattern clear.' }
-
+  security: {status: PASS, notes: 'WireGuard encryption configured; kube‑proxy replacement aligns with Cilium best practices.'}
+  performance: {status: PASS, notes: 'Native routing, ServiceMonitor enabled; no heavy templates.'}
+  reliability: {status: PASS, notes: 'Health checks defined; retries/CRD CreateReplace set.'}
+  maintainability: {status: PASS, notes: 'Pinned versions; cluster substitution pattern clear.'}
 recommendations:
   immediate:
     - action: 'Add CI job to verify OCI chart availability for 1.18.3 or fall back registry.'

@@ -4,7 +4,8 @@ Sequence: 04/50 | Prev: STORY-NET-CILIUM-GATEWAY.md | Next: STORY-SEC-EXTERNAL-S
 Sprint: 1 | Lane: Networking
 Global Sequence: 04/50
 
-Status: Approved (v3.1 QA-Aligned)
+## Status
+Approved (v3.1 QA-Aligned)
 Owner: Platform Engineering
 Date: 2025-10-27 (v3.1 QA-Aligned)
 Links: docs/architecture.md §9; kubernetes/infrastructure/networking/coredns/
@@ -152,11 +153,14 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
     namespace: flux-system
   spec:
     interval: 12h
-    # NOTE: Set the approved OCI registry URL for the CoreDNS chart in your environment (no placeholders allowed).
-    url: oci://<SET_APPROVED_REGISTRY>/coredns
+    # MUST-SET BEFORE APPLY: Replace with the approved OCI registry URL for the CoreDNS chart (no placeholders allowed at commit time).
+    # Example (adjust per org policy): oci://YOUR_REGISTRY/coredns
+    url: oci://<APPROVED_REGISTRY>/coredns
     ref:
       semver: "1.38.0"
   ```
+
+  - [ ] Must-Set (AC2): Confirm `spec.url` is set to an approved, reachable OCI URL and preflight succeeds (e.g., `helm show chart oci://<approved>/coredns --version 1.38.0`).
 
 - [ ] Create `helmrelease.yaml` with HA and security configuration:
   ```yaml
@@ -345,6 +349,8 @@ This story creates the declarative CoreDNS manifests (HelmRelease, OCIRepository
   kustomize build kubernetes/infrastructure/networking/coredns
   ```
 
+- [ ] Schema validation note: PrometheusRule and HelmRelease CRDs may be missing locally; when using `kubeconform`, add `--strict -ignore-missing-schemas` to avoid false negatives.
+
 - [ ] Validate rendering and substitutions:
   - Option A (Flux offline build; requires Flux CLI supporting postBuild substitutions without cluster access):
     ```bash
@@ -385,7 +391,7 @@ PY
 - [ ] OCI chart preflight (one):
   ```bash
   # Option A (helm)
-  helm show chart oci://<SET_APPROVED_REGISTRY>/coredns --version 1.38.0
+helm show chart oci://<APPROVED_REGISTRY>/coredns --version 1.38.0
   # Option B (flux)
   flux reconcile source oci coredns-charts --with-source --timeout 2m
   ```
@@ -471,6 +477,12 @@ PY
           name: coredns
           namespace: kube-system
     ```
+
+  - [ ] Must-Set (AC4): Confirm both cluster files contain the CoreDNS Kustomization with:
+    - `metadata.name: coredns`
+    - `spec.path: ./kubernetes/infrastructure/networking/coredns`
+    - `spec.dependsOn: [ { name: cilium-core } ]`
+    - `healthChecks` including `HelmRelease/coredns` in `kube-system`
 
 ---
 
@@ -582,7 +594,9 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
   - [ ] ClusterIP belongs to Service CIDR for each cluster
   - [ ] OCI chart source preflight succeeds
   - [ ] Security context configuration verified in rendered output
+  - [ ] OCIRepository `spec.url` committed without placeholders and points to approved registry (AC‑2)
 - [ ] Infrastructure kustomization updated to include CoreDNS
+  - [ ] Includes `dependsOn: [cilium-core]` and a `healthCheck` for `HelmRelease/coredns` in `kube-system`
 - [ ] Manifests committed to git
 - [ ] Story 45 can proceed with deployment
 
@@ -604,6 +618,8 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
 |------------|---------|--------------------------------------|---------|
 | 2025-10-26 | 3.0     | **v3.0 Refinement**: Updated header, story, scope, AC, dependencies, tasks, DoD for manifests-first approach. Separated manifest creation from deployment (moved to Story 45). Tasks simplified to T1-T7 focusing on local validation only. Removed extensive runtime validation sections. | Platform Engineering |
 | 2025-10-27 | 3.1     | **v3.1 QA-Aligned**: Set Status to Approved; added OCI chart preflight; gated ServiceMonitor (default disabled until Prometheus CRDs present); added ClusterIP-in-CIDR checks; clarified cluster-level Flux wiring; linked QA risk and test design; added navigation tips. | Product Owner |
+| 2025-10-27 | 3.1.2   | **PO Course Correction (QA‑Aligned rev 3)**: Integrated QA risks and test design into PO Course Correction; clarified Must‑Fix (OCI URL preflight), cluster Kustomization wiring with healthChecks, schema/CI guidance; added QA references. | Product Owner |
+| 2025-10-27 | 3.1.1   | **PO Course Correction**: Added `## Status` section; added Must‑Set for OCI URL and preflight; marked `ks.yaml` optional; added schema validation guidance and Service CIDR references; updated DoD to enforce approved OCI URL with preflight. | Product Owner |
 
 ---
 
@@ -618,6 +634,7 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
   - Cluster-level Flux Kustomizations are declared in `kubernetes/clusters/<cluster>/infrastructure.yaml` (no aggregate `kubernetes/infrastructure/networking/kustomization.yaml` exists).
 - Chart source:
   - Architecture specifies Helm (OCI). This story creates `ocirepository.yaml` and points the HelmRelease `sourceRef` to it. Update the OCI URL to your approved registry prior to apply.
+  - Service CIDRs (for ClusterIP checks): infra `10.245.0.0/16`, apps `10.247.0.0/16`.
 
 - ServiceMonitor enablement:
   - Default is disabled to avoid CRD timing issues. Enable in the observability story (after Prometheus CRDs exist) or via a documented cluster-settings toggle.
@@ -659,56 +676,60 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
 - kubernetes/infrastructure/networking/coredns/ocirepository.yaml
 - kubernetes/infrastructure/networking/coredns/helmrelease.yaml
 - kubernetes/infrastructure/networking/coredns/prometheusrule.yaml
-- kubernetes/infrastructure/networking/coredns/kustomization.yaml
-- kubernetes/infrastructure/networking/coredns/ks.yaml
+ - kubernetes/infrastructure/networking/coredns/kustomization.yaml
+ - (optional) kubernetes/infrastructure/networking/coredns/ks.yaml  # only if component-scoped Kustomization pattern is used
 - kubernetes/clusters/infra/infrastructure.yaml (updated)
 - kubernetes/clusters/apps/infrastructure.yaml (updated)
 
 ---
 
+## PO Course Correction (2025-10-27, QA‑Aligned rev 3)
+
+- Critical (Must Fix before gate = GO)
+  - OCIRepository URL: Set `spec.url` in `kubernetes/infrastructure/networking/coredns/ocirepository.yaml` to an approved OCI registry (no placeholders) and preflight (helm show chart or Flux Source reconcile). Maps to QA risk TECH-001-OCI-URL (score 9).
+
+- Should-Fix (Implementation under this story)
+  - Cluster wiring: Append CoreDNS Flux Kustomizations to `kubernetes/clusters/{infra,apps}/infrastructure.yaml` with `dependsOn: [cilium-core]` and a HelmRelease `healthCheck` for `coredns`. Maps to QA WIRE-001-FLUX and WIRE-002-HEALTH.
+  - File list alignment: Mark `coredns/ks.yaml` optional (component Kustomization is not the default pattern here).
+  - Preflight fallback: If network restricted locally, document that the preflight reconcile will be executed when connectivity is available.
+
+- Nice-to-Have (Quality/CI)
+  - Schema validation note: Use `kubeconform --strict -ignore-missing-schemas` locally to avoid CRD-related false negatives (Prometheus/Helm CRDs). Maps to QA SCHEMA-001-CRDs.
+  - CIDR/substitution checks: Add CI assertions that `${COREDNS_CLUSTER_IP}` is inside the Service CIDR per cluster and that `${COREDNS_REPLICAS}`/`${COREDNS_CLUSTER_IP}` substitutions render without placeholders. Maps to QA SUB-001-VALUES and CIDR checks.
+
+QA References
+- Risk profile: docs/qa/assessments/STORY-DNS-COREDNS-BASE-risk-20251027-183610.md (rev 3)
+- Test design: docs/qa/assessments/STORY-DNS-COREDNS-BASE-test-design-20251027-183716.md (rev 3)
+
+---
+
 ## QA Results
 
-Risk profile created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-risk-20251027.md
+Risk profile created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-risk-20251027-183610.md (rev 3)
 
 ```yaml
 # risk_summary
 risk_summary:
-  totals:
-    critical: 1
-    high: 2
-    medium: 2
-    low: 1
-  highest:
-    id: TECH-001-OCI-URL
-    score: 9
-    title: 'OCIRepository URL placeholder not set; Helm cannot fetch chart'
+  totals: { critical: 1, high: 1, medium: 3, low: 1 }
+  highest: { id: TECH-001-OCI-URL, score: 9, title: 'OCIRepository URL placeholder not set' }
   recommendations:
     must_fix:
-      - 'Set approved OCI chart URL and verify reachability (preflight reconcile/show chart)'
-      - 'Gate/sequence ServiceMonitor and PrometheusRule until CRDs are installed or disable temporarily'
-      - 'Assert postBuild substitutions render replicaCount and clusterIP for both clusters'
+      - 'Set approved OCI chart URL and preflight (helm show chart or Flux Source reconcile)'
+      - 'Add cluster-level CoreDNS Kustomizations with dependsOn cilium-core'
     monitor:
-      - 'Validate topologySpread label matches chart; confirm HA scheduling across nodes'
-      - 'Ensure replicaCount >= 2 with PDB minAvailable: 1 to avoid drain issues'
-      - 'CI check: ClusterIP belongs to Service CIDR and is unique'
+      - 'Validate HA spread/PDB behavior during drain/rollout'
+      - 'Enforce substitution and CIDR checks in CI'
 ```
 
 Summary
-- Gate signal: CONCERNS (presence of High risks). Use `@qa *gate` to record decision after mitigations are staged.
-- Overall Story Risk Score: 48/100
+- Gate signal: CONCERNS (one Critical, one High). Record `@qa *gate` decision after Must-Fix items are staged.
 
-Test design created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-test-design-20251027.md
+Test design created: docs/qa/assessments/STORY-DNS-COREDNS-BASE-test-design-20251027-183716.md (rev 3)
 
 ```yaml
 test_design:
-  scenarios_total: 14
-  by_level:
-    unit: 0
-    integration: 14
-    e2e: 0
-  by_priority:
-    p0: 7
-    p1: 5
-    p2: 2
+  scenarios_total: 18
+  by_level: { unit: 0, integration: 18, e2e: 0 }
+  by_priority: { p0: 8, p1: 8, p2: 2 }
   coverage_gaps: []
 ```

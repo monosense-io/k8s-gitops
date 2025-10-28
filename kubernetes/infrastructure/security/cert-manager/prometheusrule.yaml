@@ -1,0 +1,41 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cert-manager
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: cert-manager.rules
+      interval: 30s
+      rules:
+        - alert: CertManagerAbsent
+          expr: |
+            absent(up{job="cert-manager"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: cert-manager metrics absent
+            description: cert-manager has not reported metrics for 5 minutes; certificate issuance may be impacted.
+        - alert: CertificateExpiringSoon
+          expr: |
+            certmanager_certificate_expiration_timestamp_seconds - time() < (7 * 24 * 3600)
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate expiring soon
+            description: Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} will expire within 7 days.
+        - alert: CertificateNotReady
+          expr: |
+            certmanager_certificate_ready_status{condition="False"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Certificate not ready
+            description: Certificate {{ $labels.name }} in namespace {{ $labels.namespace }} has remained not ready for 15 minutes.

@@ -45,6 +45,7 @@ data:
 
   # Domain Configuration
   SECRET_DOMAIN: "monosense.io"
+  LETSENCRYPT_EMAIL: "admin@monosense.io"
 
   # GitHub Actions Configuration
   GITHUB_CONFIG_URL: "https://github.com/monosense-io/k8s-gitops"
