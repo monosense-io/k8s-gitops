@@ -626,7 +626,7 @@ GPT-5.0-Codex (Codex CLI)
 - `kustomize build kubernetes/infrastructure/security/cert-manager` → rendered manifests without schema errors.
 - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure --kustomization-file ./kubernetes/clusters/infra/infrastructure.yaml --local-sources ConfigMap/flux-system/cluster-settings=./kubernetes/clusters/infra/cluster-settings.yaml,GitRepository/flux-system/flux-system=. --dry-run --recursive | envsubst | yq 'select(.kind == "ClusterIssuer" and .metadata.name == "letsencrypt-production") | .spec.acme.email'` → produced `admin@monosense.io`.
 - Same flux build pipeline (apps cluster) with envsubst | yq on certificate dnsNames and ExternalSecret remoteRef to confirm substitutions and `credential` property.
-- `git commit -am "feat(security): add external secrets and cert-manager issuers manifests"` & `git push origin main` → recorded and published implementation.
+- `git commit -m "feat(security): add external secrets and cert-manager issuer manifests"` & `git push origin main` → recorded and published implementation.
 
 ### Completion Notes List
 

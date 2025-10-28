@@ -450,7 +450,7 @@ GPT-5.0-Codex (Codex CLI)
 - `kustomize build kubernetes/infrastructure/security/external-secrets` → rendered namespace, HelmRelease, ClusterSecretStore, PrometheusRule, and OCIRepository.
 - `flux build kustomization cluster-infra-infrastructure --path ./kubernetes/infrastructure --kustomization-file ./kubernetes/clusters/infra/infrastructure.yaml --local-sources ConfigMap/flux-system/cluster-settings=./kubernetes/clusters/infra/cluster-settings.yaml,GitRepository/flux-system/flux-system=. --dry-run --recursive | envsubst | yq 'select(.kind == "ClusterSecretStore") | .spec.provider.onepassword.connectHost'` → produced `http://opconnect.monosense.dev`.
 - Same Flux build pipeline for `cluster-apps-infrastructure` validated apps cluster substitutions.
-- `git commit -am "feat(security): add external secrets and cert-manager issuers manifests"` & `git push origin main` → recorded and published implementation.
+- `git commit -m "feat(security): add external secrets and cert-manager issuer manifests"` & `git push origin main` → recorded and published implementation.
 
 ### Completion Notes List
 
