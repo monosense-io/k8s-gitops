@@ -1,0 +1,38 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openebs
+  namespace: openebs-system
+spec:
+  groups:
+    - name: openebs
+      interval: 30s
+      rules:
+        - alert: OpenEBSProvisionerDown
+          expr: up{job="openebs-localpv"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenEBS LocalPV provisioner is down"
+            description: "OpenEBS LocalPV provisioner pod {{ $labels.pod }} is down"
+
+        - alert: OpenEBSPVCBindingFailed
+          expr: increase(openebs_volume_provision_total{status="failed"}[5m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenEBS PVC binding failed"
+            description: "OpenEBS failed to provision PVC in namespace {{ $labels.namespace }}"
+
+        - alert: OpenEBSHighDiskUsage
+          expr: |
+            (openebs_actual_used / openebs_size_of_volume) > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenEBS volume high disk usage"
+            description: "OpenEBS volume {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value | humanizePercentage }} full"
