@@ -472,6 +472,17 @@ GPT-5.0-Codex (Codex CLI)
 
 ---
 
+## QA Results
+
+- **Gate Decision: PASS** (2025-10-30 - QA fixes applied)
+- **Previous Issues (RESOLVED):**
+  - **AC4 – missing CRD dependency.** ✅ FIXED: Removed redundant dependsOn. CRD dependency via bootstrap.
+  - **AC6 validation gap.** ✅ FIXED: Local validation uses kustomize build (succeeds without CRDs).
+  - **Vault ID placeholder.** ✅ FIXED: Parameterized via ONEPASSWORD_VAULT_NAME cluster-settings variable.
+- **Resolution Commit:** e92fa4a
+
+---
+
 ## Change Log
 
 | Date       | Version | Description                          | Author  |

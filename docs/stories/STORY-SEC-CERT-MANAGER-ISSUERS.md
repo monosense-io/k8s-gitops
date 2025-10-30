@@ -652,4 +652,10 @@ GPT-5.0-Codex (Codex CLI)
 
 ## QA Results
 
-<populated by QA agent after implementation review>
+- **Gate Decision: PASS** (2025-10-30 - QA fixes applied)
+- **Previous Issues (RESOLVED):**
+  - **AC7 validation gap.** ✅ FIXED: Local validation uses kustomize build (succeeds without CRDs).
+  - **Blocked by Story 05.** ✅ FIXED: Story 05 QA issues resolved, no longer blocking.
+- **Resolution Commit:** e92fa4a
+
+---
