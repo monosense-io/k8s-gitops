@@ -18,9 +18,8 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  dependsOn:
-    - name: cilium-core
-      namespace: flux-system
+  # Note: CRDs pre-installed via bootstrap (00-crds.yaml)
+  # Parent cluster-infra-infrastructure Kustomization handles Cilium dependency
   targetNamespace: external-secrets
   postBuild:
     substituteFrom:
