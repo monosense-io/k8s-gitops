@@ -1,0 +1,46 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rook-ceph-operator
+  namespace: rook-ceph
+spec:
+  groups:
+    - name: rook-ceph-operator
+      interval: 30s
+      rules:
+        - alert: RookCephOperatorDown
+          expr: up{job="rook-ceph-operator"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Rook-Ceph operator is down"
+            description: "Rook-Ceph operator pod {{ $labels.pod }} is down"
+
+        - alert: RookCephOperatorReconcileErrors
+          expr: increase(rook_ceph_operator_reconcile_errors_total[5m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rook-Ceph operator reconcile errors"
+            description: "Rook-Ceph operator is experiencing reconcile errors for {{ $labels.resource }}"
+
+        - alert: RookCephCRDMissing
+          expr: absent(apiserver_requested_deprecated_apis{resource="cephclusters.ceph.rook.io"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Rook-Ceph CRDs not registered"
+            description: "Rook-Ceph CRDs are not registered in the API server"
+
+        - alert: RookCephDiscoveryDaemonDown
+          expr: up{job="rook-ceph-discovery"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rook-Ceph discovery daemon is down"
+            description: "Rook-Ceph discovery daemon pod {{ $labels.pod }} is down"

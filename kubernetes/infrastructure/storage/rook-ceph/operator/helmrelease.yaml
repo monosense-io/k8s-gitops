@@ -1,0 +1,114 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rook-ceph
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: rook-ceph
+  namespace: rook-ceph
+spec:
+  interval: 15m
+  url: https://charts.rook.io/release
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: rook-ceph-operator
+  namespace: rook-ceph
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: rook-ceph
+      version: v1.18.6
+      sourceRef:
+        kind: HelmRepository
+        name: rook-ceph
+        namespace: rook-ceph
+      interval: 15m
+  install:
+    remediation:
+      retries: 3
+    createNamespace: false
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    # Operator configuration
+    crds:
+      enabled: true
+
+    # Resource limits for operator
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+    # Observability
+    monitoring:
+      enabled: true
+
+    # CSI driver configuration
+    csi:
+      enableCSIHostNetwork: true
+      provisionerReplicas: 2
+
+      # CSI provisioner resource limits
+      csiRBDProvisionerResource: |
+        - name: csi-provisioner
+          resource:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+        - name: csi-resizer
+          resource:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+        - name: csi-snapshotter
+          resource:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+
+    # Node affinity for operator (run on all nodes)
+    nodeSelector: {}
+
+    tolerations: []
+
+    # Log level
+    logLevel: INFO
+
+    # Enable device discovery daemon
+    enableDiscoveryDaemon: true
+    discoveryDaemonResources:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
