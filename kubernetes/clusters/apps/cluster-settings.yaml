@@ -40,7 +40,7 @@ data:
   EXTERNAL_SECRET_STORE: "onepassword"
   ONEPASSWORD_CONNECT_HOST: "http://opconnect.monosense.dev"
   ONEPASSWORD_CONNECT_TOKEN_SECRET: "onepassword-connect-token"
-  ONEPASSWORD_VAULT_NAME: "Apps"  # Primary vault for apps cluster secrets
+  ONEPASSWORD_VAULT_NAME: "Infra"  # Shared vault for both infra and apps cluster secrets
   CILIUM_CLUSTERMESH_SECRET_PATH: "kubernetes/apps/cilium-clustermesh"
   CERTMANAGER_CLOUDFLARE_SECRET_PATH: "kubernetes/apps/cert-manager/cloudflare"
 
