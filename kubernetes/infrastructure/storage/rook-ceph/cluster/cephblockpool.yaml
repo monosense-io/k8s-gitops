@@ -1,0 +1,32 @@
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: ${ROOK_CEPH_BLOCKPOOL_NAME}
+  namespace: ${ROOK_CEPH_NAMESPACE}
+spec:
+  # Replication factor - 3 copies across nodes
+  replicated:
+    size: 3
+    requireSafeReplicaSize: true
+    replicasPerFailureDomain: 1
+    subFailureDomain: host
+
+  # Failure domain (separate nodes for each replica)
+  failureDomain: host
+
+  # Device class filter (use SSD devices only)
+  deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+
+  # Enable compression
+  compressionMode: none
+
+  # Mirroring disabled (single cluster)
+  mirroring:
+    enabled: false
+
+  # Status check
+  statusCheck:
+    mirror:
+      disabled: false
+      interval: 60s

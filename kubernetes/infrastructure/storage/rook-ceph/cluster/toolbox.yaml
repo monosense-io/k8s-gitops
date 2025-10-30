@@ -1,0 +1,70 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rook-ceph-tools
+  namespace: ${ROOK_CEPH_NAMESPACE}
+  labels:
+    app: rook-ceph-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rook-ceph-tools
+  template:
+    metadata:
+      labels:
+        app: rook-ceph-tools
+    spec:
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: rook-ceph-tools
+          image: quay.io/ceph/ceph:${ROOK_CEPH_IMAGE_TAG}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Wait for the cluster to be ready
+              while ! ceph status 2>/dev/null; do
+                echo "Waiting for Ceph cluster..."
+                sleep 5
+              done
+              echo "Ceph cluster is ready!"
+              # Keep container running
+              sleep infinity
+          env:
+            - name: ROOK_CEPH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-mon
+                  key: ceph-username
+            - name: ROOK_CEPH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rook-ceph-mon
+                  key: ceph-secret
+          volumeMounts:
+            - name: ceph-config
+              mountPath: /etc/ceph
+            - name: mon-endpoint-volume
+              mountPath: /etc/rook
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: ceph-config
+          emptyDir: {}
+        - name: mon-endpoint-volume
+          configMap:
+            name: rook-ceph-mon-endpoints
+            items:
+              - key: data
+                path: mon-endpoints
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule

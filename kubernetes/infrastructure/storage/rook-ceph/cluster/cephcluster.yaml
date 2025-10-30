@@ -1,0 +1,145 @@
+---
+apiVersion: ceph.rook.io/v1
+kind: CephCluster
+metadata:
+  name: ${ROOK_CEPH_CLUSTER_NAME}
+  namespace: ${ROOK_CEPH_NAMESPACE}
+spec:
+  cephVersion:
+    image: quay.io/ceph/ceph:${ROOK_CEPH_IMAGE_TAG}
+    allowUnsupported: false
+
+  dataDirHostPath: /var/lib/rook
+
+  # Skip initial cluster upgrade check
+  skipUpgradeChecks: false
+  continueUpgradeAfterChecksEvenIfNotHealthy: false
+
+  # Wait for healthy OSDs before proceeding
+  waitTimeoutForHealthyOSDInMinutes: 10
+
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+
+  mgr:
+    count: 2
+    allowMultiplePerNode: false
+    modules:
+      - name: pg_autoscaler
+        enabled: true
+      - name: rook
+        enabled: true
+
+  dashboard:
+    enabled: true
+    ssl: true
+
+  monitoring:
+    enabled: true
+
+  network:
+    # Use host networking for performance
+    provider: host
+
+  crashCollector:
+    disable: false
+
+  logCollector:
+    enabled: true
+    periodicity: daily
+    maxLogSize: 500M
+
+  cleanupPolicy:
+    confirmation: ""
+    sanitizeDisks:
+      method: quick
+      dataSource: zero
+      iteration: 1
+
+  removeOSDsIfOutAndSafeToRemove: false
+
+  # Priority class for Ceph daemons
+  priorityClassNames:
+    mon: system-node-critical
+    osd: system-node-critical
+    mgr: system-cluster-critical
+
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    deviceFilter: ""
+
+    # BlueStore configuration for direct block device access
+    config:
+      storeType: bluestore
+      osdsPerDevice: "1"
+      encryptedDevice: "false"
+      databaseSizeMB: "10240"  # 10GB RocksDB metadata
+      walSizeMB: "1024"  # 1GB Write-Ahead Log
+
+    # Per-node device specification using stable EUI identifiers
+    # Device allocation:
+    # - 512GB NVMe: Reserved for OpenEBS (/var/mnt/openebs)
+    # - 1TB NVMe: Reserved for Rook-Ceph (below paths)
+    nodes:
+      - name: "infra-01"
+        devices:
+          - name: "/dev/disk/by-id/nvme-eui.6479a7726a304b94"  # 1TB PNY CS1031
+            config:
+              deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+
+      - name: "infra-02"
+        devices:
+          - name: "/dev/disk/by-id/nvme-eui.6479a77cda30650b"  # 1TB PNY CS2241
+            config:
+              deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+
+      - name: "infra-03"
+        devices:
+          - name: "/dev/disk/by-id/nvme-eui.6479a7726a3054e5"  # 1TB PNY CS1031
+            config:
+              deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
+
+  # Resource limits for Ceph daemons
+  resources:
+    mon:
+      limits:
+        cpu: "2"
+        memory: "2Gi"
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+    mgr:
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+    osd:
+      limits:
+        cpu: "2"
+        memory: "4Gi"
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+
+  # Health check configuration
+  healthCheck:
+    daemonHealth:
+      mon:
+        interval: 45s
+        timeout: 600s
+      osd:
+        interval: 60s
+        timeout: 600s
+      status:
+        interval: 60s
+    livenessProbe:
+      mon:
+        disabled: false
+      mgr:
+        disabled: false
+      osd:
+        disabled: false

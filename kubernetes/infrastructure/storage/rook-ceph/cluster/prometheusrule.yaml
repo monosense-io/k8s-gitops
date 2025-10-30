@@ -1,0 +1,64 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: rook-ceph-cluster
+  namespace: ${ROOK_CEPH_NAMESPACE}
+spec:
+  groups:
+    - name: rook-ceph-cluster
+      interval: 30s
+      rules:
+        - alert: CephClusterHealthWarning
+          expr: ceph_health_status == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph cluster health is WARN"
+            description: "Ceph cluster health is WARN for more than 10 minutes"
+
+        - alert: CephClusterHealthError
+          expr: ceph_health_status == 2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Ceph cluster health is ERROR"
+            description: "Ceph cluster health is ERROR for more than 5 minutes"
+
+        - alert: CephOSDDown
+          expr: ceph_osd_up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph OSD down"
+            description: "Ceph OSD {{ $labels.ceph_daemon }} is down"
+
+        - alert: CephOSDNearFull
+          expr: ceph_osd_stat_bytes_used / ceph_osd_stat_bytes > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph OSD near full"
+            description: "Ceph OSD {{ $labels.ceph_daemon }} is {{ $value | humanizePercentage }} full"
+
+        - alert: CephPGDegraded
+          expr: ceph_pg_degraded > 0
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph PGs degraded"
+            description: "{{ $value }} Ceph PGs are degraded for more than 15 minutes"
+
+        - alert: CephPoolNearFull
+          expr: ceph_pool_bytes_used / ceph_pool_max_avail > 0.85
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ceph pool near full"
+            description: "Ceph pool {{ $labels.name }} is {{ $value | humanizePercentage }} full"

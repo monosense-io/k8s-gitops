@@ -1,0 +1,34 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rook-ceph-cluster
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m  # Ceph cluster initialization takes time
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/storage/rook-ceph/cluster
+  prune: true
+  wait: true
+  dependsOn:
+    - name: rook-ceph-operator
+      namespace: flux-system
+  postBuild:
+    substitute: {}
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  targetNamespace: ${ROOK_CEPH_NAMESPACE}
+  healthChecks:
+    - apiVersion: ceph.rook.io/v1
+      kind: CephCluster
+      name: rook-ceph
+      namespace: rook-ceph
+    - apiVersion: ceph.rook.io/v1
+      kind: CephBlockPool
+      name: rook-ceph-block
+      namespace: rook-ceph

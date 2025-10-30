@@ -4,4 +4,4 @@ kind: Kustomization
 resources:
   - openebs/ks.yaml
   - rook-ceph/operator/ks.yaml
-  # Future: rook-ceph/cluster/ks.yaml (Story 16)
+  - rook-ceph/cluster/ks.yaml
