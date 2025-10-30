@@ -89,6 +89,34 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: cilium-bgp
+  namespace: flux-system
+spec:
+  interval: 10m
+  prune: true
+  wait: true
+  timeout: 5m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  path: ./kubernetes/infrastructure/networking/cilium/bgp/cplane
+  dependsOn:
+    - name: cilium-core
+    - name: cilium-ipam
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: cilium.io/v2alpha1
+      kind: CiliumBGPClusterConfig
+      name: bgp-cluster-config
+      namespace: ""
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: cluster-infra-infrastructure
   namespace: flux-system
 spec:

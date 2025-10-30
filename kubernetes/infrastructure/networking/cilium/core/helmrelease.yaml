@@ -71,3 +71,7 @@ spec:
     # Gateway API
     gatewayAPI:
       enabled: true
+
+    # BGP Control Plane
+    bgpControlPlane:
+      enabled: true
