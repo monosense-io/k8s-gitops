@@ -13,7 +13,7 @@ spec:
   timeout: 5m
   prune: true
   wait: true
-  path: ./kubernetes/infrastructure/security/external-secrets
+  path: ./kubernetes/infrastructure/security/external-secrets/app
   sourceRef:
     kind: GitRepository
     name: flux-system

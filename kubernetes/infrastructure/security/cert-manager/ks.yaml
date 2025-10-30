@@ -13,7 +13,7 @@ spec:
   timeout: 5m
   prune: true
   wait: false
-  path: ./kubernetes/infrastructure/security/cert-manager
+  path: ./kubernetes/infrastructure/security/cert-manager/app
   sourceRef:
     kind: GitRepository
     name: flux-system
