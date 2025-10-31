@@ -4,14 +4,14 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-10-31
 **Total Stories**: 50
-**Completed**: 10 / 50 (20%)
+**Completed**: 11 / 50 (22%)
 
 ---
 
 ## 🎯 Overall Progress
 
 ```
-Networking:  ████████░░░░░░░  55% (5/9 core stories)
+Networking:  ██████████░░░░░  67% (6/9 core stories)
 Security:    ███░░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories)
 Databases:   ░░░░░░░░░░░░░░░   0% (0/3 stories)
@@ -104,6 +104,30 @@ Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
 - **Status**: ⏭️ **INVALIDATED** (redundant with Story 09)
 - **Sprint**: 4 | Lane: Networking
 - **Reason**: Story 09 already implemented all BGP Control Plane manifests. Story 10's deployment validation deferred to Story 45.
+
+---
+
+#### **Story 11: STORY-NET-SPEGEL-REGISTRY-MIRROR**
+- **Status**: ✅ **COMPLETE**
+- **Sprint**: 4 | Lane: Networking
+- **Commit**: `f889227` - feat(networking): add Spegel registry mirror v0.4.0
+- **Date**: 2025-10-31
+- **Deliverables**:
+  - Spegel DaemonSet for P2P registry mirroring (v0.4.0)
+  - OCIRepository for Spegel Helm charts
+  - Talos-specific containerd configuration (/etc/cri/conf.d/hosts)
+  - ServiceMonitor and Grafana dashboard integration
+  - Registry mirrors: docker.io, ghcr.io, quay.io, registry.k8s.io
+  - Modern registryFilters pattern (migrated from deprecated resolveLatestTag)
+- **Files Created**:
+  - `kubernetes/infrastructure/networking/spegel/app/ocirepository.yaml`
+  - `kubernetes/infrastructure/networking/spegel/app/helmrelease.yaml`
+  - `kubernetes/infrastructure/networking/spegel/app/kustomization.yaml`
+- **Files Modified**:
+  - `kubernetes/clusters/infra/infrastructure.yaml` (added spegel Kustomization)
+  - `kubernetes/clusters/apps/infrastructure.yaml` (added spegel Kustomization)
+- **Dependencies**: Story 01 (Cilium Core)
+- **Note**: Version updated from v0.0.28 to v0.4.0 (latest stable), CoreDNS dependency resolved as runtime-only
 
 ---
 
@@ -237,13 +261,7 @@ None currently.
 - **Effort**: 3-4 hours
 - **Unlocks**: Zero-trust policies, CiliumAuthPolicy
 
-### **Priority 2: Story 11 - Spegel Registry Mirror** ⚡
-- **Dependencies**: ✅ CoreDNS (likely ready)
-- **Strategic Value**: Performance optimization via P2P caching
-- **Effort**: 1-2 hours
-- **Unlocks**: Faster image pulls, reduced bandwidth
-
-### **Priority 3: Database Layer** 🗄️
+### **Priority 2: Database Layer** 🗄️
 - **Story DB-CNPG-OPERATOR**: CloudNative-PG Operator
 - **Story DB-CNPG-SHARED-CLUSTER**: Multi-tenant PostgreSQL
 - **Dependencies**: ✅ Storage ready (Rook-Ceph)
@@ -275,7 +293,7 @@ Foundation:
 │  │  ├─ Story 03: Gateway API ✅
 │  │  ├─ Story 09: BGP Control Plane ✅
 │  │  └─ Story 12: ClusterMesh ✅
-│  └─ Story 11: Spegel (CoreDNS) 📋
+│  └─ Story 11: Spegel ✅
 │
 ├─ Story 05: External Secrets ✅
 │  ├─ Story 06: cert-manager ✅
@@ -296,7 +314,7 @@ Foundation:
 | Sprint | Theme | Completed | Remaining |
 |---|---|---|---|
 | **Sprint 3** | Security Foundation | 2/2 ✅ | 0 |
-| **Sprint 4** | Networking Core | 4/6 (67%) | 2 |
+| **Sprint 4** | Networking Core | 5/6 (83%) | 1 |
 | **Sprint 5** | Storage Infrastructure | 3/3 ✅ | 0 |
 | **Sprint 6** | Multi-Cluster + Security | 1/4 (25%) | 3 |
 
@@ -306,12 +324,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 10 |
-| **Total Commits** | 10 |
-| **Lines Added** | ~2,500 |
-| **Files Created** | ~40 |
+| **Stories Completed** | 11 |
+| **Total Commits** | 11 |
+| **Lines Added** | ~2,700 |
+| **Files Created** | ~43 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (10/10) |
+| **Success Rate** | 100% (11/11) |
 
 ---
 
@@ -323,7 +341,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (20% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (22% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -338,4 +356,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-10-31 by Claude Code (Story 12 completion)
+**Last Updated**: 2025-10-31 by Claude Code (Story 11 completion)
