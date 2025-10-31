@@ -4,14 +4,14 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-10-31
 **Total Stories**: 50
-**Completed**: 12 / 50 (24%)
+**Completed**: 13 / 50 (26%)
 
 ---
 
 ## 🎯 Overall Progress
 
 ```
-Networking:  ███████████░░░░  78% (7/9 core stories)
+Networking:  ██████████████░  89% (8/9 core stories)
 Security:    ███░░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories)
 Databases:   ░░░░░░░░░░░░░░░   0% (0/3 stories)
@@ -176,6 +176,28 @@ Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
   - `kubernetes/clusters/apps/infrastructure.yaml` (added cilium-clustermesh Kustomization)
 - **Dependencies**: Story 01 (Core), Story 05 (External Secrets), Storage (Stories 14-16)
 - **Note**: SPIRE workload identity deferred to Story 28 after storage available
+
+---
+
+#### **Story 13: STORY-NET-CLUSTERMESH-DNS**
+- **Status**: ✅ **COMPLETE**
+- **Sprint**: 6 | Lane: Networking
+- **Commit**: `de7873a` - feat(networking): add DNS configuration for ClusterMesh discovery
+- **Date**: 2025-10-31
+- **Deliverables**:
+  - DNS-based ClusterMesh discovery using split-horizon DNS architecture
+  - FQDN variables for ClusterMesh API servers in both clusters
+  - Comprehensive DNS setup documentation for internal BIND server
+  - Internal DNS records (BIND only, not Cloudflare):
+    - clustermesh-infra.monosense.io → 10.25.11.100
+    - clustermesh-apps.monosense.io → 10.25.11.120
+- **Files Created**:
+  - `docs/operations/clustermesh-dns-setup.md` (comprehensive DNS setup guide)
+- **Files Modified**:
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (added CILIUM_CLUSTERMESH_FQDN, CILIUM_CLUSTERMESH_APPS_FQDN)
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (added CILIUM_CLUSTERMESH_FQDN, CILIUM_CLUSTERMESH_INFRA_FQDN)
+- **Dependencies**: Story 12 (ClusterMesh), Story 04 (CoreDNS)
+- **Note**: Split-horizon DNS - private IPs in internal BIND (10.25.10.30), not exposed publicly. CoreDNS default forwarding configuration sufficient (no customization needed).
 
 ---
 
