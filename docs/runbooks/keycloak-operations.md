@@ -54,39 +54,39 @@ Platform realm: `https://sso.monosense.io/realms/platform`
 ### Operator Upgrade
 
 1. Update operator version in cluster-settings.yaml:
-   \`\`\`yaml
+   ```yaml
    KEYCLOAK_OPERATOR_VERSION: "26.x.x"
-   \`\`\`
+   ```
 
 2. Commit and push to trigger Flux reconciliation
 
 3. Monitor rollout:
-   \`\`\`bash
+   ```bash
    kubectl -n keycloak-operator-system get pods -w
    kubectl -n keycloak-operator-system logs -l app.kubernetes.io/name=keycloak-operator
-   \`\`\`
+   ```
 
 ### Keycloak Instance Upgrade
 
 1. Update image tag in cluster-settings.yaml:
-   \`\`\`yaml
+   ```yaml
    KEYCLOAK_IMAGE_TAG: "26.x.x"
-   \`\`\`
+   ```
 
 2. Commit and push - Flux will update the Keycloak CR
 
 3. Operator performs rolling upgrade automatically
 
 4. Monitor rollout:
-   \`\`\`bash
+   ```bash
    kubectl -n keycloak-system get pods -w
    kubectl -n keycloak-system get keycloak keycloak
-   \`\`\`
+   ```
 
 5. Verify health:
-   \`\`\`bash
+   ```bash
    curl -sfk https://sso.monosense.io/health | jq .
-   \`\`\`
+   ```
 
 ## Realm Management
 
@@ -95,7 +95,7 @@ Platform realm: `https://sso.monosense.io/realms/platform`
 Realms are managed via `KeycloakRealmImport` CRs. The operator applies imports idempotently.
 
 Example:
-\`\`\`yaml
+```yaml
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
 metadata:
@@ -108,13 +108,13 @@ spec:
     realm: my-realm
     enabled: true
     # ... realm configuration
-\`\`\`
+```
 
 ### Export Realm
 
 Export realm for backup:
 
-\`\`\`bash
+```bash
 # Get Keycloak pod
 POD=$(kubectl -n keycloak-system get pods -l app=keycloak -o jsonpath='{.items[0].metadata.name}')
 
@@ -127,7 +127,7 @@ kubectl -n keycloak-system exec $POD -- \
 
 # Copy export locally
 kubectl -n keycloak-system cp $POD:/tmp/platform-realm.json ./platform-realm-$(date +%Y%m%d).json
-\`\`\`
+```
 
 ### Client Registration
 
@@ -190,71 +190,71 @@ Configured alerts (see `prometheusrule.yaml`):
 ### Keycloak Not Starting
 
 Check operator logs:
-\`\`\`bash
+```bash
 kubectl -n keycloak-operator-system logs -l app.kubernetes.io/name=keycloak-operator
-\`\`\`
+```
 
 Check Keycloak CR status:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system get keycloak keycloak
 kubectl -n keycloak-system describe keycloak keycloak
-\`\`\`
+```
 
 Check pod events and logs:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system describe pod <pod-name>
 kubectl -n keycloak-system logs <pod-name> -f
-\`\`\`
+```
 
 ### Database Connection Issues
 
 Test pooler connectivity:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system run -it --rm psql --image=postgres:16 --restart=Never -- \
   psql -h keycloak-pooler-rw.cnpg-system.svc.cluster.local -U keycloak -d keycloak
-\`\`\`
+```
 
 Check pooler status:
-\`\`\`bash
+```bash
 kubectl -n cnpg-system get pooler keycloak-pooler
 kubectl -n cnpg-system logs -l cnpg.io/poolerName=keycloak-pooler
-\`\`\`
+```
 
 ### TLS Certificate Issues
 
 Check certificate status:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system get certificate sso-tls
 kubectl -n keycloak-system describe certificate sso-tls
-\`\`\`
+```
 
 Check certificate secret:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system get secret sso-tls
-\`\`\`
+```
 
 Test TLS:
-\`\`\`bash
+```bash
 curl -vk https://sso.monosense.io
-\`\`\`
+```
 
 ### HTTPRoute Not Working
 
 Check HTTPRoute status:
-\`\`\`bash
+```bash
 kubectl -n keycloak-system get httproute keycloak
 kubectl -n keycloak-system describe httproute keycloak
-\`\`\`
+```
 
 Check Gateway status:
-\`\`\`bash
+```bash
 kubectl -n kube-system get gateway cilium-gateway-external
-\`\`\`
+```
 
 ### Clustering Issues
 
 Check JGroups communication:
-\`\`\`bash
+```bash
 # Check headless service resolves all pods
 kubectl -n keycloak-system run -it --rm nslookup --image=busybox --restart=Never -- \
   nslookup keycloak-headless.keycloak-system.svc.cluster.local
@@ -262,7 +262,7 @@ kubectl -n keycloak-system run -it --rm nslookup --image=busybox --restart=Never
 # Check JGroups metrics
 kubectl -n keycloak-system exec <pod-name> -- \
   curl -s http://localhost:9000/metrics | grep jgroups
-\`\`\`
+```
 
 ## Security Considerations
 
@@ -279,21 +279,21 @@ kubectl -n keycloak-system exec <pod-name> -- \
 ### Scaling Up
 
 Increase replicas:
-\`\`\`yaml
+```yaml
 # In cluster-settings.yaml
 KEYCLOAK_REPLICAS: "3"
-\`\`\`
+```
 
 ### Resource Adjustments
 
 Adjust based on actual usage:
-\`\`\`yaml
+```yaml
 # In cluster-settings.yaml
 KEYCLOAK_CPU_REQUEST: "1000m"
 KEYCLOAK_CPU_LIMIT: "4000m"
 KEYCLOAK_MEMORY_REQUEST: "2Gi"
 KEYCLOAK_MEMORY_LIMIT: "4Gi"
-\`\`\`
+```
 
 ### Cache Tuning
 
