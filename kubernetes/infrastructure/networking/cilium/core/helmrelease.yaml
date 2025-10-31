@@ -75,3 +75,29 @@ spec:
     # BGP Control Plane
     bgpControlPlane:
       enabled: true
+
+    # ClusterMesh
+    # NOTE: SPIRE authentication added in Story 28 after storage is available
+    # Current security: Auto-generated TLS + WireGuard node-to-node encryption
+    clustermesh:
+      useAPIServer: true
+      apiserver:
+        replicas: 2
+        service:
+          type: LoadBalancer
+          annotations:
+            io.cilium/lb-ipam-ips: ${CLUSTERMESH_IP}
+        tls:
+          auto:
+            enabled: true
+            method: cronJob
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      config:
+        enabled: true
+        domain: mesh.cilium.io
