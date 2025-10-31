@@ -1,0 +1,25 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: ${CNPG_SHARED_CLUSTER_NAME}-backup
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: backup
+spec:
+  # Six-field cron: seconds minutes hours day month weekday
+  schedule: ${CNPG_BACKUP_SCHEDULE}
+
+  backupOwnerReference: self
+
+  cluster:
+    name: ${CNPG_SHARED_CLUSTER_NAME}
+
+  immediate: false
+
+  # Backup method (physical backup)
+  method: barmanObjectStore
+
+  # Target (primary or prefer-standby)
+  target: prefer-standby

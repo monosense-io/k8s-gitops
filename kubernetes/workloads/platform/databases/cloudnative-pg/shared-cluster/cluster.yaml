@@ -1,0 +1,167 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ${CNPG_SHARED_CLUSTER_NAME}
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: cluster
+spec:
+  instances: ${CNPG_INSTANCES}
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:${CNPG_POSTGRES_VERSION}
+
+  postgresql:
+    parameters:
+      # Connection settings
+      max_connections: "200"
+
+      # Memory settings
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "64MB"
+      work_mem: "2621kB"
+      huge_pages: "off"
+
+      # WAL settings
+      wal_buffers: "16MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+
+      # Query planner
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+
+      # Checkpointing
+      checkpoint_completion_target: "0.9"
+
+      # Parallel query
+      max_worker_processes: "4"
+      max_parallel_workers_per_gather: "2"
+      max_parallel_workers: "4"
+      max_parallel_maintenance_workers: "2"
+
+  # Synchronous replication for data durability
+  minSyncReplicas: ${CNPG_MIN_SYNC_REPLICAS}
+  maxSyncReplicas: ${CNPG_MAX_SYNC_REPLICAS}
+
+  # Storage configuration
+  storage:
+    storageClass: ${CNPG_STORAGE_CLASS}
+    size: ${CNPG_DATA_SIZE}
+
+  walStorage:
+    storageClass: ${CNPG_STORAGE_CLASS}
+    size: ${CNPG_WAL_SIZE}
+
+  # Superuser access (use sparingly, prefer Database CRs)
+  enableSuperuserAccess: true
+  superuserSecret:
+    name: cnpg-superuser
+
+  # Managed roles for applications (declarative)
+  managed:
+    roles:
+      - name: harbor
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        inherit: true
+        replication: false
+        passwordSecret:
+          name: harbor-db-credentials
+          key: password
+
+      - name: keycloak
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        inherit: true
+        replication: false
+        passwordSecret:
+          name: keycloak-db-credentials
+          key: password
+
+      - name: gitlab
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        inherit: true
+        replication: false
+        passwordSecret:
+          name: gitlab-db-credentials
+          key: password
+
+      - name: synergyflow
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        inherit: true
+        replication: false
+        passwordSecret:
+          name: synergyflow-db-credentials
+          key: password
+
+  # Backup configuration
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://${CNPG_BACKUP_BUCKET}/${CNPG_SHARED_CLUSTER_NAME}
+      endpointURL: ${CNPG_MINIO_ENDPOINT_URL}
+      s3Credentials:
+        accessKeyId:
+          name: cnpg-minio-credentials
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: cnpg-minio-credentials
+          key: SECRET_ACCESS_KEY
+      wal:
+        compression: gzip
+        encryption: AES256
+      data:
+        compression: gzip
+        encryption: AES256
+        immediateCheckpoint: true
+        jobs: 2
+    retentionPolicy: ${CNPG_BACKUP_RETENTION}
+
+  # Monitoring
+  monitoring:
+    enablePodMonitor: true
+
+  # High availability
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: preferred
+
+  # Resource limits
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  # Bootstrap (for new cluster)
+  bootstrap:
+    initdb:
+      database: postgres
+      owner: postgres
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+        - CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        - CREATE EXTENSION IF NOT EXISTS btree_gist;
+        - CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        - CREATE EXTENSION IF NOT EXISTS plpgsql;
+        - CREATE EXTENSION IF NOT EXISTS amcheck;

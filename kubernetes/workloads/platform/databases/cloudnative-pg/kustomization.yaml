@@ -1,0 +1,32 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: cnpg-system
+
+resources:
+  # ExternalSecrets (must exist before Cluster)
+  - shared-cluster/externalsecrets.yaml
+
+  # Cluster and backup configuration
+  - shared-cluster/cluster.yaml
+  - shared-cluster/scheduledbackup.yaml
+  - shared-cluster/databases.yaml
+
+  # Poolers
+  - poolers/harbor-pooler.yaml
+  - poolers/keycloak-pooler.yaml
+  - poolers/gitlab-pooler.yaml
+  - poolers/synergyflow-pooler.yaml
+
+  # PodDisruptionBudgets
+  - poolers/harbor-pooler-pdb.yaml
+  - poolers/keycloak-pooler-pdb.yaml
+  - poolers/gitlab-pooler-pdb.yaml
+  - poolers/synergyflow-pooler-pdb.yaml
+
+  # Monitoring
+  - shared-cluster/prometheusrule.yaml
+
+  # Backup validation
+  - shared-cluster/backup-validation.yaml

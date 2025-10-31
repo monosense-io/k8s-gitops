@@ -1,0 +1,154 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: cloudnative-pg-cluster
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: cloudnativepg.cluster
+      interval: 30s
+      rules:
+        # Cluster Health Alerts
+        - alert: CNPGClusterNotReady
+          expr: cnpg_pg_cluster_ready{cluster="${CNPG_SHARED_CLUSTER_NAME}"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "CNPG cluster {{ $labels.cluster }} is not ready"
+            description: "CloudNativePG cluster {{ $labels.cluster }} has been not ready for 5 minutes"
+
+        - alert: CNPGClusterPrimaryMissing
+          expr: count(cnpg_pg_cluster_role{cluster="${CNPG_SHARED_CLUSTER_NAME}",role="primary"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "CNPG cluster {{ $labels.cluster }} has no primary instance"
+            description: "CloudNativePG cluster {{ $labels.cluster }} has no primary instance for 2 minutes"
+
+        - alert: CNPGClusterReplicasBelowTarget
+          expr: cnpg_pg_cluster_instances{cluster="${CNPG_SHARED_CLUSTER_NAME}"} < 3
+          for: 10m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG cluster {{ $labels.cluster }} has fewer replicas than expected"
+            description: "CloudNativePG cluster {{ $labels.cluster }} has {{ $value }} instances (expected 3)"
+
+        # Replication Alerts
+        - alert: CNPGReplicationLagHigh
+          expr: cnpg_pg_replication_lag{cluster="${CNPG_SHARED_CLUSTER_NAME}"} > 60
+          for: 5m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG replication lag high on {{ $labels.pod }}"
+            description: "Replication lag is {{ $value }}s on {{ $labels.pod }}"
+
+        - alert: CNPGReplicationLagCritical
+          expr: cnpg_pg_replication_lag{cluster="${CNPG_SHARED_CLUSTER_NAME}"} > 300
+          for: 2m
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "CNPG replication lag critical on {{ $labels.pod }}"
+            description: "Replication lag is {{ $value }}s on {{ $labels.pod }}"
+
+        # Backup Alerts
+        - alert: CNPGBackupFailed
+          expr: cnpg_pg_backup_last_status{cluster="${CNPG_SHARED_CLUSTER_NAME}"} != 0
+          for: 5m
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "CNPG backup failed for cluster {{ $labels.cluster }}"
+            description: "Last backup status is {{ $value }} (non-zero indicates failure)"
+
+        - alert: CNPGBackupOverdue
+          expr: time() - cnpg_pg_backup_last_successful_timestamp{cluster="${CNPG_SHARED_CLUSTER_NAME}"} > 172800  # 48 hours
+          for: 1h
+          labels:
+            severity: critical
+            component: database
+          annotations:
+            summary: "CNPG backup overdue for cluster {{ $labels.cluster }}"
+            description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+
+        # Storage Alerts
+        - alert: CNPGStorageNearFull
+          expr: (cnpg_pg_database_size_bytes{cluster="${CNPG_SHARED_CLUSTER_NAME}"} / (80 * 1024 * 1024 * 1024)) > 0.8
+          for: 15m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG storage near capacity for database {{ $labels.datname }}"
+            description: "Database {{ $labels.datname }} is {{ $value | humanizePercentage }} full"
+
+        # Connection Alerts
+        - alert: CNPGConnectionsNearLimit
+          expr: (cnpg_pg_stat_database_numbackends{cluster="${CNPG_SHARED_CLUSTER_NAME}"} / 200) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG connections near limit for database {{ $labels.datname }}"
+            description: "Database {{ $labels.datname }} is using {{ $value | humanizePercentage }} of max_connections"
+
+    - name: cloudnativepg.pooler
+      interval: 30s
+      rules:
+        # Pooler Health Alerts
+        - alert: CNPGPoolerNotReady
+          expr: kube_deployment_status_replicas_available{namespace="cnpg-system",deployment=~".*-pooler.*"} < 2
+          for: 5m
+          labels:
+            severity: warning
+            component: pooler
+          annotations:
+            summary: "CNPG pooler {{ $labels.deployment }} not highly available"
+            description: "Pooler {{ $labels.deployment }} has only {{ $value }} replicas available"
+
+        # PgBouncer Connection Alerts
+        - alert: CNPGPoolerConnectionsHigh
+          expr: (cnpg_pgbouncer_pools_cl_active / cnpg_pgbouncer_config_max_client_conn) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: pooler
+          annotations:
+            summary: "CNPG pooler {{ $labels.pooler }} client connections high"
+            description: "Pooler {{ $labels.pooler }} is using {{ $value | humanizePercentage }} of max_client_conn"
+
+        - alert: CNPGPoolerServerConnectionsExhausted
+          expr: cnpg_pgbouncer_pools_sv_active >= cnpg_pgbouncer_config_default_pool_size
+          for: 5m
+          labels:
+            severity: warning
+            component: pooler
+          annotations:
+            summary: "CNPG pooler {{ $labels.pooler }} server pool exhausted"
+            description: "Pooler {{ $labels.pooler }} has reached default_pool_size limit"
+
+        # PgBouncer Wait Queue Alerts
+        - alert: CNPGPoolerWaitQueueBuildup
+          expr: cnpg_pgbouncer_pools_cl_waiting > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: pooler
+          annotations:
+            summary: "CNPG pooler {{ $labels.pooler }} has waiting clients"
+            description: "Pooler {{ $labels.pooler }} has {{ $value }} clients waiting for connections"

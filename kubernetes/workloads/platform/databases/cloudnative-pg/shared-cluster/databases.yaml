@@ -1,0 +1,70 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: harbor
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: database
+    app: harbor
+spec:
+  cluster:
+    name: ${CNPG_SHARED_CLUSTER_NAME}
+  name: harbor
+  owner: harbor
+  extensions:
+    - uuid-ossp
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: keycloak
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: database
+    app: keycloak
+spec:
+  cluster:
+    name: ${CNPG_SHARED_CLUSTER_NAME}
+  name: keycloak
+  owner: keycloak
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: gitlab
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: database
+    app: gitlab
+spec:
+  cluster:
+    name: ${CNPG_SHARED_CLUSTER_NAME}
+  name: gitlab
+  owner: gitlab
+  extensions:
+    - pg_trgm
+    - btree_gist
+    - plpgsql
+    - amcheck
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: synergyflow
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: database
+    app: synergyflow
+spec:
+  cluster:
+    name: ${CNPG_SHARED_CLUSTER_NAME}
+  name: synergyflow
+  owner: synergyflow

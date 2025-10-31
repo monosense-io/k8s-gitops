@@ -103,14 +103,22 @@ data:
   CNPG_DATA_SIZE: "80Gi"
   CNPG_WAL_SIZE: "20Gi"
   CNPG_INSTANCES: "3"
+  CNPG_MIN_SYNC_REPLICAS: "1"
+  CNPG_MAX_SYNC_REPLICAS: "2"
   CNPG_SHARED_CLUSTER_NAME: "shared-postgres"
   CNPG_BACKUP_BUCKET: "monosense-cnpg"
   # NOTE: CNPG ScheduledBackup uses a six-field cron expression (seconds first).
   # Example below runs at 02:00:00 UTC daily.
   CNPG_BACKUP_SCHEDULE: "0 0 2 * * *"
+  CNPG_BACKUP_RETENTION: "30d"
   CNPG_MINIO_ENDPOINT_URL: "http://10.25.11.3:9000"
   CNPG_MINIO_SECRET_PATH: "kubernetes/infra/cloudnative-pg/minio"
   CNPG_SUPERUSER_SECRET_PATH: "kubernetes/infra/cloudnative-pg/superuser"
+  CNPG_POOLER_REPLICAS: "3"
+  CNPG_HARBOR_SECRET_PATH: "kubernetes/infra/cloudnative-pg/harbor"
+  CNPG_KEYCLOAK_SECRET_PATH: "kubernetes/infra/cloudnative-pg/keycloak"
+  CNPG_GITLAB_SECRET_PATH: "kubernetes/infra/cloudnative-pg/gitlab"
+  CNPG_SYNERGYFLOW_SECRET_PATH: "kubernetes/infra/cloudnative-pg/synergyflow"
 
   # Dragonfly Configuration (infra)
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
