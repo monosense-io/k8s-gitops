@@ -5,4 +5,5 @@ resources:
   - security/
   - storage/
   - networking/
+  - databases/
   # Note: gitops/ components wired separately if needed

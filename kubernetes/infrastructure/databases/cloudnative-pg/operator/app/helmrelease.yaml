@@ -1,0 +1,97 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cloudnative-pg
+  namespace: cnpg-system
+spec:
+  interval: 1h
+  timeout: 10m
+  chart:
+    spec:
+      chart: cloudnative-pg
+      version: 0.26.1
+      sourceRef:
+        kind: OCIRepository
+        name: cloudnative-pg
+        namespace: flux-system
+      interval: 12h
+  install:
+    crds: Skip
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: Skip
+    remediation:
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    cleanupOnFail: true
+    recreate: true
+  values:
+    fullnameOverride: cloudnative-pg
+
+    # High Availability configuration
+    replicaCount: 2
+
+    # Resource limits (production-sized: 400Mi memory minimum)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Anti-affinity for pod distribution across nodes
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: cloudnative-pg
+              topologyKey: kubernetes.io/hostname
+
+    # Watch scope - cluster-wide for shared infrastructure
+    config:
+      clusterWide: true
+
+    # Security context - PSA restricted compliant
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      fsGroup: 10001
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+
+    # Service configuration
+    service:
+      type: ClusterIP
+      port: 8080
+
+    # Webhook configuration
+    webhook:
+      port: 9443
+      mutating:
+        create: true
+        failurePolicy: Fail
+      validating:
+        create: true
+        failurePolicy: Fail
+
+    # Leader election for HA
+    leaderElection:
+      enabled: true
+
+    # Monitoring - metrics exposed on port 8080
+    monitoring:
+      podMonitorEnabled: false  # Manual VMPodScrape created separately

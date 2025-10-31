@@ -1,0 +1,63 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: cloudnative-pg-operator
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/component: operator
+spec:
+  groups:
+    - name: cloudnativepg.operator
+      interval: 30s
+      rules:
+        # Operator availability
+        - alert: CNPGOperatorDown
+          expr: up{job="cnpg-system/cloudnative-pg"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CloudNativePG operator is down"
+            description: "CloudNativePG operator in namespace {{ $labels.namespace }} has been down for more than 5 minutes"
+
+        # Operator pod restarts
+        - alert: CNPGOperatorHighRestarts
+          expr: rate(kube_pod_container_status_restarts_total{namespace="cnpg-system",pod=~"cloudnative-pg.*"}[15m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CloudNativePG operator restarting frequently"
+            description: "CloudNativePG operator pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"
+
+        # Webhook errors
+        - alert: CNPGWebhookErrors
+          expr: rate(cnpg_webhook_requests_total{result="error"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CloudNativePG webhook errors detected"
+            description: "CloudNativePG webhook is experiencing errors at {{ $value }} errors/second"
+
+        # Reconciliation errors
+        - alert: CNPGReconciliationErrors
+          expr: rate(cnpg_controller_reconciliation_errors_total[5m]) > 0.1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CloudNativePG reconciliation errors"
+            description: "CloudNativePG controller is experiencing reconciliation errors at {{ $value }} errors/second"
+
+        # Operator replicas
+        - alert: CNPGOperatorNotHighlyAvailable
+          expr: kube_deployment_status_replicas_available{namespace="cnpg-system",deployment="cloudnative-pg"} < 2
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CloudNativePG operator not highly available"
+            description: "CloudNativePG operator has {{ $value }} replicas available (expected 2)"
