@@ -1,0 +1,39 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-gateway
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: cilium-gateway
+    app.kubernetes.io/component: networking
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./kubernetes/infrastructure/networking/cilium/gateway/app
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  dependsOn:
+    - name: cilium-core
+      namespace: flux-system
+    - name: cilium-ipam
+      namespace: flux-system
+  targetNamespace: kube-system
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      name: cilium-gateway-external
+      namespace: kube-system
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      name: cilium-gateway-internal
+      namespace: kube-system
