@@ -1,0 +1,19 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: keycloak
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: keycloak
+
+  endpoints:
+    - port: http-management  # Keycloak management port 9000
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http

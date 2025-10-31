@@ -130,3 +130,27 @@ data:
   DRAGONFLY_MEMORY_REQUEST: "1Gi"
   DRAGONFLY_CPU_REQUEST: "500m"
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"
+
+  # Keycloak Configuration
+  KEYCLOAK_OPERATOR_VERSION: "26.4.5"
+  KEYCLOAK_IMAGE_TAG: "26.4.5"
+  KEYCLOAK_REPLICAS: "2"
+  KEYCLOAK_HOSTNAME: "sso.monosense.io"
+  KEYCLOAK_ADMIN_SECRET_PATH: "kubernetes/infra/keycloak/admin"
+  KEYCLOAK_CPU_REQUEST: "500m"
+  KEYCLOAK_CPU_LIMIT: "2000m"
+  KEYCLOAK_MEMORY_REQUEST: "1Gi"
+  KEYCLOAK_MEMORY_LIMIT: "2Gi"
+
+  # Keycloak Database Configuration
+  KEYCLOAK_DB_HOST: "keycloak-pooler-rw.cnpg-system.svc.cluster.local"
+  KEYCLOAK_DB_PORT: "5432"
+  KEYCLOAK_DB_NAME: "keycloak"
+  KEYCLOAK_DB_SECRET_NAME: "keycloak-db-credentials"
+
+  # Keycloak TLS Configuration
+  KEYCLOAK_TLS_SECRET_NAME: "sso-tls"
+
+  # Keycloak Gateway Configuration
+  KEYCLOAK_GATEWAY_NAME: "cilium-gateway-external"
+  KEYCLOAK_GATEWAY_NAMESPACE: "kube-system"

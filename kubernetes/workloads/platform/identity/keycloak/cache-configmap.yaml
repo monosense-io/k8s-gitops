@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-cache-config
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: cache-config
+data:
+  cache-ispn-kubernetes.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <infinispan
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="urn:infinispan:config:14.0 http://www.infinispan.org/schemas/infinispan-config-14.0.xsd"
+        xmlns="urn:infinispan:config:14.0">
+
+      <!-- JGroups transport with DNS_PING for Kubernetes -->
+      <jgroups>
+        <stack name="kubernetes" extends="tcp">
+          <DNS_PING dns_query="keycloak-headless.keycloak-system.svc.cluster.local"/>
+        </stack>
+      </jgroups>
+
+      <cache-container name="keycloak">
+        <transport lock-timeout="60000" stack="kubernetes"/>
+
+        <!-- Distributed caches for sessions (2 owners for HA) -->
+        <distributed-cache name="sessions" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="authenticationSessions" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="offlineSessions" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="clientSessions" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="offlineClientSessions" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="loginFailures" owners="2">
+          <expiration lifespan="-1"/>
+        </distributed-cache>
+
+        <distributed-cache name="actionTokens" owners="2">
+          <expiration max-idle="300000" lifespan="-1"/>
+        </distributed-cache>
+
+        <!-- Local caches for realm data -->
+        <local-cache name="realms">
+          <memory max-count="10000"/>
+          <expiration max-idle="3600000"/>
+        </local-cache>
+
+        <local-cache name="users">
+          <memory max-count="10000"/>
+          <expiration max-idle="3600000"/>
+        </local-cache>
+
+        <local-cache name="authorization">
+          <memory max-count="10000"/>
+          <expiration max-idle="3600000"/>
+        </local-cache>
+
+        <local-cache name="keys">
+          <memory max-count="1000"/>
+          <expiration max-idle="3600000" interval="300000"/>
+        </local-cache>
+
+        <local-cache name="work">
+          <expiration lifespan="-1"/>
+        </local-cache>
+      </cache-container>
+    </infinispan>

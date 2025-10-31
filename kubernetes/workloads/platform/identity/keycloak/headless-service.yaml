@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-headless
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: headless-service
+spec:
+  clusterIP: None  # Headless service for DNS_PING
+  publishNotReadyAddresses: true  # Required for cluster discovery
+  selector:
+    app: keycloak
+  ports:
+    - name: jgroups
+      port: 7800
+      targetPort: 7800
+      protocol: TCP
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 8443
+      targetPort: 8443
+      protocol: TCP

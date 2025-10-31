@@ -1,0 +1,124 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: keycloak
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: alerting
+spec:
+  groups:
+    - name: keycloak.availability
+      interval: 30s
+      rules:
+        - alert: KeycloakDown
+          expr: up{job="keycloak-system/keycloak"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: identity
+          annotations:
+            summary: "Keycloak instance {{ $labels.pod }} is down"
+            description: "Keycloak pod {{ $labels.pod }} has been unreachable for 5 minutes"
+
+        - alert: KeycloakNotHighlyAvailable
+          expr: count(up{job="keycloak-system/keycloak"} == 1) < 2
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak cluster has fewer replicas than expected"
+            description: "Keycloak has {{ $value }} replicas (expected 2)"
+
+    - name: keycloak.performance
+      interval: 30s
+      rules:
+        - alert: KeycloakHighErrorRate
+          expr: rate(keycloak_failed_login_attempts[5m]) > 10
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak high login failure rate"
+            description: "Keycloak is experiencing {{ $value }} failed login attempts per second"
+
+        - alert: KeycloakHighResponseTime
+          expr: histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{job="keycloak-system/keycloak"}[5m])) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak high response time"
+            description: "Keycloak P99 response time is {{ $value }}s"
+
+    - name: keycloak.jvm
+      interval: 30s
+      rules:
+        - alert: KeycloakJVMMemoryHigh
+          expr: (jvm_memory_used_bytes{area="heap", job="keycloak-system/keycloak"} / jvm_memory_max_bytes{area="heap", job="keycloak-system/keycloak"}) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak JVM heap memory usage high on {{ $labels.pod }}"
+            description: "Keycloak pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of heap memory"
+
+        - alert: KeycloakJVMMemoryCritical
+          expr: (jvm_memory_used_bytes{area="heap", job="keycloak-system/keycloak"} / jvm_memory_max_bytes{area="heap", job="keycloak-system/keycloak"}) > 0.9
+          for: 5m
+          labels:
+            severity: critical
+            component: identity
+          annotations:
+            summary: "Keycloak JVM heap memory critical on {{ $labels.pod }}"
+            description: "Keycloak pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of heap memory"
+
+        - alert: KeycloakJVMGCPressure
+          expr: rate(jvm_gc_pause_seconds_count{job="keycloak-system/keycloak"}[5m]) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak JVM experiencing high GC pressure"
+            description: "Keycloak pod {{ $labels.pod }} has {{ $value }} GC pauses per second"
+
+    - name: keycloak.database
+      interval: 30s
+      rules:
+        - alert: KeycloakDatabaseConnectionsHigh
+          expr: (hikaricp_connections_active{job="keycloak-system/keycloak"} / hikaricp_connections_max{job="keycloak-system/keycloak"}) > 0.8
+          for: 10m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak database connection pool usage high"
+            description: "Keycloak is using {{ $value | humanizePercentage }} of database connections"
+
+        - alert: KeycloakDatabaseConnectionsCritical
+          expr: (hikaricp_connections_active{job="keycloak-system/keycloak"} / hikaricp_connections_max{job="keycloak-system/keycloak"}) > 0.95
+          for: 5m
+          labels:
+            severity: critical
+            component: identity
+          annotations:
+            summary: "Keycloak database connection pool exhausted"
+            description: "Keycloak is using {{ $value | humanizePercentage }} of database connections"
+
+    - name: keycloak.clustering
+      interval: 30s
+      rules:
+        - alert: KeycloakClusteringIssue
+          expr: increase(jgroups_failed_messages_total{job="keycloak-system/keycloak"}[5m]) > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: identity
+          annotations:
+            summary: "Keycloak clustering communication issues"
+            description: "Keycloak pod {{ $labels.pod }} has {{ $value }} failed JGroups messages"

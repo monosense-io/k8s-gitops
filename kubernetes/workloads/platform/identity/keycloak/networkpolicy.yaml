@@ -1,0 +1,83 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow from Cilium Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cilium
+      ports:
+        - protocol: TCP
+          port: 8443  # HTTPS
+        - protocol: TCP
+          port: 9000  # Management/metrics
+
+    # Allow JGroups clustering between Keycloak pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 7800  # JGroups
+
+  egress:
+    # Allow to PostgreSQL pooler
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+          podSelector:
+            matchLabels:
+              cnpg.io/poolerName: keycloak-pooler
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow JGroups clustering between Keycloak pods
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 7800
+
+    # Allow HTTPS egress (for external IdP federation if needed in future)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443

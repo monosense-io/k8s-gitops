@@ -1,0 +1,131 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: platform-realm
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: realm
+spec:
+  keycloakCRName: keycloak
+  realm:
+    id: platform
+    realm: platform
+    displayName: "Platform Services"
+    enabled: true
+
+    # Login settings
+    registrationAllowed: false
+    registrationEmailAsUsername: true
+    rememberMe: true
+    verifyEmail: true
+    loginWithEmailAllowed: true
+    duplicateEmailsAllowed: false
+    resetPasswordAllowed: true
+    editUsernameAllowed: false
+
+    # Security settings
+    bruteForceProtected: true
+    permanentLockout: false
+    maxFailureWaitSeconds: 900
+    minimumQuickLoginWaitSeconds: 60
+    waitIncrementSeconds: 60
+    quickLoginCheckMilliSeconds: 1000
+    maxDeltaTimeSeconds: 43200
+    failureFactor: 5
+
+    # Token settings
+    ssoSessionIdleTimeout: 1800
+    ssoSessionMaxLifespan: 36000
+    accessTokenLifespan: 300
+    accessTokenLifespanForImplicitFlow: 900
+    accessCodeLifespan: 60
+    accessCodeLifespanUserAction: 300
+    accessCodeLifespanLogin: 1800
+
+    # SMTP (placeholder - configure via admin console)
+    smtpServer: {}
+
+    # Default roles
+    defaultRoles:
+      - user
+      - offline_access
+      - uma_authorization
+
+    # Clients
+    clients:
+      # GitLab OIDC client
+      - clientId: gitlab
+        name: "GitLab"
+        description: "GitLab SSO Integration"
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        authorizationServicesEnabled: false
+        redirectUris:
+          - "https://gitlab.${SECRET_DOMAIN}/users/auth/openid_connect/callback"
+        webOrigins:
+          - "https://gitlab.${SECRET_DOMAIN}"
+        attributes:
+          "pkce.code.challenge.method": "S256"
+          "oauth2.device.authorization.grant.enabled": "false"
+          "backchannel.logout.session.required": "true"
+          "backchannel.logout.revoke.offline.tokens": "false"
+        defaultClientScopes:
+          - email
+          - profile
+          - roles
+        optionalClientScopes:
+          - address
+          - phone
+          - offline_access
+
+      # Grafana OIDC client
+      - clientId: grafana
+        name: "Grafana"
+        description: "Grafana SSO Integration"
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        authorizationServicesEnabled: false
+        redirectUris:
+          - "https://grafana.${SECRET_DOMAIN}/login/generic_oauth"
+        webOrigins:
+          - "https://grafana.${SECRET_DOMAIN}"
+        attributes:
+          "pkce.code.challenge.method": "S256"
+        defaultClientScopes:
+          - email
+          - profile
+          - roles
+
+      # Harbor OIDC client
+      - clientId: harbor
+        name: "Harbor"
+        description: "Harbor Container Registry SSO"
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        standardFlowEnabled: true
+        implicitFlowEnabled: false
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        authorizationServicesEnabled: false
+        redirectUris:
+          - "https://harbor.${SECRET_DOMAIN}/c/oidc/callback"
+        webOrigins:
+          - "https://harbor.${SECRET_DOMAIN}"
+        attributes:
+          "pkce.code.challenge.method": "S256"
+        defaultClientScopes:
+          - email
+          - profile
+          - roles

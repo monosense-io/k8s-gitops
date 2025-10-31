@@ -1,0 +1,180 @@
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: keycloak-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/managed-by: flux
+spec:
+  # Instance configuration
+  instances: ${KEYCLOAK_REPLICAS}
+
+  # Image
+  image: quay.io/keycloak/keycloak:${KEYCLOAK_IMAGE_TAG}
+
+  # Hostname configuration
+  hostname:
+    hostname: ${KEYCLOAK_HOSTNAME}
+    strict: true
+    strictBackchannel: true
+
+  # HTTP/TLS configuration
+  http:
+    tlsSecret: ${KEYCLOAK_TLS_SECRET_NAME}
+    httpEnabled: false  # HTTPS only
+
+  # Ingress disabled (using Gateway API instead)
+  ingress:
+    enabled: false
+
+  # External PostgreSQL database
+  db:
+    vendor: postgres
+    host: ${KEYCLOAK_DB_HOST}
+    port: ${KEYCLOAK_DB_PORT}
+    database: ${KEYCLOAK_DB_NAME}
+    usernameSecret:
+      name: ${KEYCLOAK_DB_SECRET_NAME}
+      key: username
+    passwordSecret:
+      name: ${KEYCLOAK_DB_SECRET_NAME}
+      key: password
+    poolMinSize: 5
+    poolInitialSize: 10
+    poolMaxSize: 20
+
+  # Additional options for production optimization
+  additionalOptions:
+    # Admin credentials
+    - name: KEYCLOAK_ADMIN
+      secret:
+        name: keycloak-admin
+        key: KEYCLOAK_ADMIN
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      secret:
+        name: keycloak-admin
+        key: KEYCLOAK_ADMIN_PASSWORD
+
+    # Cache clustering (DNS_PING for Kubernetes)
+    - name: cache-config-file
+      value: cache-ispn-kubernetes.xml
+
+    # Database SSL (prefer mode - use if available)
+    - name: db-url-properties
+      value: "?ssl=true&sslmode=prefer"
+
+    # Performance tuning
+    - name: http-pool-max-threads
+      value: "200"
+
+    # Metrics enabled
+    - name: metrics-enabled
+      value: "true"
+
+    # Health endpoints
+    - name: health-enabled
+      value: "true"
+
+    # Security hardening
+    - name: spi-login-protocol-openid-connect-legacy-logout-redirect-uri
+      value: "false"
+
+  # Feature flags
+  features:
+    enabled:
+      - token-exchange
+      - admin-fine-grained-authz
+      - declarative-user-profile
+      - client-secret-rotation
+    disabled:
+      - impersonation
+
+  # Transaction configuration
+  transaction:
+    xaEnabled: false  # Not needed with session-mode pooler
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: ${KEYCLOAK_CPU_REQUEST}
+      memory: ${KEYCLOAK_MEMORY_REQUEST}
+    limits:
+      cpu: ${KEYCLOAK_CPU_LIMIT}
+      memory: ${KEYCLOAK_MEMORY_LIMIT}
+
+  # Health probes
+  startupProbe:
+    httpGet:
+      path: /health/started
+      port: 9000
+      scheme: HTTP
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 60  # Up to 10 minutes startup time
+
+  livenessProbe:
+    httpGet:
+      path: /health/live
+      port: 9000
+      scheme: HTTP
+    initialDelaySeconds: 0
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 9000
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Pod template customization
+  unsupported:
+    podTemplate:
+      metadata:
+        labels:
+          app: keycloak
+      spec:
+        # Pod anti-affinity for HA
+        affinity:
+          podAntiAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    app: keycloak
+                topologyKey: kubernetes.io/hostname
+
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+
+        # Volume for cache config
+        volumes:
+          - name: cache-config
+            configMap:
+              name: keycloak-cache-config
+
+        # Container security and volume mounts
+        containers:
+          - name: keycloak
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false  # Keycloak needs writable /tmp
+              capabilities:
+                drop:
+                  - ALL
+            volumeMounts:
+              - name: cache-config
+                mountPath: /opt/keycloak/conf/cache-ispn-kubernetes.xml
+                subPath: cache-ispn-kubernetes.xml
+                readOnly: true
