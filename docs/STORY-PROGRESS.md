@@ -4,14 +4,14 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-10-31
 **Total Stories**: 50
-**Completed**: 11 / 50 (22%)
+**Completed**: 12 / 50 (24%)
 
 ---
 
 ## 🎯 Overall Progress
 
 ```
-Networking:  ██████████░░░░░  67% (6/9 core stories)
+Networking:  ███████████░░░░  78% (7/9 core stories)
 Security:    ███░░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories)
 Databases:   ░░░░░░░░░░░░░░░   0% (0/3 stories)
@@ -78,6 +78,32 @@ Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
   - `kubernetes/infrastructure/networking/cilium/gateway/gateway.yaml`
   - `kubernetes/infrastructure/networking/cilium/gateway/kustomization.yaml`
 - **Dependencies**: Story 01 (Core), Story 02 (IPAM), Story 06 (cert-manager)
+
+---
+
+#### **Story 04: STORY-DNS-COREDNS-BASE**
+- **Status**: ✅ **COMPLETE**
+- **Sprint**: 1 | Lane: Networking
+- **Commit**: `b6efa5d` - feat(dns): add CoreDNS v1.45.0 GitOps manifests
+- **Date**: 2025-10-31
+- **Deliverables**:
+  - CoreDNS HelmRelease v1.45.0 (updated from story's 1.38.0)
+  - OCIRepository for CoreDNS charts (ghcr.io/coredns/charts/coredns)
+  - High availability: 2 replicas, topology spread, PodDisruptionBudget
+  - Security hardening: non-root, read-only filesystem, dropped capabilities
+  - Observability: Prometheus metrics, 4 production alert rules
+  - Health probes: /health (8080), /ready (8181), /metrics (9153)
+  - Cluster-specific ClusterIP substitution (infra: .10, apps: .10)
+- **Files Created**:
+  - `kubernetes/infrastructure/networking/coredns/ocirepository.yaml`
+  - `kubernetes/infrastructure/networking/coredns/helmrelease.yaml`
+  - `kubernetes/infrastructure/networking/coredns/prometheusrule.yaml`
+  - `kubernetes/infrastructure/networking/coredns/kustomization.yaml`
+- **Files Modified**:
+  - `kubernetes/clusters/infra/infrastructure.yaml` (added coredns Kustomization)
+  - `kubernetes/clusters/apps/infrastructure.yaml` (added coredns Kustomization)
+- **Dependencies**: Story 01 (Cilium Core)
+- **Note**: Greenfield deployment (Talos CoreDNS disabled), ServiceMonitor disabled until Prometheus CRDs available
 
 ---
 
@@ -293,6 +319,7 @@ Foundation:
 │  │  ├─ Story 03: Gateway API ✅
 │  │  ├─ Story 09: BGP Control Plane ✅
 │  │  └─ Story 12: ClusterMesh ✅
+│  ├─ Story 04: CoreDNS ✅
 │  └─ Story 11: Spegel ✅
 │
 ├─ Story 05: External Secrets ✅
@@ -313,6 +340,7 @@ Foundation:
 
 | Sprint | Theme | Completed | Remaining |
 |---|---|---|---|
+| **Sprint 1** | DNS Foundation | 1/1 ✅ | 0 |
 | **Sprint 3** | Security Foundation | 2/2 ✅ | 0 |
 | **Sprint 4** | Networking Core | 5/6 (83%) | 1 |
 | **Sprint 5** | Storage Infrastructure | 3/3 ✅ | 0 |
@@ -324,12 +352,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 11 |
-| **Total Commits** | 11 |
-| **Lines Added** | ~2,700 |
-| **Files Created** | ~43 |
+| **Stories Completed** | 12 |
+| **Total Commits** | 12 |
+| **Lines Added** | ~2,900 |
+| **Files Created** | ~47 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (11/11) |
+| **Success Rate** | 100% (12/12) |
 
 ---
 
@@ -341,7 +369,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (22% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (24% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -356,4 +384,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-10-31 by Claude Code (Story 11 completion)
+**Last Updated**: 2025-10-31 by Claude Code (Story 04 completion)
