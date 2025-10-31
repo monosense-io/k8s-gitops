@@ -4,16 +4,16 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-10-31
 **Total Stories**: 50
-**Completed**: 13 / 50 (26%)
+**Completed**: 14 / 50 (28%)
 
 ---
 
 ## 🎯 Overall Progress
 
 ```
-Networking:  ██████████████░  89% (8/9 core stories)
+Networking:  ████████████████ 100% (9/9 core stories) ✅
 Security:    ███░░░░░░░░░░░░  20% (2/10 stories)
-Storage:     ████████████████ 100% (3/3 stories)
+Storage:     ████████████████ 100% (3/3 stories) ✅
 Databases:   ░░░░░░░░░░░░░░░   0% (0/3 stories)
 Observability: ░░░░░░░░░░░░░   0% (0/4 stories)
 Workloads:   ░░░░░░░░░░░░░░░   0% (0/15 stories)
@@ -104,6 +104,32 @@ Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
   - `kubernetes/clusters/apps/infrastructure.yaml` (added coredns Kustomization)
 - **Dependencies**: Story 01 (Cilium Core)
 - **Note**: Greenfield deployment (Talos CoreDNS disabled), ServiceMonitor disabled until Prometheus CRDs available
+
+---
+
+#### **Story 08: STORY-DNS-EXTERNALDNS-CF-BIND-TUNNEL**
+- **Status**: ✅ **COMPLETE**
+- **Sprint**: 4 | Lane: Networking
+- **Commit**: `2f4137d` - feat(networking): implement ExternalDNS + Cloudflare Tunnel
+- **Date**: 2025-10-31
+- **Deliverables**:
+  - ExternalDNS controllers (Cloudflare + RFC2136/BIND)
+  - Split-horizon DNS: Public (Cloudflare) + Private (BIND)
+  - Cloudflared tunnel (v2025.10.1) with QUIC + post-quantum encryption
+  - Gateway integration: External (public) + Internal (private)
+  - Per-cluster controller isolation (txt-owner-id: k8s-${CLUSTER}-public/private)
+  - Dual Gateway architecture (external: .110/.121, internal: .111/.122)
+- **Files Created**:
+  - `kubernetes/infrastructure/networking/cloudflared/app/*` (7 files)
+  - `kubernetes/infrastructure/networking/external-dns/cloudflare/app/*` (5 files)
+  - `kubernetes/infrastructure/networking/external-dns/rfc2136/app/*` (5 files)
+  - `kubernetes/infrastructure/networking/cilium/gateway/gateway-internal.yaml`
+- **Files Modified**:
+  - `kubernetes/infrastructure/networking/cilium/gateway/gateway.yaml` (renamed to external)
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (12 new variables)
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (12 new variables)
+- **Dependencies**: Story 03 (Gateway), Story 05 (External Secrets), Story 06 (cert-manager)
+- **Note**: Per-cluster deployment (both infra + apps) for HA, shared tunnel with 4 replicas total
 
 ---
 
@@ -364,7 +390,7 @@ Foundation:
 |---|---|---|---|
 | **Sprint 1** | DNS Foundation | 1/1 ✅ | 0 |
 | **Sprint 3** | Security Foundation | 2/2 ✅ | 0 |
-| **Sprint 4** | Networking Core | 5/6 (83%) | 1 |
+| **Sprint 4** | Networking Core | 6/6 ✅ | 0 |
 | **Sprint 5** | Storage Infrastructure | 3/3 ✅ | 0 |
 | **Sprint 6** | Multi-Cluster + Security | 1/4 (25%) | 3 |
 
@@ -374,12 +400,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 12 |
-| **Total Commits** | 12 |
-| **Lines Added** | ~2,900 |
-| **Files Created** | ~47 |
+| **Stories Completed** | 14 |
+| **Total Commits** | 14 |
+| **Lines Added** | ~3,500 |
+| **Files Created** | ~64 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (12/12) |
+| **Success Rate** | 100% (14/14) |
 
 ---
 
@@ -406,4 +432,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-10-31 by Claude Code (Story 04 completion)
+**Last Updated**: 2025-10-31 by Claude Code (Story 08 completion - Networking 100%)
