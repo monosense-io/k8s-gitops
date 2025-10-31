@@ -1,0 +1,104 @@
+# Example per-tenant Dragonfly CR for GitLab
+# This demonstrates isolation pattern for future multi-tenant deployments
+# NOT deployed in Story 25 - design reference only
+
+---
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: dragonfly-gitlab
+  namespace: gitlab-system
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: gitlab
+spec:
+  # Image (ghcr.io registry)
+  image: ghcr.io/dragonflydb/dragonfly:v1.34.2
+
+  # Smaller footprint for single-tenant
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  snapshot:
+    dir: /data
+    cron: "0 */12 * * *"
+
+  storage:
+    storageClassName: rook-ceph-block
+    requests:
+      storage: 5Gi
+
+  authentication:
+    passwordFromSecret:
+      name: dragonfly-gitlab-auth
+      key: password
+
+  metrics:
+    enabled: true
+    port: 6379
+
+  args:
+    - --dir=/data
+    - --logtostderr
+    - --requirepass=$(DRAGONFLY_PASSWORD)
+    - --primary_port_http_enabled=true
+    - --admin_port=6380
+    - --metrics_port=6379
+    - --proactor_threads=2
+    - --cluster_mode=emulated
+
+  env:
+    - name: DRAGONFLY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: dragonfly-gitlab-auth
+          key: password
+
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app: dragonfly
+          dragonflydb.io/instance: dragonfly-gitlab
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  serviceSpec:
+    type: ClusterIP
+
+---
+# Dedicated PodDisruptionBudget for GitLab's Dragonfly
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dragonfly-gitlab
+  namespace: gitlab-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dragonfly
+      dragonflydb.io/instance: dragonfly-gitlab

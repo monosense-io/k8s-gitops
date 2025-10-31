@@ -121,6 +121,12 @@ data:
   CNPG_SYNERGYFLOW_SECRET_PATH: "kubernetes/infra/cloudnative-pg/synergyflow"
 
   # Dragonfly Configuration (infra)
+  DRAGONFLY_IMAGE_TAG: "v1.34.2"
+  DRAGONFLY_REPLICAS: "3"
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
-  DRAGONFLY_DATA_SIZE: "30Gi"           # default for shared cache; tune per-tenant if split
+  DRAGONFLY_DATA_SIZE: "10Gi"           # per-pod size (3 pods = 30Gi total)
+  DRAGONFLY_MEMORY_LIMIT: "2Gi"
+  DRAGONFLY_CPU_LIMIT: "2000m"
+  DRAGONFLY_MEMORY_REQUEST: "1Gi"
+  DRAGONFLY_CPU_REQUEST: "500m"
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"

@@ -1,0 +1,97 @@
+---
+# Default deny all ingress to dragonfly-system
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: dragonfly-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - cluster
+      toPorts:
+        - ports:
+            - port: "8080"  # Health checks from kubelet
+              protocol: TCP
+
+---
+# Allow ingress from approved namespaces
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: dragonfly-allow-clients
+  namespace: dragonfly-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: dragonfly
+
+  ingress:
+    # Allow from GitLab namespace
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: gitlab-system
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+            - port: "6380"
+              protocol: TCP
+
+    # Allow from Harbor namespace
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: harbor
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+
+    # Allow from Observability namespace (metrics scraping)
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: observability
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+
+    # Allow health checks from within namespace
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: dragonfly-system
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+            - port: "6380"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
+
+  egress:
+    # Allow DNS resolution
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*"
+
+    # Allow communication between Dragonfly pods (replication)
+    - toEndpoints:
+        - matchLabels:
+            app: dragonfly
+            dragonflydb.io/instance: dragonfly
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+            - port: "6380"
+              protocol: TCP
