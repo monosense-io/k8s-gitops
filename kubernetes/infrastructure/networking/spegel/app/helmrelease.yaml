@@ -1,0 +1,75 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: spegel
+  namespace: kube-system
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: spegel
+      version: 0.4.0
+      sourceRef:
+        kind: OCIRepository
+        name: spegel-charts
+        namespace: flux-system
+  install:
+    createNamespace: false  # kube-system already exists
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 2
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+  values:
+    fullnameOverride: spegel
+
+    # Talos Linux compatibility
+    spegel:
+      # Talos uses a different containerd registry config path than standard distributions
+      containerdRegistryConfigPath: /etc/cri/conf.d/hosts
+      # Append mirrors instead of replacing (graceful fallback to upstream)
+      appendMirrors: true
+      # Modern registryFilters instead of deprecated resolveLatestTag
+      # Filter out :latest tags to prevent resolution overhead
+      registryFilters:
+        - :latest$
+
+    # Registry mirrors to cache
+    # Note: P2P caching for common registries used in the cluster
+    registries:
+      - https://docker.io
+      - https://ghcr.io
+      - https://quay.io
+      - https://registry.k8s.io
+
+    # Host networking for registry endpoint
+    service:
+      registry:
+        hostPort: 29999
+        nodePort: null
+
+    # Resource limits for 3-node cluster
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+    # Observability integration
+    serviceMonitor:
+      enabled: true
+      namespace: kube-system
+
+    grafanaDashboard:
+      enabled: true
+      namespace: kube-system
+
+    # Priority for system component
+    priorityClassName: system-node-critical
