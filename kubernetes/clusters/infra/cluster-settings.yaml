@@ -24,6 +24,10 @@ data:
   CILIUM_CLUSTERMESH_FQDN: "clustermesh-infra.monosense.io"
   CILIUM_CLUSTERMESH_APPS_FQDN: "clustermesh-apps.monosense.io"
   CILIUM_GATEWAY_LB_IP: "10.25.11.110"
+  CILIUM_GATEWAY_EXTERNAL_NAME: "cilium-gateway-external"
+  CILIUM_GATEWAY_INTERNAL_NAME: "cilium-gateway-internal"
+  CILIUM_GATEWAY_LB_IP_EXTERNAL: "10.25.11.110"
+  CILIUM_GATEWAY_LB_IP_INTERNAL: "10.25.11.111"
   CILIUM_BGP_LOCAL_ASN: "64512"
   CILIUM_BGP_PEER_ASN: "64501"
   CILIUM_BGP_PEER_ADDRESS: "10.25.11.1"
@@ -49,6 +53,15 @@ data:
   # Domain Configuration
   SECRET_DOMAIN: "monosense.io"
   LETSENCRYPT_EMAIL: "admin@monosense.io"
+
+  # ExternalDNS Configuration
+  EXTERNALDNS_INTERVAL: "1m"
+  EXTERNALDNS_LOG_LEVEL: "info"
+  EXTERNALDNS_TXT_PREFIX: "k8s."
+
+  # Cloudflared Configuration
+  CLOUDFLARED_REPLICAS: "2"
+  CLOUDFLARED_TARGET_SERVICE: "https://cilium-gateway-external.kube-system.svc.cluster.local"
 
   # GitHub Actions Configuration
   GITHUB_CONFIG_URL: "https://github.com/monosense-io/k8s-gitops"

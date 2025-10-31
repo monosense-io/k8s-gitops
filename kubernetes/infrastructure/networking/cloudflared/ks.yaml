@@ -1,0 +1,39 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudflared
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: cloudflared
+    app.kubernetes.io/component: networking
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  prune: true
+  wait: true
+  path: ./kubernetes/infrastructure/networking/cloudflared/app
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+    namespace: flux-system
+  dependsOn:
+    - name: cilium-gateway
+      namespace: flux-system
+    - name: external-secrets
+      namespace: flux-system
+  targetNamespace: networking
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: cloudflared
+      namespace: networking
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: cloudflared
+      namespace: networking

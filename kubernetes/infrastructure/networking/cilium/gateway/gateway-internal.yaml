@@ -2,16 +2,16 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: ${CILIUM_GATEWAY_EXTERNAL_NAME}
+  name: ${CILIUM_GATEWAY_INTERNAL_NAME}
   namespace: kube-system
   labels:
-    app.kubernetes.io/name: ${CILIUM_GATEWAY_EXTERNAL_NAME}
+    app.kubernetes.io/name: ${CILIUM_GATEWAY_INTERNAL_NAME}
     app.kubernetes.io/component: ingress
 spec:
   gatewayClassName: cilium
   addresses:
     - type: IPAddress
-      value: ${CILIUM_GATEWAY_LB_IP_EXTERNAL}
+      value: ${CILIUM_GATEWAY_LB_IP_INTERNAL}
   listeners:
     - name: http
       protocol: HTTP

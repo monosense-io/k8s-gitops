@@ -1,0 +1,7 @@
+ingress:
+  - hostname: "*.${SECRET_DOMAIN}"
+    service: ${CLOUDFLARED_TARGET_SERVICE}
+    originRequest:
+      http2Origin: true
+      originServerName: external.${SECRET_DOMAIN}
+  - service: http_status:404

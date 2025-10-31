@@ -1,0 +1,17 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloudflared
+  namespace: networking
+spec:
+  groups:
+    - name: cloudflared.rules
+      rules:
+        - alert: CloudflaredNotReady
+          expr: up{job="cloudflared"} == 0
+          for: 5m
+          annotations:
+            summary: cloudflared metrics endpoint is not up
+          labels:
+            severity: warning
