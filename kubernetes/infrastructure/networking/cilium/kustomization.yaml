@@ -5,4 +5,5 @@ resources:
   - gateway/ks.yaml
   - bgp/
   - clustermesh/ks.yaml
+  - ipam/
 
