@@ -1,0 +1,18 @@
+---
+# CiliumNetworkPolicy: Allow kube-apiserver egress
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+spec:
+  endpointSelector: {}
+  egress:
+    # Allow HTTPS to Kubernetes API server
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP

@@ -1,0 +1,21 @@
+---
+# Kubernetes NetworkPolicy: Allow kube-apiserver egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow access to Kubernetes API server
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443

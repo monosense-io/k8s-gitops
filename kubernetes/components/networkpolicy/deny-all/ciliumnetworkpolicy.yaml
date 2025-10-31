@@ -1,0 +1,11 @@
+---
+# CiliumNetworkPolicy: Default deny all ingress and egress
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  endpointSelector: {}
+  # Empty ingress/egress arrays = deny all
+  ingress: []
+  egress: []

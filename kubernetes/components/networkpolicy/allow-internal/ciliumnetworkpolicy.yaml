@@ -1,0 +1,16 @@
+---
+# CiliumNetworkPolicy: Allow pod-to-pod within namespace
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-internal
+spec:
+  endpointSelector: {}
+  ingress:
+    # Allow from same namespace
+    - fromEndpoints:
+        - {}
+  egress:
+    # Allow to same namespace
+    - toEndpoints:
+        - {}

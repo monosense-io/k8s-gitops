@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Apply baseline network policies to platform namespaces
+
+resources:
+  # Observability namespace
+  - observability-policies.yaml
+
+  # Database namespaces
+  - cnpg-system-policies.yaml
+  - dragonfly-system-policies.yaml
+
+  # Platform namespaces
+  - harbor-policies.yaml
+  - gitlab-system-policies.yaml
+  - flux-system-policies.yaml

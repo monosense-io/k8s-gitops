@@ -1,0 +1,22 @@
+---
+# CiliumNetworkPolicy: Allow egress to specific FQDNs
+# TEMPLATE: Customize matchPattern and matchName for your use case
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-fqdn-egress
+spec:
+  endpointSelector: {}
+  egress:
+    # Allow HTTPS to specific FQDNs
+    - toFQDNs:
+        # Pattern matching (wildcards supported)
+        - matchPattern: "*.github.com"
+        - matchPattern: "*.githubusercontent.com"
+        # Exact matching
+        - matchName: "registry-1.docker.io"
+        - matchName: "ghcr.io"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

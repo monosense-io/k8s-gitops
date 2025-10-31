@@ -1,0 +1,25 @@
+# Template: Tenant Namespace NetworkPolicy Kustomization
+# Copy this file to your tenant namespace directory and customize
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: <TENANT-NAMESPACE>
+
+# Baseline network policies
+components:
+  - ../../components/networkpolicy/deny-all
+  - ../../components/networkpolicy/allow-dns
+  - ../../components/networkpolicy/allow-kube-api
+  - ../../components/networkpolicy/allow-internal
+
+# Optional: Add FQDN allowlist
+# Uncomment and customize for internet egress
+# - ../../components/networkpolicy/allow-fqdn
+
+# Application-specific resources
+resources:
+  # Add your application manifests here
+  # - deployment.yaml
+  # - service.yaml
+  # - etc.
