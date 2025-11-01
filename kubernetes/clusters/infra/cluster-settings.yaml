@@ -103,8 +103,14 @@ data:
   CNPG_DATA_SIZE: "80Gi"
   CNPG_WAL_SIZE: "20Gi"
   CNPG_INSTANCES: "3"
-  CNPG_MIN_SYNC_REPLICAS: "1"
-  CNPG_MAX_SYNC_REPLICAS: "2"
+
+  # Synchronous Replication (Modern API - CNPG 1.25+)
+  CNPG_SYNC_METHOD: "any"
+  CNPG_SYNC_NUMBER: "1"
+  CNPG_SYNC_MAX_STANDBYS: "2"
+  CNPG_DATA_DURABILITY: "preferred"
+
+  # Cluster Configuration
   CNPG_SHARED_CLUSTER_NAME: "shared-postgres"
   CNPG_BACKUP_BUCKET: "monosense-cnpg"
   # NOTE: CNPG ScheduledBackup uses a six-field cron expression (seconds first).

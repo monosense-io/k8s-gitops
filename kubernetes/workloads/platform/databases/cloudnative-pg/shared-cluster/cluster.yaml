@@ -17,17 +17,18 @@ spec:
       # Connection settings
       max_connections: "200"
 
-      # Memory settings
-      shared_buffers: "256MB"
-      effective_cache_size: "1GB"
-      maintenance_work_mem: "64MB"
-      work_mem: "2621kB"
+      # Memory settings (optimized for 2Gi limit)
+      shared_buffers: "512MB"
+      effective_cache_size: "1536MB"
+      maintenance_work_mem: "128MB"
+      work_mem: "4MB"
       huge_pages: "off"
 
       # WAL settings
       wal_buffers: "16MB"
-      min_wal_size: "1GB"
-      max_wal_size: "4GB"
+      min_wal_size: "2GB"
+      max_wal_size: "8GB"
+      wal_compression: "on"
 
       # Query planner
       default_statistics_target: "100"
@@ -43,9 +44,25 @@ spec:
       max_parallel_workers: "4"
       max_parallel_maintenance_workers: "2"
 
-  # Synchronous replication for data durability
-  minSyncReplicas: ${CNPG_MIN_SYNC_REPLICAS}
-  maxSyncReplicas: ${CNPG_MAX_SYNC_REPLICAS}
+      # Autovacuum
+      autovacuum_max_workers: "3"
+      autovacuum_vacuum_cost_limit: "2000"
+
+      # TLS/SSL settings
+      ssl: "on"
+      ssl_min_protocol_version: "TLSv1.3"
+      ssl_prefer_server_ciphers: "on"
+
+    # Enforce TLS for all connections
+    pg_hba:
+      - hostssl all all all scram-sha-256
+
+    # Synchronous replication (modern API - CNPG 1.25+)
+    synchronous:
+      method: ${CNPG_SYNC_METHOD}
+      number: ${CNPG_SYNC_NUMBER}
+      maxStandbyNamesFromCluster: ${CNPG_SYNC_MAX_STANDBYS}
+      dataDurability: ${CNPG_DATA_DURABILITY}
 
   # Storage configuration
   storage:

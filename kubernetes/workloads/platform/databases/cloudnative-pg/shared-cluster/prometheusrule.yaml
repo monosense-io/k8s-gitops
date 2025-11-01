@@ -64,6 +64,16 @@ spec:
             summary: "CNPG replication lag critical on {{ $labels.pod }}"
             description: "Replication lag is {{ $value }}s on {{ $labels.pod }}"
 
+        - alert: CNPGSyncReplicationDegraded
+          expr: cnpg_pg_stat_replication_sync_state{cluster="${CNPG_SHARED_CLUSTER_NAME}",application_name=~".*"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG synchronous replication degraded on {{ $labels.pod }}"
+            description: "Synchronous replica {{ $labels.application_name }} is not in sync state"
+
         # Backup Alerts
         - alert: CNPGBackupFailed
           expr: cnpg_pg_backup_last_status{cluster="${CNPG_SHARED_CLUSTER_NAME}"} != 0
@@ -106,6 +116,28 @@ spec:
           annotations:
             summary: "CNPG connections near limit for database {{ $labels.datname }}"
             description: "Database {{ $labels.datname }} is using {{ $value | humanizePercentage }} of max_connections"
+
+        # WAL Generation Alerts
+        - alert: CNPGWALGenerationHigh
+          expr: rate(cnpg_pg_wal_generated_bytes_total{cluster="${CNPG_SHARED_CLUSTER_NAME}"}[5m]) > 100000000
+          for: 15m
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG high WAL generation rate on {{ $labels.pod }}"
+            description: "WAL generation rate is {{ $value | humanize1024 }}/s (>100MB/s threshold)"
+
+        # Vacuum Health Alerts
+        - alert: CNPGTableNeedsVacuum
+          expr: cnpg_pg_stat_user_tables_n_dead_tup{cluster="${CNPG_SHARED_CLUSTER_NAME}"} > 100000
+          for: 1h
+          labels:
+            severity: warning
+            component: database
+          annotations:
+            summary: "CNPG table {{ $labels.relname }} needs VACUUM"
+            description: "Table {{ $labels.relname }} in database {{ $labels.datname }} has {{ $value }} dead tuples"
 
     - name: cloudnativepg.pooler
       interval: 30s
@@ -152,3 +184,13 @@ spec:
           annotations:
             summary: "CNPG pooler {{ $labels.pooler }} has waiting clients"
             description: "Pooler {{ $labels.pooler }} has {{ $value }} clients waiting for connections"
+
+        - alert: CNPGPoolerQueueDepthCritical
+          expr: cnpg_pgbouncer_pools_cl_waiting > 20
+          for: 2m
+          labels:
+            severity: critical
+            component: pooler
+          annotations:
+            summary: "CNPG pooler {{ $labels.pooler }} queue depth critical"
+            description: "Pooler {{ $labels.pooler }} has {{ $value }} clients waiting (critical threshold)"
