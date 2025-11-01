@@ -1,0 +1,28 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${DRAGONFLY_SERVICE_NAME:=dragonfly-global}
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: ${DRAGONFLY_COMPONENT:=database}
+  annotations:
+    # Cilium ClusterMesh global Service
+    service.cilium.io/global: "${DRAGONFLY_SERVICE_GLOBAL:=true}"
+    service.cilium.io/shared: "${DRAGONFLY_SERVICE_SHARED:=true}"
+spec:
+  type: ClusterIP
+  ports:
+    - name: dragonfly
+      port: ${DRAGONFLY_PORT:=6379}
+      targetPort: 6379
+      protocol: TCP
+    - name: admin
+      port: ${DRAGONFLY_ADMIN_PORT:=6380}
+      targetPort: 6380
+      protocol: TCP
+  selector:
+    app: dragonfly
+    dragonflydb.io/instance: ${DRAGONFLY_NAME:=dragonfly}
+    dragonflydb.io/role: primary

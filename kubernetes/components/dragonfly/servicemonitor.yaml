@@ -2,8 +2,8 @@
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMServiceScrape
 metadata:
-  name: dragonfly
-  namespace: dragonfly-system
+  name: ${DRAGONFLY_NAME:=dragonfly}
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
   labels:
     app.kubernetes.io/name: dragonfly
     app.kubernetes.io/component: monitoring
@@ -15,5 +15,5 @@ spec:
   endpoints:
     - port: dragonfly
       path: /metrics
-      interval: 30s
-      scrapeTimeout: 10s
+      interval: ${DRAGONFLY_METRICS_INTERVAL:=30s}
+      scrapeTimeout: ${DRAGONFLY_METRICS_TIMEOUT:=10s}

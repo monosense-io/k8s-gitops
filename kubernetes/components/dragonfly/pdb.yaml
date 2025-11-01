@@ -1,0 +1,15 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ${DRAGONFLY_NAME:=dragonfly}
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: ${DRAGONFLY_COMPONENT:=database}
+spec:
+  minAvailable: ${DRAGONFLY_PDB_MIN_AVAILABLE:=2}
+  selector:
+    matchLabels:
+      app: dragonfly
+      dragonflydb.io/instance: ${DRAGONFLY_NAME:=dragonfly}

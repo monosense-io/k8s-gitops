@@ -1,0 +1,126 @@
+---
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: ${DRAGONFLY_NAME:=dragonfly}
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/component: ${DRAGONFLY_COMPONENT:=database}
+spec:
+  # Image version (ghcr.io registry)
+  image: ghcr.io/dragonflydb/dragonfly:${DRAGONFLY_IMAGE_TAG:=v1.34.1}
+
+  # High availability: Configurable replicas (1 primary + N replicas)
+  replicas: ${DRAGONFLY_REPLICAS:=3}
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: ${DRAGONFLY_CPU_REQUEST:=200m}
+      memory: ${DRAGONFLY_MEMORY_REQUEST:=512Mi}
+    limits:
+      cpu: ${DRAGONFLY_CPU_LIMIT:=1000m}
+      memory: ${DRAGONFLY_MEMORY_LIMIT:=2Gi}
+
+  # Persistence
+  snapshot:
+    dir: /data
+    cron: ${DRAGONFLY_SNAPSHOT_CRON:=0 */6 * * *}  # Default: every 6 hours
+
+  # Storage
+  storage:
+    storageClassName: ${DRAGONFLY_STORAGE_CLASS:=openebs-local-nvme}
+    requests:
+      storage: ${DRAGONFLY_DATA_SIZE:=10Gi}
+
+  # Authentication
+  authentication:
+    passwordFromSecret:
+      name: ${DRAGONFLY_SECRET_NAME:=dragonfly-auth}
+      key: password
+
+  # Metrics
+  metrics:
+    enabled: true
+    port: 6379
+
+  # Args for Dragonfly process
+  args:
+    # === CRITICAL CONFIGURATION ===
+    - --dbfilename=dump                           # Static filename prevents disk exhaustion
+    - --maxmemory=${DRAGONFLY_MAXMEMORY:=1800Mi}  # Graceful memory management (90% of limit)
+    - --cache_mode=${DRAGONFLY_CACHE_MODE:=false} # Enable eviction for cache workloads
+
+    # === PERFORMANCE TUNING ===
+    - --proactor_threads=${DRAGONFLY_THREADS:=0}  # Auto-detect CPU cores (optimal threading)
+    - --save_schedule=                            # Disable continuous saves (cron snapshots only)
+
+    # === CORE CONFIGURATION ===
+    - --dir=/data
+    - --logtostderr
+    - --requirepass=$(DRAGONFLY_PASSWORD)
+    - --primary_port_http_enabled=true
+    - --admin_port=6380
+    - --metrics_port=6379
+    - --cluster_mode=${DRAGONFLY_CLUSTER_MODE:=emulated}
+    - --default_lua_flags=${DRAGONFLY_LUA_FLAGS:=allow-undeclared-keys}
+
+  # Environment variables
+  env:
+    - name: DRAGONFLY_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: ${DRAGONFLY_SECRET_NAME:=dragonfly-auth}
+          key: password
+
+  # Topology spread for high availability
+  topologySpreadConstraints:
+    - maxSkew: ${DRAGONFLY_TOPOLOGY_MAX_SKEW:=1}
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: ${DRAGONFLY_TOPOLOGY_WHEN_UNSATISFIABLE:=ScheduleAnyway}
+      labelSelector:
+        matchLabels:
+          app: dragonfly
+          dragonflydb.io/instance: ${DRAGONFLY_NAME:=dragonfly}
+
+  # Security context (PSA restricted compliant)
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: ${DRAGONFLY_USER_ID:=10001}
+    fsGroup: ${DRAGONFLY_FS_GROUP:=10001}
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    runAsNonRoot: true
+    runAsUser: ${DRAGONFLY_USER_ID:=10001}
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  # Liveness probe
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: ${DRAGONFLY_LIVENESS_INITIAL_DELAY:=30}
+    periodSeconds: ${DRAGONFLY_LIVENESS_PERIOD:=10}
+    timeoutSeconds: ${DRAGONFLY_LIVENESS_TIMEOUT:=5}
+    failureThreshold: ${DRAGONFLY_LIVENESS_FAILURE_THRESHOLD:=3}
+
+  # Readiness probe
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: 8080
+    initialDelaySeconds: ${DRAGONFLY_READINESS_INITIAL_DELAY:=10}
+    periodSeconds: ${DRAGONFLY_READINESS_PERIOD:=5}
+    timeoutSeconds: ${DRAGONFLY_READINESS_TIMEOUT:=3}
+    failureThreshold: ${DRAGONFLY_READINESS_FAILURE_THRESHOLD:=3}
+
+  # Service configuration
+  serviceSpec:
+    type: ClusterIP

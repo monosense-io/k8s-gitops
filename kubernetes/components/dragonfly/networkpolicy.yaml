@@ -1,10 +1,10 @@
 ---
-# Default deny all ingress to dragonfly-system
+# Default deny all ingress to dragonfly namespace
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: default-deny-ingress
-  namespace: dragonfly-system
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
 spec:
   endpointSelector: {}
   ingress:
@@ -20,52 +20,52 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: dragonfly-allow-clients
-  namespace: dragonfly-system
+  name: ${DRAGONFLY_NAME:=dragonfly}-allow-clients
+  namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
 spec:
   endpointSelector:
     matchLabels:
       app: dragonfly
 
   ingress:
-    # Allow from GitLab namespace
+    # Allow from GitLab namespace (if enabled)
     - fromEndpoints:
         - matchLabels:
-            io.kubernetes.pod.namespace: gitlab-system
+            io.kubernetes.pod.namespace: ${DRAGONFLY_ALLOW_GITLAB_NS:=gitlab-system}
       toPorts:
         - ports:
-            - port: "6379"
+            - port: "${DRAGONFLY_PORT:=6379}"
               protocol: TCP
-            - port: "6380"
+            - port: "${DRAGONFLY_ADMIN_PORT:=6380}"
               protocol: TCP
 
-    # Allow from Harbor namespace
+    # Allow from Harbor namespace (if enabled)
     - fromEndpoints:
         - matchLabels:
-            io.kubernetes.pod.namespace: harbor
+            io.kubernetes.pod.namespace: ${DRAGONFLY_ALLOW_HARBOR_NS:=harbor}
       toPorts:
         - ports:
-            - port: "6379"
+            - port: "${DRAGONFLY_PORT:=6379}"
               protocol: TCP
 
     # Allow from Observability namespace (metrics scraping)
     - fromEndpoints:
         - matchLabels:
-            io.kubernetes.pod.namespace: observability
+            io.kubernetes.pod.namespace: ${DRAGONFLY_ALLOW_OBSERVABILITY_NS:=observability}
       toPorts:
         - ports:
-            - port: "6379"
+            - port: "${DRAGONFLY_PORT:=6379}"
               protocol: TCP
 
     # Allow health checks from within namespace
     - fromEndpoints:
         - matchLabels:
-            io.kubernetes.pod.namespace: dragonfly-system
+            io.kubernetes.pod.namespace: ${DRAGONFLY_NAMESPACE:=dragonfly-system}
       toPorts:
         - ports:
-            - port: "6379"
+            - port: "${DRAGONFLY_PORT:=6379}"
               protocol: TCP
-            - port: "6380"
+            - port: "${DRAGONFLY_ADMIN_PORT:=6380}"
               protocol: TCP
             - port: "8080"
               protocol: TCP
@@ -88,10 +88,10 @@ spec:
     - toEndpoints:
         - matchLabels:
             app: dragonfly
-            dragonflydb.io/instance: dragonfly
+            dragonflydb.io/instance: ${DRAGONFLY_NAME:=dragonfly}
       toPorts:
         - ports:
-            - port: "6379"
+            - port: "${DRAGONFLY_PORT:=6379}"
               protocol: TCP
-            - port: "6380"
+            - port: "${DRAGONFLY_ADMIN_PORT:=6380}"
               protocol: TCP

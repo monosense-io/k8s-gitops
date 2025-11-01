@@ -1,15 +1,38 @@
 ---
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: dragonfly-system
 
+# Reference the reusable DragonflyDB component
+components:
+  - ../../../../components/dragonfly
+
 resources:
   - namespace.yaml
-  - externalsecret.yaml
-  - dragonfly.yaml
-  - service.yaml
-  - dragonfly-pdb.yaml
-  - networkpolicy.yaml
-  - servicemonitor.yaml
-  - prometheusrule.yaml
+
+# All configuration comes from cluster-settings.yaml via Flux postBuild.substitute
+# The component provides production-ready defaults for any unset variables:
+#
+# Set in cluster-settings:
+# - DRAGONFLY_IMAGE_TAG
+# - DRAGONFLY_REPLICAS
+# - DRAGONFLY_STORAGE_CLASS
+# - DRAGONFLY_DATA_SIZE
+# - DRAGONFLY_MEMORY_LIMIT
+# - DRAGONFLY_CPU_LIMIT
+# - DRAGONFLY_MEMORY_REQUEST
+# - DRAGONFLY_CPU_REQUEST
+# - DRAGONFLY_MAXMEMORY
+# - DRAGONFLY_CACHE_MODE
+# - DRAGONFLY_AUTH_SECRET_PATH
+# - EXTERNAL_SECRET_STORE
+#
+# Using component defaults:
+# - DRAGONFLY_NAME (dragonfly)
+# - DRAGONFLY_NAMESPACE (dragonfly-system)
+# - DRAGONFLY_COMPONENT (database)
+# - Plus all other parameters with sensible defaults
+#
+# See: kubernetes/components/dragonfly/README.md for full parameter list
