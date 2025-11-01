@@ -11,7 +11,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  path: ./kubernetes/infrastructure/storage/rook-ceph/operator
+  path: ./kubernetes/bases/rook-ceph-operator/operator
   prune: true
   wait: true
   targetNamespace: rook-ceph

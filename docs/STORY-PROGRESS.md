@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-01
 **Total Stories**: 50
-**Completed**: 16 / 50 (32%)
+**Completed**: 17 / 50 (34%)
 
 ---
 
@@ -15,7 +15,7 @@ Networking:  ████████████████ 100% (9/9 core sto
 Security:    ███░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories) ✅
 Observability: ████░░░░░░░░░░  25% (1/4 stories)
-Databases:   █████░░░░░░░░░  33% (1/3 stories)
+Databases:   ██████████░░░░  67% (2/3 stories)
 Workloads:   ░░░░░░░░░░░░░░   0% (0/15 stories)
 Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
 ```
@@ -416,6 +416,52 @@ Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+#### **Story 25: STORY-DB-DRAGONFLY-OPERATOR-CLUSTER**
+- **Status**: ✅ **COMPLETE** (v5.0 - Production-Ready with Critical Fixes & Operator Standardization)
+- **Sprint**: 5 | Lane: Database
+- **Commit**: (pending) - feat(databases): rework DragonflyDB v5.0 + operator directory standardization
+- **Date**: 2025-11-01
+- **Version**: DragonflyDB v1.34.2 / Operator v1.3.0 (latest stable)
+- **Deliverables**:
+  - **Critical Configuration Fixes**:
+    - Added `--dbfilename=dump` (prevents disk exhaustion from timestamped snapshots)
+    - Added `--maxmemory=1610612736` (1.5Gi, 90% of limit for graceful eviction)
+    - Changed `--proactor_threads=0` (auto-detect CPU cores, was hardcoded to 2)
+    - Added `--cache_mode=true` (eviction-based caching for GitLab/Harbor)
+    - Changed `--save_schedule=` (empty, cron handles snapshots)
+  - **Version Upgrades**:
+    - DragonflyDB: v1.23.1 → v1.34.2 (+11 releases, CVE-2025-26268 fix)
+    - Story docs corrected to match deployed version
+  - **Operator Directory Standardization**:
+    - Moved CNPG operator: `infrastructure/databases/cloudnative-pg/operator/app/` → `bases/cnpg-operator/operator/`
+    - Moved Rook-Ceph operator: `infrastructure/storage/rook-ceph/operator/` → `bases/rook-ceph-operator/operator/`
+    - All operators now follow consistent pattern in `kubernetes/bases/`
+  - **Documentation**:
+    - Created `docs/runbooks/dragonfly-operations.md` (comprehensive ops runbook)
+    - Updated CLAUDE.md with operator placement pattern documentation
+    - Story updated to v5.0 with detailed changelog
+- **Files Created**:
+  - `docs/runbooks/dragonfly-operations.md` ⭐ NEW
+- **Files Modified**:
+  - `kubernetes/workloads/platform/databases/dragonfly/dragonfly.yaml` (critical args fixes)
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (added DRAGONFLY_MAXMEMORY, DRAGONFLY_CACHE_MODE)
+  - `kubernetes/bases/cnpg-operator/operator/*` (moved from infrastructure)
+  - `kubernetes/bases/rook-ceph-operator/operator/*` (moved from infrastructure)
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/ks.yaml` (path update to bases)
+  - `kubernetes/infrastructure/storage/rook-ceph/operator/ks.yaml` (path update to bases)
+  - `CLAUDE.md` (operator pattern documentation)
+  - `docs/stories/STORY-DB-DRAGONFLY-OPERATOR-CLUSTER.md` (v5.0 changelog)
+- **Impact**:
+  - Prevents production outages (disk exhaustion, OOM kills)
+  - Performance optimization (auto-threading, cache mode)
+  - Architectural consistency (all operators in bases/)
+  - Operational excellence (comprehensive runbook)
+  - Security (CVE fix)
+- **Dependencies**: Story 14 (OpenEBS), Story 12 (ClusterMesh), Story 05 (External Secrets)
+- **Note**: 3-node HA cluster (1 primary + 2 replicas), cross-cluster access via Cilium ClusterMesh
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -432,14 +478,7 @@ None currently.
 - **Unlocks**: GitLab, Harbor, Mattermost, Keycloak database backends
 - **Details**: Shared PostgreSQL cluster with PgBouncer poolers for multiple applications
 
-### **Priority 2: Story 25 - DragonflyDB** 🔴
-- **Status**: 📋 **READY**
-- **Dependencies**: ✅ Storage ready (OpenEBS)
-- **Strategic Value**: Redis-compatible cache for application performance
-- **Effort**: 2-3 hours
-- **Unlocks**: Session storage, caching layer for applications
-
-### **Priority 3: Story 28 - SPIRE + Cilium Auth** 🔐
+### **Priority 2: Story 28 - SPIRE + Cilium Auth** 🔐
 - **Status**: 📋 **READY**
 - **Dependencies**: ✅ ALL SATISFIED (Storage now available)
 - **Strategic Value**: Completes ClusterMesh security with workload identity
@@ -538,4 +577,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-01 by Claude Code (Story 23 - CloudNativePG Operator v4.0 rework with latest version & critical fixes)
+**Last Updated**: 2025-11-01 by Claude Code (Story 25 v5.0 - DragonflyDB critical fixes + operator directory standardization)

@@ -47,16 +47,24 @@ spec:
 
   # Args for Dragonfly process
   args:
+    # === CRITICAL CONFIGURATION ===
+    - --dbfilename=dump                           # Static filename prevents disk exhaustion
+    - --maxmemory=${DRAGONFLY_MAXMEMORY}          # Graceful memory management (90% of limit)
+    - --cache_mode=${DRAGONFLY_CACHE_MODE}        # Enable eviction for cache workloads
+
+    # === PERFORMANCE TUNING ===
+    - --proactor_threads=0                        # Auto-detect CPU cores (optimal threading)
+    - --save_schedule=                            # Disable continuous saves (cron snapshots only)
+
+    # === CORE CONFIGURATION ===
     - --dir=/data
     - --logtostderr
     - --requirepass=$(DRAGONFLY_PASSWORD)
     - --primary_port_http_enabled=true
     - --admin_port=6380
     - --metrics_port=6379
-    - --proactor_threads=2
     - --cluster_mode=emulated
     - --default_lua_flags=allow-undeclared-keys
-    - --save_schedule=*:*
 
   # Environment variables
   env:

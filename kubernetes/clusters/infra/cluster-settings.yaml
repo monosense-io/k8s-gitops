@@ -23,7 +23,6 @@ data:
   CLUSTERMESH_IP: "10.25.11.100"
   CILIUM_CLUSTERMESH_FQDN: "clustermesh-infra.monosense.io"
   CILIUM_CLUSTERMESH_APPS_FQDN: "clustermesh-apps.monosense.io"
-  CILIUM_GATEWAY_LB_IP: "10.25.11.110"
   CILIUM_GATEWAY_EXTERNAL_NAME: "cilium-gateway-external"
   CILIUM_GATEWAY_INTERNAL_NAME: "cilium-gateway-internal"
   CILIUM_GATEWAY_LB_IP_EXTERNAL: "10.25.11.110"
@@ -135,6 +134,8 @@ data:
   DRAGONFLY_CPU_LIMIT: "2000m"
   DRAGONFLY_MEMORY_REQUEST: "1Gi"
   DRAGONFLY_CPU_REQUEST: "500m"
+  DRAGONFLY_MAXMEMORY: "1610612736"     # 1.5Gi in bytes (90% of 2Gi limit for graceful eviction)
+  DRAGONFLY_CACHE_MODE: "true"          # Enable cache eviction (recommended for GitLab/Harbor)
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/infra/dragonfly/auth"
 
   # Keycloak Configuration
