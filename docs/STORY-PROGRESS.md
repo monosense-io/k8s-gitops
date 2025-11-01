@@ -2,9 +2,9 @@
 
 **Project**: Multi-Cluster GitOps Home Lab (v3.0)
 **Approach**: Manifests-First (deployment deferred to Story 45)
-**Last Updated**: 2025-10-31
+**Last Updated**: 2025-11-01
 **Total Stories**: 50
-**Completed**: 15 / 50 (30%)
+**Completed**: 16 / 50 (32%)
 
 ---
 
@@ -15,7 +15,7 @@ Networking:  ████████████████ 100% (9/9 core sto
 Security:    ███░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories) ✅
 Observability: ████░░░░░░░░░░  25% (1/4 stories)
-Databases:   ░░░░░░░░░░░░░░   0% (0/3 stories)
+Databases:   █████░░░░░░░░░  33% (1/3 stories)
 Workloads:   ░░░░░░░░░░░░░░   0% (0/15 stories)
 Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
 ```
@@ -368,6 +368,54 @@ Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+### 🗄️ Database Layer
+
+#### **Story 23: STORY-DB-CNPG-OPERATOR**
+- **Status**: ✅ **COMPLETE** (v4.0 - Reworked with latest version & best practices)
+- **Sprint**: 5 | Lane: Database
+- **Commit**: `cbd0a0d` - feat(databases): rework CloudNativePG operator configuration (Story 23)
+- **Date**: 2025-11-01
+- **Version**: Chart 0.26.1 / Operator 1.27.1 (latest stable)
+- **Deliverables**:
+  - CloudNativePG operator HelmRelease with HA configuration (2 replicas)
+  - OCIRepository with semver auto-update (0.26.x)
+  - Namespace with Pod Security Admission (restricted level)
+  - PodDisruptionBudget for operator availability protection
+  - VMPodScrape for metrics collection (VictoriaMetrics)
+  - VMRule with 5 production alerts (operator health, webhooks, reconciliation)
+  - Flux Kustomization with CRD health checks
+  - **v4.0 Critical Fixes**:
+    - Updated CRD version alignment (0.26.0 → 0.26.1)
+    - Fixed PDB selector bug (added app.kubernetes.io/instance label)
+    - Added 3 CRD health checks to Flux Kustomization
+    - Added explicit maxConcurrentReconciles configuration (10)
+    - Updated production memory sizing (400Mi request vs story's 128Mi)
+  - **v4.0 Enhancements**:
+    - Comprehensive runbooks for cluster management and operations
+    - Production-grade resource sizing with scaling guidance
+    - Story documentation updated with version clarity
+- **Files Created**:
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/namespace.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/ocirepository.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/helmrelease.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/pdb.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/podmonitor.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/prometheusrule.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/kustomization.yaml`
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/ks.yaml`
+  - `docs/runbooks/cnpg-cluster-management.md` ⭐ NEW
+  - `docs/runbooks/cnpg-operations.md` ⭐ NEW
+- **Files Modified**:
+  - `bootstrap/helmfile.d/00-crds.yaml` (CRD version 0.26.0 → 0.26.1)
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/pdb.yaml` (selector fix)
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/ks.yaml` (health checks)
+  - `kubernetes/infrastructure/databases/cloudnative-pg/operator/app/helmrelease.yaml` (maxConcurrentReconciles)
+  - `docs/stories/STORY-DB-CNPG-OPERATOR.md` (version updates, memory sizing)
+- **Dependencies**: Story 14 (OpenEBS), Story 15-16 (Rook-Ceph), Story 17 (VictoriaMetrics)
+- **Note**: PostgreSQL 18 support, enhanced PgBouncer TLS configuration, production-ready with comprehensive monitoring
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -376,21 +424,27 @@ None currently.
 
 ## 📋 Next Candidates (Prioritized)
 
-### **Priority 1: Story 28 - SPIRE + Cilium Auth** 🔐
-- **Status**: 🚧 **IN PROGRESS**
+### **Priority 1: Story 24 - CNPG Shared Cluster** 🗄️
+- **Status**: 📋 **READY**
+- **Dependencies**: ✅ ALL SATISFIED (Story 23 complete)
+- **Strategic Value**: Multi-tenant PostgreSQL for application workloads
+- **Effort**: 3-4 hours
+- **Unlocks**: GitLab, Harbor, Mattermost, Keycloak database backends
+- **Details**: Shared PostgreSQL cluster with PgBouncer poolers for multiple applications
+
+### **Priority 2: Story 25 - DragonflyDB** 🔴
+- **Status**: 📋 **READY**
+- **Dependencies**: ✅ Storage ready (OpenEBS)
+- **Strategic Value**: Redis-compatible cache for application performance
+- **Effort**: 2-3 hours
+- **Unlocks**: Session storage, caching layer for applications
+
+### **Priority 3: Story 28 - SPIRE + Cilium Auth** 🔐
+- **Status**: 📋 **READY**
 - **Dependencies**: ✅ ALL SATISFIED (Storage now available)
 - **Strategic Value**: Completes ClusterMesh security with workload identity
 - **Effort**: 3-4 hours
 - **Unlocks**: Zero-trust policies, CiliumAuthPolicy
-- **Started**: 2025-10-31
-
-### **Priority 2: Database Layer** 🗄️
-- **Story DB-CNPG-OPERATOR**: CloudNative-PG Operator
-- **Story DB-CNPG-SHARED-CLUSTER**: Multi-tenant PostgreSQL
-- **Dependencies**: ✅ Storage ready (Rook-Ceph)
-- **Strategic Value**: Foundation for application workloads
-- **Effort**: 4-6 hours
-- **Unlocks**: GitLab, Harbor, Mattermost, Keycloak deployments
 
 ---
 
@@ -428,8 +482,10 @@ Foundation:
    ├─ Story 15: Rook-Ceph Operator ✅
    ├─ Story 16: Rook-Ceph Cluster ✅
    ├─ Story 17: VictoriaMetrics ✅
-   ├─ Story 28: SPIRE 📋
-   └─ Database Stories 📋
+   ├─ Story 23: CNPG Operator ✅
+   │  └─ Story 24: CNPG Shared Cluster 📋
+   ├─ Story 25: DragonflyDB 📋
+   └─ Story 28: SPIRE 📋
 ```
 
 ---
@@ -450,12 +506,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 15 |
-| **Total Commits** | 15 |
-| **Lines Added** | ~4,000 |
-| **Files Created** | ~75 |
+| **Stories Completed** | 16 |
+| **Total Commits** | 16 |
+| **Lines Added** | ~6,400 |
+| **Files Created** | ~85 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (15/15) |
+| **Success Rate** | 100% (16/16) |
 
 ---
 
@@ -467,7 +523,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (30% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (32% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -482,4 +538,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-01 by Claude Code (Story 17 v4.0 refinement - VictoriaMetrics LTS upgrade & best practices)
+**Last Updated**: 2025-11-01 by Claude Code (Story 23 - CloudNativePG Operator v4.0 rework with latest version & critical fixes)
