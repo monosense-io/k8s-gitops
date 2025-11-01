@@ -1,0 +1,54 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability-victoria-metrics-vmcluster
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 30m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/observability/victoria-metrics/vmcluster
+  prune: true
+  wait: true
+  dependsOn:
+    - name: cluster-infra-infrastructure
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: vmstorage-victoria-metrics-global-vmcluster
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmselect-victoria-metrics-global-vmcluster
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vminsert-victoria-metrics-global-vmcluster
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmauth-victoria-metrics-global
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmalert-victoria-metrics-global
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: alertmanager-victoria-metrics-global
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: victoria-metrics-global-grafana
+      namespace: observability

@@ -1,0 +1,38 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability-victoria-metrics-vmagent
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmagent
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 30m
+  timeout: 15m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/observability/victoria-metrics/vmagent
+  prune: true
+  wait: true
+  dependsOn:
+    - name: cluster-apps-infrastructure
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: victoria-metrics-vmagent
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: victoria-metrics-prometheus-node-exporter
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: victoria-metrics-kube-state-metrics
+      namespace: observability

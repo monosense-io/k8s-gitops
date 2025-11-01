@@ -1,0 +1,274 @@
+---
+# PrometheusRule for VictoriaMetrics VMCluster health monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: victoria-metrics-vmcluster-health
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  groups:
+    - name: victoria-metrics-vmcluster.rules
+      rules:
+        # VMStorage health alerts
+        - alert: VMStorageDown
+          expr: up{job="vmstorage"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: vmstorage
+          annotations:
+            summary: "VMStorage instance is down"
+            description: "VMStorage instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: VMStorageHighMemoryUsage
+          expr: (vm_storage_cache_size_bytes / vm_storage_memory_available_bytes) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            component: vmstorage
+          annotations:
+            summary: "VMStorage high memory usage"
+            description: "VMStorage {{ $labels.instance }} memory usage is {{ $value }}%."
+
+        - alert: VMStorageDiskSpaceHigh
+          expr: (vm_storage_data_size_bytes / vm_storage_available_bytes) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+            component: vmstorage
+          annotations:
+            summary: "VMStorage high disk usage"
+            description: "VMStorage {{ $labels.instance }} disk usage is {{ $value }}%."
+
+        # VMSelect health alerts
+        - alert: VMSelectDown
+          expr: up{job="vmselect"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: vmselect
+          annotations:
+            summary: "VMSelect instance is down"
+            description: "VMSelect instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: VMSelectHighRequestRate
+          expr: rate(vm_select_request_duration_seconds_count[5m]) > 100
+          for: 5m
+          labels:
+            severity: warning
+            component: vmselect
+          annotations:
+            summary: "VMSelect high request rate"
+            description: "VMSelect {{ $labels.instance }} request rate is {{ $value }} requests/sec."
+
+        # VMInsert health alerts
+        - alert: VMInsertDown
+          expr: up{job="vminsert"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: vminsert
+          annotations:
+            summary: "VMInsert instance is down"
+            description: "VMInsert instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: VMInsertHighRequestRate
+          expr: rate(vm_insert_request_duration_seconds_count[5m]) > 1000
+          for: 5m
+          labels:
+            severity: warning
+            component: vminsert
+          annotations:
+            summary: "VMInsert high request rate"
+            description: "VMInsert {{ $labels.instance }} request rate is {{ $value }} requests/sec."
+
+        - alert: VMInsertSlowRequests
+          expr: histogram_quantile(0.95, rate(vm_insert_request_duration_seconds_bucket[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: vminsert
+          annotations:
+            summary: "VMInsert slow requests"
+            description: "VMInsert {{ $labels.instance }} 95th percentile latency is {{ $value }}s."
+
+        # VMAuth health alerts
+        - alert: VMAuthDown
+          expr: up{job="vmauth"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: vmauth
+          annotations:
+            summary: "VMAuth instance is down"
+            description: "VMAuth instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        # VMAlert health alerts
+        - alert: VMAlertDown
+          expr: up{job="vmalert"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: vmalert
+          annotations:
+            summary: "VMAlert instance is down"
+            description: "VMAlert instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: VMAlertRuleEvaluationErrors
+          expr: rate(vmalert_rule_execution_errors_total[5m]) > 0
+          for: 2m
+          labels:
+            severity: warning
+            component: vmalert
+          annotations:
+            summary: "VMAlert rule evaluation errors"
+            description: "VMAlert {{ $labels.instance }} has {{ $value }} rule evaluation errors per second."
+
+        # Alertmanager health alerts
+        - alert: AlertmanagerDown
+          expr: up{job="alertmanager"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: alertmanager
+          annotations:
+            summary: "Alertmanager instance is down"
+            description: "Alertmanager instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: AlertmanagerNotificationFailures
+          expr: rate(alertmanager_notifications_failed_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: alertmanager
+          annotations:
+            summary: "Alertmanager notification failures"
+            description: "Alertmanager {{ $labels.instance }} has {{ $value }} failed notifications per second."
+
+        # Grafana health alerts
+        - alert: GrafanaDown
+          expr: up{job="grafana"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: grafana
+          annotations:
+            summary: "Grafana instance is down"
+            description: "Grafana instance {{ $labels.instance }} has been down for more than 2 minutes."
+
+        - alert: GrafanaHighMemoryUsage
+          expr: (process_resident_memory_bytes{job="grafana"} / 1024 / 1024) > 500
+          for: 10m
+          labels:
+            severity: warning
+            component: grafana
+          annotations:
+            summary: "Grafana high memory usage"
+            description: "Grafana {{ $labels.instance }} memory usage is {{ $value }}MB."
+
+        # Cluster-wide alerts
+        - alert: VictoriaMetricsClusterDegraded
+          expr: (count(up{job=~"vmstorage|vmselect|vminsert"}) / count(up{job=~"vmstorage|vmselect|vminsert"})) < 0.8
+          for: 5m
+          labels:
+            severity: critical
+            component: cluster
+          annotations:
+            summary: "VictoriaMetrics cluster degraded"
+            description: "Less than 80% of VictoriaMetrics components are healthy."
+
+        - alert: VictoriaMetricsDataIngestionStalled
+          expr: increase(vm_cache_entries_total{job="vminsert"}[10m]) == 0
+          for: 15m
+          labels:
+            severity: warning
+            component: cluster
+          annotations:
+            summary: "VictoriaMetrics data ingestion stalled"
+            description: "No new data has been ingested by VictoriaMetrics for 15 minutes."
+
+        # Storage capacity planning alerts
+        - alert: VMStorageCapacityWarning
+          expr: |
+            (
+              vm_free_disk_space_bytes{job="vmstorage"}
+              /
+              (vm_free_disk_space_bytes{job="vmstorage"} + vm_data_size_bytes{job="vmstorage"})
+            ) < 0.20
+          for: 30m
+          labels:
+            severity: warning
+            component: vmstorage
+          annotations:
+            summary: "VMStorage {{ $labels.instance }} low disk space"
+            description: "Less than 20% free space remaining ({{ $value | humanizePercentage }})"
+
+        - alert: VMStorageCapacityCritical
+          expr: |
+            (
+              vm_free_disk_space_bytes{job="vmstorage"}
+              /
+              (vm_free_disk_space_bytes{job="vmstorage"} + vm_data_size_bytes{job="vmstorage"})
+            ) < 0.10
+          for: 15m
+          labels:
+            severity: critical
+            component: vmstorage
+          annotations:
+            summary: "VMStorage {{ $labels.instance }} critical disk space"
+            description: "Less than 10% free space remaining ({{ $value | humanizePercentage }}). Immediate action required!"
+
+        # High cardinality detection
+        - alert: VMHighCardinality
+          expr: |
+            sum(vm_cache_entries{type="storage/tsid"}) > 10000000
+          for: 15m
+          labels:
+            severity: warning
+            component: cluster
+          annotations:
+            summary: "High cardinality detected in VictoriaMetrics"
+            description: "More than 10M unique time series ({{ $value }}). Consider reviewing metric labels and cardinality."
+
+        # Query performance alerts
+        - alert: VMSelectSlowQueries
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(vm_request_duration_seconds_bucket{job="vmselect"}[5m])) by (le)
+            ) > 10
+          for: 15m
+          labels:
+            severity: warning
+            component: vmselect
+          annotations:
+            summary: "VMSelect query performance degraded"
+            description: "P99 query latency is {{ $value }}s (threshold: 10s)"
+
+        - alert: VMSelectQueryQueueFull
+          expr: |
+            vm_concurrent_select_current{job="vmselect"} >= vm_concurrent_select_capacity{job="vmselect"}
+          for: 5m
+          labels:
+            severity: warning
+            component: vmselect
+          annotations:
+            summary: "VMSelect query queue full"
+            description: "VMSelect {{ $labels.instance }} query queue is at capacity. Queries may be rejected."
+
+        # Deduplication effectiveness
+        - alert: VMDeduplicationIneffective
+          expr: |
+            rate(vm_deduplicated_samples_total{job="vmstorage"}[5m])
+            /
+            rate(vm_rows_inserted_total{job="vmstorage"}[5m]) < 0.01
+          for: 1h
+          labels:
+            severity: info
+            component: vmstorage
+          annotations:
+            summary: "VictoriaMetrics deduplication not working effectively"
+            description: "Deduplication rate is very low ({{ $value | humanizePercentage }}). Verify scrape interval configuration."

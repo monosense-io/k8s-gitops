@@ -154,3 +154,12 @@ data:
   # Keycloak Gateway Configuration
   KEYCLOAK_GATEWAY_NAME: "cilium-gateway-external"
   KEYCLOAK_GATEWAY_NAMESPACE: "kube-system"
+
+  # VictoriaMetrics Configuration (Quay.io Registry)
+  VICTORIAMETRICS_IMAGE_REGISTRY: "quay.io/victoriametrics"
+  VICTORIAMETRICS_VERSION: "v1.122.1"
+  VICTORIAMETRICS_OPERATOR_VERSION: "0.63.0"
+  VICTORIAMETRICS_K8S_STACK_VERSION: "0.61.11"
+  VM_RETENTION_PERIOD: "30d"
+  VM_STORAGE_SIZE: "50Gi"
+  VM_REPLICATION_FACTOR: "2"

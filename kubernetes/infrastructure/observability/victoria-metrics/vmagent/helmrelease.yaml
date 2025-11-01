@@ -1,0 +1,145 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmagent
+    app.kubernetes.io/managed-by: flux
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-metrics-k8s-stack
+    namespace: flux-system
+  version: "${VICTORIAMETRICS_K8S_STACK_VERSION}"
+  interval: 1h
+  timeout: 15m
+  values:
+    fullnameOverride: victoria-metrics
+    
+    # Global configuration with Quay.io registry
+    global:
+      imageRegistry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+      imagePullSecrets: []
+      
+    # Disable operator and vmcluster (use infra cluster)
+    victoria-metrics-operator:
+      enabled: false
+    vmcluster:
+      enabled: false
+    vmauth:
+      enabled: false
+    vmalert:
+      enabled: false
+    alertmanager:
+      enabled: false
+    grafana:
+      enabled: false
+      
+    # VMAgent for metrics collection and remote-write
+    vmagent:
+      enabled: true
+      spec:
+        replicaCount: 2
+        image:
+          repository: vmagent
+          registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+          tag: "${VICTORIAMETRICS_VERSION}"
+        externalLabels:
+          cluster: "${CLUSTER}"
+          environment: "production"
+        remoteWrite:
+          - url: "${GLOBAL_VM_INSERT_ENDPOINT}/insert/0/prometheus/api/v1/write"
+            sendTimeout: 30s
+            queueConfig:
+              maxSamplesPerSend: 5000
+              capacity: 10000
+              maxShards: 10
+              maxRetries: 3
+              minBackoff: 30ms
+              maxBackoff: 100ms
+            headers:
+              X-Custom-Header: "victoria-metrics-remote-write"
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        selectAllByDefault: true
+        extraArgs:
+          - --scrape.align-interval-to=1m
+          - --scrape.compact-interval=1h
+          - --remoteWrite.maxDailySeriesPerMetric=1000000
+          
+    # Node Exporter for system metrics
+    prometheus-node-exporter:
+      enabled: true
+      image:
+        repository: node-exporter
+        registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+        tag: "${VICTORIAMETRICS_VERSION}"
+      resources:
+        limits:
+          cpu: 1
+          memory: 128Mi
+        requests:
+          cpu: 50m
+          memory: 64Mi
+      extraArgs:
+        - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+        - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$
+        
+    # Kube State Metrics for Kubernetes resources
+    kube-state-metrics:
+      enabled: true
+      image:
+        repository: kube-state-metrics
+        registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+        tag: "${VICTORIAMETRICS_VERSION}"
+      resources:
+        limits:
+          cpu: 1
+          memory: 256Mi
+        requests:
+          cpu: 50m
+          memory: 128Mi
+      collectors:
+        - certificatesigningrequests
+        - configmaps
+        - cronjobs
+        - daemonsets
+        - deployments
+        - endpoints
+        - horizontalpodautoscalers
+        - ingresses
+        - jobs
+        - limitranges
+        - mutatingwebhookconfigurations
+        - namespaces
+        - networkpolicies
+        - nodes
+        - persistentvolumeclaims
+        - persistentvolumes
+        - poddisruptionbudgets
+        - pods
+        - replicasets
+        - replicationcontrollers
+        - resourcequotas
+        - secrets
+        - services
+        - statefulsets
+        - storageclasses
+        - validatingwebhookconfigurations
+        - verticalpodautoscalers
+        - volumeattachments
+        
+    # ServiceMonitor configuration
+    serviceMonitor:
+      enabled: true
+      namespace: observability
+      labels:
+        release: victoria-metrics

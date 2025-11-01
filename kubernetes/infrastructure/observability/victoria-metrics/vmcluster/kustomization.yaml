@@ -1,0 +1,13 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: victoria-metrics-vmcluster
+  namespace: flux-system
+resources:
+  - helmrelease.yaml
+  - externalsecret.yaml
+commonLabels:
+  app.kubernetes.io/name: victoria-metrics
+  app.kubernetes.io/component: vmcluster
+  app.kubernetes.io/managed-by: flux

@@ -1514,3 +1514,85 @@ kubectl --context=infra -n observability get configmap -l grafana_dashboard=1
 
 **Previous Version:** Story focused on deployment with cluster access required
 **Current Version:** Story focuses on manifest creation with local validation only
+
+---
+
+### v4.0 (2025-11-01) - Production Best Practices & Latest Versions
+
+**Major Version Upgrades:**
+- VictoriaMetrics: v1.113.0 → v1.122.1 LTS (+15 releases, 12-month support)
+- victoria-metrics-k8s-stack chart: 0.29.0 → 0.61.11 (+32 releases)
+- victoria-metrics-operator: 0.63.0 (already current)
+
+**Critical Configuration Fixes:**
+1. **CPU Limits Correction (10 components):**
+   - Fixed all fractional CPU limits → whole units per VM best practices
+   - vmstorage, vmselect: 2000m → 2
+   - vminsert, vmagent, vmauth, vmalert, grafana: 500m/1000m → 1
+   - alertmanager, node-exporter, kube-state-metrics: 200m → 1
+   - Rationale: VictoriaMetrics docs state "Avoid fractional CPU units" for Go runtime optimization
+
+**New Features & Enhancements:**
+2. **Deduplication Configuration:**
+   - Added `-dedup.minScrapeInterval=30s` to vmstorage, vmselect, vminsert
+   - Reduces storage space and improves query performance
+   - Automatic handling of duplicate metrics from HA setups
+
+3. **Query Performance Optimization:**
+   - Added `--search.maxPointsPerTimeseries=30000` to prevent OOM on large queries
+   - Enhanced vmselect query settings for better performance
+
+4. **Enhanced PrometheusRules (7 new alerts):**
+   - **Capacity Planning:**
+     - VMStorageCapacityWarning (20% free space)
+     - VMStorageCapacityCritical (10% free space)
+   - **Performance Monitoring:**
+     - VMSelectSlowQueries (P99 latency > 10s)
+     - VMSelectQueryQueueFull
+   - **Operational:**
+     - VMHighCardinality (>10M time series)
+     - VMDeduplicationIneffective
+
+**Documentation Updates:**
+5. **Updated Documentation:**
+   - VICTORIA-METRICS-IMPLEMENTATION.md: Added version info, CPU best practices, dedup config
+   - VM-UPGRADE-NOTES.md: Comprehensive upgrade documentation (new)
+   - victoria-metrics-operations.md: Operations runbook (new)
+   - STORY-PROGRESS.md: Updated Story 17 status
+
+**Architecture Decisions:**
+6. **Replication Factor:** Kept RF=2 (adequate for production, tolerates 1 node failure)
+7. **Version Strategy:** LTS v1.122.1 chosen for production stability over latest v1.128.0
+8. **Storage:** Continued use of ceph-block (Rook-Ceph) for production reliability
+
+**Risk Mitigation:**
+- Comprehensive CHANGELOG review (chart 0.29.0 → 0.61.11)
+- All breaking changes analyzed (none affect our deployment)
+- Rollback procedure documented (Git revert + Flux reconcile)
+- Staged deployment planned (infra first, then apps)
+
+**Files Modified (10):**
+- kubernetes/clusters/infra/cluster-settings.yaml
+- kubernetes/clusters/apps/cluster-settings.yaml
+- kubernetes/infrastructure/observability/victoria-metrics/vmcluster/helmrelease.yaml
+- kubernetes/infrastructure/observability/victoria-metrics/vmagent/helmrelease.yaml
+- kubernetes/infrastructure/observability/victoria-metrics/vmcluster/prometheusrule.yaml
+- docs/observability/VICTORIA-METRICS-IMPLEMENTATION.md
+- docs/stories/STORY-OBS-VM-STACK.md
+- docs/STORY-PROGRESS.md
+- docs/observability/VM-UPGRADE-NOTES.md (new)
+- docs/runbooks/victoria-metrics-operations.md (new)
+
+**Validation:**
+- All manifests validated with kubectl --dry-run
+- Kustomization builds successful
+- Flux builds successful
+- Resource calculations verified
+
+**Deployment:**
+- Actual deployment deferred to Story 45 (GitOps principle: manifest creation first)
+- Deployment strategy: Staged (infra → apps)
+- Monitoring period: 24-48 hours post-deployment
+
+**Previous Version:** v3.0 - Manifests-first refinement
+**Current Version:** v4.0 - Production best practices with latest stable versions

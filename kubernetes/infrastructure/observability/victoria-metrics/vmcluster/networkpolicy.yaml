@@ -1,0 +1,120 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-metrics-vmcluster
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow from Cilium Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cilium
+      ports:
+        - protocol: TCP
+          port: 8481  # VMSelect
+        - protocol: TCP
+          port: 3000  # Grafana
+
+    # Allow intra-cluster communication between VMCluster components
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics
+              app.kubernetes.io/component: vmcluster
+      ports:
+        - protocol: TCP
+          port: 8481  # VMSelect
+        - protocol: TCP
+          port: 8480  # VMInsert
+        - protocol: TCP
+          port: 8428  # VMAuth
+        - protocol: TCP
+          port: 8888  # VMAlert
+        - protocol: TCP
+          port: 9093  # Alertmanager
+        - protocol: TCP
+          port: 3000  # Grafana
+
+    # Allow from apps cluster via ClusterMesh
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              cluster: apps
+      ports:
+        - protocol: TCP
+          port: 8480  # VMInsert for remote-write
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow communication with Rook-Ceph storage
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rook-ceph
+      ports:
+        - protocol: TCP
+          port: 6789
+        - protocol: TCP
+          port: 6800
+        - protocol: TCP
+          port: 3300
+
+    # Allow HTTPS egress (for updates, external access)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+    # Allow intra-cluster communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics
+              app.kubernetes.io/component: vmcluster
+      ports:
+        - protocol: TCP
+          port: 8481  # VMSelect
+        - protocol: TCP
+          port: 8480  # VMInsert
+        - protocol: TCP
+          port: 8428  # VMAuth
+        - protocol: TCP
+          port: 8888  # VMAlert
+        - protocol: TCP
+          port: 9093  # Alertmanager
+        - protocol: TCP
+          port: 3000  # Grafana

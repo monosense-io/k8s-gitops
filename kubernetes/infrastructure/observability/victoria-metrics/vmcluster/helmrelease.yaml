@@ -1,0 +1,262 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-metrics-global
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-metrics-k8s-stack
+    namespace: flux-system
+  version: "${VICTORIAMETRICS_K8S_STACK_VERSION}"
+  interval: 1h
+  timeout: 15m
+  values:
+    fullnameOverride: victoria-metrics-global
+    
+    # Global configuration with Quay.io registry
+    global:
+      imageRegistry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+      imagePullSecrets: []
+      
+    # Disable operator (installed separately)
+    victoria-metrics-operator:
+      enabled: false
+      
+    # VMCluster for centralized storage
+    vmcluster:
+      enabled: true
+      spec:
+        retentionPeriod: "${VM_RETENTION_PERIOD}"
+        replicationFactor: ${VM_REPLICATION_FACTOR}
+        
+        # VMStorage - Data persistence layer
+        vmstorage:
+          replicaCount: 3
+          image:
+            repository: victoria-metrics
+            registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+            tag: "${VICTORIAMETRICS_VERSION}"
+          storage:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: "${BLOCK_SC}"
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: "${VM_STORAGE_SIZE}"
+          resources:
+            limits:
+              cpu: 2
+              memory: 4Gi
+            requests:
+              cpu: 500m
+              memory: 2Gi
+          extraArgs:
+            - --dedup.minScrapeInterval=30s
+            - --logNewSeries
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: app.kubernetes.io/name
+                          operator: In
+                          values: ["vmstorage"]
+                    topologyKey: kubernetes.io/hostname
+                    
+        # VMSelect - Query processing layer
+        vmselect:
+          replicaCount: 3
+          image:
+            repository: victoria-metrics
+            registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+            tag: "${VICTORIAMETRICS_VERSION}"
+          cacheMountPath: /cache
+          storage:
+            volumeClaimTemplate:
+              spec:
+                storageClassName: "${BLOCK_SC}"
+                accessModes: ["ReadWriteOnce"]
+                resources:
+                  requests:
+                    storage: 10Gi
+          resources:
+            limits:
+              cpu: 2
+              memory: 2Gi
+            requests:
+              cpu: 200m
+              memory: 500Mi
+          extraArgs:
+            - --search.maxConcurrentRequests=100
+            - --search.maxQueryDuration=5m
+            - --search.maxSeriesPerQuery=1000000
+            - --search.maxPointsPerTimeseries=30000
+            - --dedup.minScrapeInterval=30s
+            
+        # VMInsert - Ingestion layer
+        vminsert:
+          replicaCount: 3
+          image:
+            repository: victoria-metrics
+            registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+            tag: "${VICTORIAMETRICS_VERSION}"
+          resources:
+            limits:
+              cpu: 1
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 500Mi
+          extraArgs:
+            - --maxInsertRequestSize=32000000
+            - --maxHourlySeriesPerMetric=1000000
+            - --maxDailySeriesPerMetric=10000000
+            - --dedup.minScrapeInterval=30s
+            
+    # VMAuth - Authentication and routing
+    vmauth:
+      enabled: true
+      spec:
+        replicaCount: 2
+        image:
+          repository: vmauth
+          registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+          tag: "${VICTORIAMETRICS_VERSION}"
+        selectAllByDefault: true
+        unauthorizedAccessConfig:
+          - src_paths: ["/.*"]
+            url_prefix: 
+              - "http://vmselect-victoria-metrics-global-vmcluster.observability.svc.cluster.local:8481/select/0/prometheus"
+        resources:
+          limits:
+            cpu: 1
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
+    # VMAlert - Rule evaluation
+    vmalert:
+      enabled: true
+      spec:
+        replicaCount: 2
+        image:
+          repository: vmalert
+          registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+          tag: "${VICTORIAMETRICS_VERSION}"
+        datasource:
+          url: "${GLOBAL_VM_SELECT_ENDPOINT}/select/0/prometheus"
+        remoteWrite:
+          url: "${GLOBAL_VM_INSERT_ENDPOINT}/insert/0/prometheus"
+        notifier:
+          url: "${GLOBAL_ALERTMANAGER_ENDPOINT}"
+        evaluationInterval: 15s
+        rulePath: /etc/vmalert/rules
+        resources:
+          limits:
+            cpu: 1
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
+    # Alertmanager - Alert routing
+    alertmanager:
+      enabled: true
+      spec:
+        replicaCount: 3
+        image:
+          repository: alertmanager
+          registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+          tag: "${VICTORIAMETRICS_VERSION}"
+        retention: 120h
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: "${BLOCK_SC}"
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 10Gi
+        resources:
+          limits:
+            cpu: 1
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        configSecret: alertmanager-config
+            
+    # Grafana - Dashboards and visualization
+    grafana:
+      enabled: true
+      replicas: 2
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
+      persistence:
+        enabled: true
+        storageClassName: "${BLOCK_SC}"
+        size: 10Gi
+        accessModes: ["ReadWriteOnce"]
+      datasources:
+        datasources.yaml:
+          apiVersion: 1
+          datasources:
+            - name: VictoriaMetrics
+              type: prometheus
+              url: "${GLOBAL_VM_SELECT_ENDPOINT}/select/0/prometheus"
+              access: proxy
+              isDefault: true
+              jsonData:
+                timeInterval: "30s"
+            - name: Alertmanager
+              type: alertmanager
+              url: "${GLOBAL_ALERTMANAGER_ENDPOINT}"
+              access: proxy
+              jsonData:
+                handleGrafanaManagedAlerts: true
+      dashboardProviders:
+        dashboardproviders.yaml:
+          apiVersion: 1
+          providers:
+            - name: 'default'
+              orgId: 1
+              folder: ''
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/default
+      resources:
+        limits:
+          cpu: 1
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        
+    # Disable components not needed on infra cluster
+    prometheus-node-exporter:
+      enabled: false
+    kube-state-metrics:
+      enabled: false
+    vmagent:
+      enabled: false
+      
+    # ServiceMonitor configuration
+    serviceMonitor:
+      enabled: true
+      namespace: observability
+      labels:
+        release: victoria-metrics-global

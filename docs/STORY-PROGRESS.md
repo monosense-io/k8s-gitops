@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-10-31
 **Total Stories**: 50
-**Completed**: 14 / 50 (28%)
+**Completed**: 15 / 50 (30%)
 
 ---
 
@@ -12,12 +12,12 @@
 
 ```
 Networking:  ████████████████ 100% (9/9 core stories) ✅
-Security:    ███░░░░░░░░░░░░  20% (2/10 stories)
+Security:    ███░░░░░░░░░░░  20% (2/10 stories)
 Storage:     ████████████████ 100% (3/3 stories) ✅
-Databases:   ░░░░░░░░░░░░░░░   0% (0/3 stories)
-Observability: ░░░░░░░░░░░░░   0% (0/4 stories)
-Workloads:   ░░░░░░░░░░░░░░░   0% (0/15 stories)
-Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
+Observability: ████░░░░░░░░░░  25% (1/4 stories)
+Databases:   ░░░░░░░░░░░░░░   0% (0/3 stories)
+Workloads:   ░░░░░░░░░░░░░░   0% (0/15 stories)
+Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
 ```
 
 ---
@@ -321,6 +321,53 @@ Validation:  ░░░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+### 📊 Observability Layer
+
+#### **Story 17: STORY-OBS-VM-STACK**
+- **Status**: ✅ **COMPLETE** (v4.0 - Reworked with latest versions & best practices)
+- **Sprint**: 6 | Lane: Observability
+- **Commits**:
+  - `victoria-metrics-implementation` - feat(observability): add VictoriaMetrics multi-cluster manifests
+  - `victoria-metrics-v4-refinement` - feat(observability): upgrade to v1.122.1 LTS and apply best practices
+- **Date**: 2025-10-31 (initial), 2025-11-01 (v4.0 rework)
+- **Version**: v1.122.1 LTS, chart 0.61.11
+- **Deliverables**:
+  - Multi-cluster VictoriaMetrics architecture (VMCluster + VMAgent)
+  - VMCluster on infra cluster (VMSelect, VMInsert, VMStorage, VMAuth, VMAlert)
+  - VMAgent on apps cluster (metrics collection + remote-write)
+  - Cross-cluster communication via Cilium ClusterMesh
+  - NetworkPolicies with minimal required ports based on existing services
+  - High availability with PodDisruptionBudgets
+  - ExternalSecrets integration for sensitive configuration
+  - Grafana and Alertmanager integration
+  - **v4.0 Enhancements**:
+    - Upgraded from v1.113.0 to v1.122.1 LTS (+15 releases, 12-month support)
+    - Upgraded chart from 0.29.0 to 0.61.11 (+32 releases, security/bug fixes)
+    - Fixed CPU limits to whole units per VM best practices (10 components)
+    - Added deduplication configuration (30s scrape interval)
+    - Enhanced query performance settings
+    - 7 new PrometheusRules (capacity, performance, cardinality monitoring)
+    - Comprehensive operations runbook
+- **Files Created**:
+  - `kubernetes/infrastructure/observability/victoria-metrics/vmcluster/*` (7 files)
+  - `kubernetes/infrastructure/observability/victoria-metrics/vmagent/*` (4 files)
+  - `docs/observability/VICTORIA-METRICS-IMPLEMENTATION.md` (comprehensive guide)
+  - `docs/observability/VM-UPGRADE-NOTES.md` (v4.0 upgrade documentation) ⭐ NEW
+  - `docs/runbooks/victoria-metrics-operations.md` (operations runbook) ⭐ NEW
+- **Files Modified**:
+  - `kubernetes/infrastructure/kustomization.yaml` (added observability)
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (VMCluster variables, versions updated)
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (VMAgent variables, versions updated)
+  - `kubernetes/infrastructure/observability/victoria-metrics/vmcluster/helmrelease.yaml` (CPU limits, dedup config)
+  - `kubernetes/infrastructure/observability/victoria-metrics/vmagent/helmrelease.yaml` (CPU limits)
+  - `kubernetes/infrastructure/observability/victoria-metrics/vmcluster/prometheusrule.yaml` (7 new alerts)
+  - `docs/observability/VICTORIA-METRICS-IMPLEMENTATION.md` (best practices section)
+  - `docs/stories/STORY-OBS-VM-STACK.md` (v4.0 changelog)
+- **Dependencies**: Story 01 (Cilium Core), Story 05 (External Secrets), Storage (Stories 14-16)
+- **Note**: Production-ready with LTS version, CPU best practices, deduplication, and comprehensive monitoring
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -330,10 +377,12 @@ None currently.
 ## 📋 Next Candidates (Prioritized)
 
 ### **Priority 1: Story 28 - SPIRE + Cilium Auth** 🔐
+- **Status**: 🚧 **IN PROGRESS**
 - **Dependencies**: ✅ ALL SATISFIED (Storage now available)
 - **Strategic Value**: Completes ClusterMesh security with workload identity
 - **Effort**: 3-4 hours
 - **Unlocks**: Zero-trust policies, CiliumAuthPolicy
+- **Started**: 2025-10-31
 
 ### **Priority 2: Database Layer** 🗄️
 - **Story DB-CNPG-OPERATOR**: CloudNative-PG Operator
@@ -378,6 +427,7 @@ Foundation:
    ├─ Story 14: OpenEBS ✅
    ├─ Story 15: Rook-Ceph Operator ✅
    ├─ Story 16: Rook-Ceph Cluster ✅
+   ├─ Story 17: VictoriaMetrics ✅
    ├─ Story 28: SPIRE 📋
    └─ Database Stories 📋
 ```
@@ -392,7 +442,7 @@ Foundation:
 | **Sprint 3** | Security Foundation | 2/2 ✅ | 0 |
 | **Sprint 4** | Networking Core | 6/6 ✅ | 0 |
 | **Sprint 5** | Storage Infrastructure | 3/3 ✅ | 0 |
-| **Sprint 6** | Multi-Cluster + Security | 1/4 (25%) | 3 |
+| **Sprint 6** | Multi-Cluster + Security | 2/4 (50%) | 2 |
 
 ---
 
@@ -400,12 +450,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 14 |
-| **Total Commits** | 14 |
-| **Lines Added** | ~3,500 |
-| **Files Created** | ~64 |
+| **Stories Completed** | 15 |
+| **Total Commits** | 15 |
+| **Lines Added** | ~4,000 |
+| **Files Created** | ~75 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (14/14) |
+| **Success Rate** | 100% (15/15) |
 
 ---
 
@@ -417,7 +467,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (24% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (30% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -432,4 +482,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-10-31 by Claude Code (Story 08 completion - Networking 100%)
+**Last Updated**: 2025-11-01 by Claude Code (Story 17 v4.0 refinement - VictoriaMetrics LTS upgrade & best practices)

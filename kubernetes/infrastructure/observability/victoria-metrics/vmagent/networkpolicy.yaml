@@ -1,0 +1,93 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-metrics-vmagent
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmagent
+    app.kubernetes.io/managed-by: flux
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmagent
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Allow from Cilium Gateway for external access
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cilium
+      ports:
+        - protocol: TCP
+          port: 8429  # VMAgent HTTP
+
+    # Allow intra-cluster communication between VMAgent components
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-metrics
+              app.kubernetes.io/component: vmagent
+      ports:
+        - protocol: TCP
+          port: 8429  # VMAgent HTTP
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow remote-write to infra cluster VMInsert
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              cluster: infra
+      ports:
+        - protocol: TCP
+          port: 8480  # VMInsert
+
+    # Allow HTTPS egress (for updates, external access)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+    # Allow scraping of actual metrics ports from your existing services
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6379  # Dragonfly Redis
+        - protocol: TCP
+          port: 6380  # Dragonfly admin
+        - protocol: TCP
+          port: 8080  # Dragonfly metrics, Cloudflared, Keycloak HTTP
+        - protocol: TCP
+          port: 8443  # Keycloak HTTPS
+        - protocol: TCP
+          port: 9000  # Keycloak management/metrics
+        - protocol: TCP
+          port: 9153  # CoreDNS metrics
+        - protocol: TCP
+          port: 7979  # External DNS

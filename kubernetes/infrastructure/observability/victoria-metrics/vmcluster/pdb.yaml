@@ -1,0 +1,126 @@
+---
+# PodDisruptionBudget for VictoriaMetrics VMCluster components
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vmstorage-victoria-metrics-global-vmcluster
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: vmstorage
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vmselect-victoria-metrics-global-vmcluster
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: vmselect
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vminsert-victoria-metrics-global-vmcluster
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: vminsert
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vmauth-victoria-metrics-global
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: vmauth
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vmalert-victoria-metrics-global
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: vmalert
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: alertmanager-victoria-metrics-global
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: alertmanager
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: victoria-metrics-global-grafana
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+    app.kubernetes.io/component: vmcluster
+    app.kubernetes.io/managed-by: flux
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics
+      app.kubernetes.io/component: vmcluster
+      app.kubernetes.io/instance: grafana
