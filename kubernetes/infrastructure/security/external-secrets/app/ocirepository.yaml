@@ -8,4 +8,4 @@ spec:
   interval: 12h
   url: oci://ghcr.io/external-secrets/charts/external-secrets
   ref:
-    semver: "0.10.x"
+    semver: "0.20.4"  # Pinned to exact version (Flux best practice)

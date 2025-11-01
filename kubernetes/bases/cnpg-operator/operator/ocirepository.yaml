@@ -8,4 +8,4 @@ spec:
   interval: 12h
   url: oci://ghcr.io/cloudnative-pg/charts/cloudnative-pg
   ref:
-    semver: "0.26.x"
+    semver: "0.26.1"  # Pinned to exact version (Flux best practice)
