@@ -53,18 +53,18 @@ spec:
     - plpgsql
     - amcheck
 
----
-apiVersion: postgresql.cnpg.io/v1
-kind: Database
-metadata:
-  name: synergyflow
-  namespace: cnpg-system
-  labels:
-    app.kubernetes.io/name: cloudnative-pg
-    app.kubernetes.io/component: database
-    app: synergyflow
-spec:
-  cluster:
-    name: ${CNPG_SHARED_CLUSTER_NAME}
-  name: synergyflow
-  owner: synergyflow
+# ---
+# apiVersion: postgresql.cnpg.io/v1
+# kind: Database
+# metadata:
+#   name: synergyflow
+#   namespace: cnpg-system
+#   labels:
+#     app.kubernetes.io/name: cloudnative-pg
+#     app.kubernetes.io/component: database
+#     app: synergyflow
+# spec:
+#   cluster:
+#     name: ${CNPG_SHARED_CLUSTER_NAME}
+#   name: synergyflow
+#   owner: synergyflow

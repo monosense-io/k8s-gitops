@@ -126,7 +126,7 @@ Create the following CloudNativePG operator manifests:
 **Cluster Variables (from cluster-settings ConfigMap):**
 ```yaml
 # CloudNativePG Operator
-CNPG_OPERATOR_VERSION: "0.26.0"
+CNPG_OPERATOR_VERSION: "0.26.1"
 CNPG_OPERATOR_REPLICAS: "2"
 BLOCK_SC: "ceph-block"
 ```
@@ -201,14 +201,14 @@ spec:
     # High Availability configuration
     replicaCount: ${CNPG_OPERATOR_REPLICAS}
 
-    # Resource limits
+    # Resource limits (production-sized for operator managing multiple clusters)
     resources:
       limits:
         cpu: 500m
         memory: 512Mi
       requests:
         cpu: 100m
-        memory: 128Mi
+        memory: 400Mi  # Production-sized (operator with multiple clusters)
 
     # Anti-affinity for pod distribution
     affinity:
@@ -513,9 +513,11 @@ spec:
 releases:
   - name: cloudnative-pg-crds
     namespace: cnpg-system
-    chart: oci://ghcr.io/cloudnative-pg/charts/cloudnative-pg-crds
-    version: 0.26.0  # Aligned with operator chart
-    installed: true
+    chart: oci://ghcr.io/cloudnative-pg/charts/cloudnative-pg
+    version: 0.26.1  # Aligned with operator chart
+    set:
+      - name: crds.create
+        value: true
 ```
 
 **Acceptance:** CRD version aligned with operator version
@@ -527,7 +529,7 @@ releases:
 **Add:**
 ```yaml
   # CloudNativePG Operator
-  CNPG_OPERATOR_VERSION: "0.26.0"
+  CNPG_OPERATOR_VERSION: "0.26.1"
   CNPG_OPERATOR_REPLICAS: "2"
 ```
 
@@ -953,11 +955,12 @@ kubectl --context=infra -n cnpg-system logs deployment/cloudnative-pg | grep -i 
 - Version skew can cause webhook validation failures
 - Minor version alignment ensures compatibility
 
-**Chosen Version: 0.26.x**
-- CRD bundle: 0.26.0 (bootstrap/helmfile.d/00-crds.yaml)
-- Operator chart: 0.26.0 (HelmRelease)
-- Operator app version: 1.27.0 (bundled with chart)
-- Released: 2025-08-12
+**Chosen Version: 0.26.1 (Chart) / 1.27.1 (Operator)**
+- Helm Chart: 0.26.1 (released Oct 23, 2025)
+- Operator App: 1.27.1 (bundled with chart)
+- CRD bundle: 0.26.1 (bootstrap/helmfile.d/00-crds.yaml)
+- PostgreSQL 18 support with enhanced PgBouncer TLS configuration
+- Released: October 23, 2025
 
 **Upgrade Path:**
 - Patch updates within 0.26.x are safe (e.g., 0.26.0 → 0.26.1)
@@ -1007,13 +1010,14 @@ kubectl --context=infra -n cnpg-system logs deployment/cloudnative-pg | grep -i 
 
 **Per-Replica Resources:**
 - CPU: 100m request, 500m limit
-- Memory: 128Mi request, 512Mi limit
-- Typical usage: ~50m CPU, ~100Mi memory
+- Memory: 400Mi request, 512Mi limit (production-sized)
+- Typical usage: ~50m CPU, ~150-200Mi memory (varies with cluster count)
 
 **Total Operator:**
-- 2 replicas: 200m-1000m CPU, 256Mi-1Gi memory
+- 2 replicas: 200m-1000m CPU, 800Mi-1Gi memory
 - Minimal overhead compared to PostgreSQL clusters
 - Scales well with number of managed clusters
+- Memory sizing accounts for multiple concurrent reconciliations
 
 ### Security Considerations
 

@@ -100,17 +100,17 @@ spec:
           name: gitlab-db-credentials
           key: password
 
-      - name: synergyflow
-        ensure: present
-        login: true
-        superuser: false
-        createdb: false
-        createrole: false
-        inherit: true
-        replication: false
-        passwordSecret:
-          name: synergyflow-db-credentials
-          key: password
+      # - name: synergyflow
+      #   ensure: present
+      #   login: true
+      #   superuser: false
+      #   createdb: false
+      #   createrole: false
+      #   inherit: true
+      #   replication: false
+      #   passwordSecret:
+      #     name: synergyflow-db-credentials
+      #     key: password
 
   # Backup configuration
   backup:

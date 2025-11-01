@@ -28,7 +28,7 @@
 # Future Flux Deployments (CRDs pre-installed, controllers deployed via Flux):
 #   victoria-metrics-operator: 0.5.1   (CRD only)
 #   prometheus-operator:       24.0.1  (CRD only)
-#   cloudnative-pg:            0.26.0  (CRD only)
+#   cloudnative-pg:            0.26.1  (CRD only)
 #
 # When updating versions:
 # 1. Update CRD version in this file
@@ -95,7 +95,7 @@ releases:
   - name: cloudnative-pg-crds
     namespace: cnpg-system
     chart: oci://ghcr.io/cloudnative-pg/charts/cloudnative-pg
-    version: 0.26.0
+    version: 0.26.1
     set:
       - name: crds.create
         value: true

@@ -59,6 +59,11 @@ spec:
     # Watch scope - cluster-wide for shared infrastructure
     config:
       clusterWide: true
+      # Maximum concurrent reconciles for operator scalability
+      # Default: 10 (suitable for most deployments with <50 clusters)
+      # Increase if managing >50 clusters or experiencing reconciliation delays
+      # Decrease if operator CPU usage is high
+      maxConcurrentReconciles: 10
 
     # Security context - PSA restricted compliant
     securityContext:
