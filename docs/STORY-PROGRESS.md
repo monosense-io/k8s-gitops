@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 28 / 50 (56%)
+**Completed**: 29 / 50 (58%)
 
 ---
 
@@ -16,6 +16,7 @@ Security:      ████░░░░░░░░░░  30% (3/10 stories)
 Storage:       ████████████████ 100% (5/5 stories) ✅
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
+Messaging:     ███░░░░░░░░░░░  33% (1/3 stories)
 Operations:    ████████████████ 100% (1/1 stories) ✅
 CI/CD:         ███░░░░░░░░░░░  20% (3/15 stories)
 Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
@@ -1154,6 +1155,90 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+### 📨 Messaging Infrastructure Layer
+
+#### **Story 37: STORY-MSG-STRIMZI-OPERATOR**
+- **Status**: ✅ **COMPLETE** (v1.0 - Manifests-First)
+- **Sprint**: 6 | Lane: Messaging
+- **Commit**: `<pending>` - feat(messaging): add Strimzi Kafka Operator v0.48.0 manifests (Story 37)
+- **Date**: 2025-11-08
+- **Version**: Strimzi Operator 0.48.0 / Kafka 3.9.0, 4.0.0, 4.1.0 support
+- **Deliverables**:
+  - **Strimzi Kafka Operator**:
+    - HelmRelease v0.48.0 (pinned, stable)
+    - HelmRepository: https://strimzi.io/charts/ (official Strimzi repository)
+    - High availability: 2 replicas with pod anti-affinity + PodDisruptionBudget (minAvailable: 1)
+    - KRaft mode enabled by default (no ZooKeeper, modern Kafka architecture)
+    - Feature gates: +UseKRaft, +KafkaNodePools (Kafka 3.0+ cluster pools)
+    - Namespace watching: `messaging` namespace only (scoped management)
+    - NetworkPolicy generation enabled (zero-trust pod-to-pod)
+    - Leader election enabled (active-passive HA)
+  - **Security Hardening** (PSA Restricted):
+    - PSA: restricted (strimzi-operator-system namespace)
+    - Non-root execution: uid 1000
+    - Read-only root filesystem
+    - Capabilities: ALL dropped
+    - Seccomp profile: RuntimeDefault
+    - No privilege escalation
+  - **Resource Configuration**:
+    - CPU: 200m requests, 1000m limits
+    - Memory: 256Mi requests, 512Mi limits
+    - Designed for production workloads
+  - **Monitoring** (8 VMRule alerts):
+    - VMPodScrape for metrics collection (30s interval)
+    - Comprehensive alerting:
+      1. StrimziOperatorDown (critical, 5m)
+      2. StrimziOperatorHighRestarts (warning, frequent restarts)
+      3. StrimziOperatorNotHighlyAvailable (warning, <2 replicas)
+      4. StrimziReconciliationErrors (warning, CRD reconciliation failures)
+      5. StrimziSlowReconciliation (warning, >300s P99 latency)
+      6. StrimziOperatorHighMemoryUsage (warning, >90% memory)
+      7. StrimziOperatorHighCPUThrottling (warning, >50% throttled)
+      8. StrimziCRDValidationErrors (warning, invalid Kafka CRs)
+  - **Comprehensive Documentation**:
+    - Operations runbook (650+ lines): CRD reference, common operations, troubleshooting, disaster recovery
+    - Test Kafka cluster example (KRaft mode, single-node for validation)
+    - Covers 7 CRDs: Kafka, KafkaTopic, KafkaUser, KafkaConnect, KafkaMirrorMaker2, KafkaBridge, KafkaNodePool
+- **Files Created** (11 files, ~1,200 lines):
+  - `kubernetes/bases/strimzi-operator/operator/namespace.yaml`
+  - `kubernetes/bases/strimzi-operator/operator/helmrepository.yaml`
+  - `kubernetes/bases/strimzi-operator/operator/helmrelease.yaml`
+  - `kubernetes/bases/strimzi-operator/operator/servicemonitor.yaml`
+  - `kubernetes/bases/strimzi-operator/operator/prometheusrule.yaml`
+  - `kubernetes/bases/strimzi-operator/operator/kustomization.yaml`
+  - `kubernetes/infrastructure/messaging/strimzi-operator/ks.yaml`
+  - `kubernetes/infrastructure/messaging/kustomization.yaml`
+  - `kubernetes/workloads/platform/messaging/namespace.yaml`
+  - `docs/runbooks/strimzi-operator.md` (650+ lines)
+  - `docs/examples/test-kafka-kraft.yaml` (verification cluster)
+- **Files Modified**:
+  - `kubernetes/infrastructure/kustomization.yaml` (added messaging/ layer)
+- **Key Features**:
+  - **KRaft Architecture**: ZooKeeper-less Kafka (default in Strimzi 0.48.0, Kafka 3.3+)
+  - **CRD Management**: CreateReplace on install/upgrade (manual CRD updates required post-Helm upgrade per Strimzi docs)
+  - **Operator Pattern**: Follows v5.0 standardized operator placement (bases/ + infrastructure/)
+  - **GitOps Integration**: Flux Kustomization with health checks (Deployment, CRDs, HelmRelease)
+- **Breaking Changes from Story Spec**:
+  - **Chart Source**: HelmRepository (https://strimzi.io/charts/) instead of OCI (quay.io requires auth)
+  - **API Version**: source.toolkit.fluxcd.io/v1 (vs v1beta2, using latest stable Flux API)
+- **Kubernetes Requirements**:
+  - Kubernetes 1.27+ (Strimzi 0.48.0 requirement)
+  - Kafka versions supported: 3.9.0, 4.0.0, 4.1.0
+- **Prerequisites for Story 45 Deployment**:
+  - messaging namespace deployed
+  - Rook-Ceph storage available (for persistent Kafka clusters)
+  - VictoriaMetrics deployed (for metrics collection)
+  - Flux reconciliation working
+- **Dependencies**: Story 17 (VictoriaMetrics for monitoring), Story 16 (Rook-Ceph for storage)
+- **Impact**:
+  - Foundation for Stories 38-39 (Kafka cluster + Schema Registry)
+  - Enables event-driven architecture across platform
+  - Self-managed Kafka (no external SaaS fees)
+  - Production-ready operator with comprehensive monitoring
+- **Note**: Deployment and validation deferred to Story 45. Strimzi 0.48.0 makes KRaft mode default (no ZooKeeper needed). Test cluster example provided for operator validation.
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -1250,12 +1335,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 28 |
-| **Total Commits** | 28 |
-| **Lines Added** | ~15,548 |
-| **Files Created** | ~184 |
+| **Stories Completed** | 29 |
+| **Total Commits** | 29 |
+| **Lines Added** | ~16,748 |
+| **Files Created** | ~195 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (28/28) |
+| **Success Rate** | 100% (29/29) |
 
 ---
 
@@ -1282,4 +1367,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Added Story 34 tracking - Harbor container registry)
+**Last Updated**: 2025-11-08 by Claude Code (Added Story 37 tracking - Strimzi Kafka Operator)
