@@ -1,0 +1,40 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: fluent-bit-operator
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  path: ./kubernetes/bases/fluent-bit-operator/operator
+
+  prune: true
+  wait: true
+
+  # Health checks - ensure DaemonSet is running
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: DaemonSet
+      name: fluent-bit
+      namespace: fluent-bit
+
+  # Dependencies - VictoriaLogs must be ready to receive logs
+  dependsOn:
+    - name: observability-victoria-logs
+
+  # Variable substitution from cluster-settings ConfigMap
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

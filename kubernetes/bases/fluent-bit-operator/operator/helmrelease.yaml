@@ -1,0 +1,243 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: fluent-bit
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: logging-collector
+    app.kubernetes.io/part-of: observability
+spec:
+  interval: 30m
+  timeout: 10m
+  chartRef:
+    kind: OCIRepository
+    name: fluent-bit
+  driftDetection:
+    mode: enabled
+  maxHistory: 3
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+
+  values:
+    # Image configuration - Fluent Bit 4.1.1 (exact version pinning)
+    image:
+      repository: cr.fluentbit.io/fluent/fluent-bit
+      tag: "4.1.1"
+      pullPolicy: IfNotPresent
+
+    # DaemonSet deployment strategy
+    kind: DaemonSet
+    daemonSet:
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxUnavailable: 1
+
+    # Resource allocation
+    resources:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+    # Talos Linux volume mounts for container log collection
+    extraVolumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+          type: Directory
+      - name: varlibcontainers
+        hostPath:
+          path: /var/lib/containerd/io.containerd.runtime.v2.task/k8s.io
+          type: Directory
+      - name: fluent-bit-state
+        hostPath:
+          path: /var/fluent-bit/state
+          type: DirectoryOrCreate
+
+    extraVolumeMounts:
+      - name: varlog
+        mountPath: /var/log
+        readOnly: true
+      - name: varlibcontainers
+        mountPath: /var/lib/containerd/io.containerd.runtime.v2.task/k8s.io
+        readOnly: true
+      - name: fluent-bit-state
+        mountPath: /var/fluent-bit/state
+
+    # Network configuration - host network required for node-level logging
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
+
+    # Run on all nodes including control plane
+    tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      - operator: Exists
+        effect: NoExecute
+
+    # Security context - privileged required for log access on Talos
+    podSecurityContext:
+      runAsUser: 0
+      fsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+
+    containerSecurityContext:
+      privileged: true
+      readOnlyRootFilesystem: false
+      allowPrivilegeEscalation: true
+      capabilities:
+        drop:
+          - ALL
+        add:
+          - DAC_READ_SEARCH
+          - DAC_OVERRIDE
+
+    # Priority class for critical infrastructure
+    priorityClassName: system-node-critical
+
+    # RBAC configuration
+    rbac:
+      create: true
+      nodeAccess: true
+
+    # Service account
+    serviceAccount:
+      create: true
+      name: fluent-bit
+      annotations: {}
+
+    # Fluent Bit configuration
+    config:
+      # Service configuration
+      service: |
+        [SERVICE]
+            Flush         5
+            Daemon        Off
+            Log_Level     info
+            Parsers_File  parsers.conf
+            HTTP_Server   On
+            HTTP_Listen   0.0.0.0
+            HTTP_Port     2020
+            Health_Check  On
+            storage.path  /var/fluent-bit/state/flb-storage/
+            storage.sync  normal
+            storage.checksum off
+            storage.max_chunks_up 128
+
+      # Input configuration - tail container logs
+      inputs: |
+        [INPUT]
+            Name              tail
+            Path              /var/log/containers/*.log
+            Exclude_Path      /var/log/containers/*fluent-bit*.log,/var/log/containers/*kube-system*.log
+            Parser            cri
+            Tag               kube.*
+            DB                /var/fluent-bit/state/flb_kube.db
+            DB.Sync           Normal
+            Mem_Buf_Limit     5MB
+            Skip_Long_Lines   On
+            Refresh_Interval  10
+            Rotate_Wait       30
+            storage.type      filesystem
+
+      # Filter configuration
+      filters: |
+        [FILTER]
+            Name                kubernetes
+            Match               kube.*
+            Kube_URL            https://kubernetes.default.svc:443
+            Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+            Kube_Tag_Prefix     kube.var.log.containers.
+            Merge_Log           On
+            Merge_Log_Key       log_processed
+            K8S-Logging.Parser  On
+            K8S-Logging.Exclude On
+            Labels              On
+            Annotations         Off
+            Buffer_Size         32k
+
+        [FILTER]
+            Name          modify
+            Match         kube.*
+            Add           cluster ${CLUSTER}
+            Add           tenant ${OBSERVABILITY_LOG_TENANT}
+
+        [FILTER]
+            Name          grep
+            Match         kube.*
+            Exclude       log ^$
+
+        [FILTER]
+            Name          nest
+            Match         kube.*
+            Operation     lift
+            Nested_under  kubernetes
+            Add_prefix    k8s_
+
+      # Output configuration - VictoriaLogs
+      outputs: |
+        [OUTPUT]
+            Name          http
+            Match         kube.*
+            Host          ${OBSERVABILITY_LOG_ENDPOINT_HOST}
+            Port          ${OBSERVABILITY_LOG_ENDPOINT_PORT}
+            URI           ${OBSERVABILITY_LOG_ENDPOINT_PATH}
+            Format        json
+            Header        X-Scope-OrgID ${OBSERVABILITY_LOG_TENANT}
+            compress      gzip
+            Retry_Limit   3
+            storage.total_limit_size 10M
+
+        [OUTPUT]
+            Name          stdout
+            Match         kube.*
+            Format        json_lines
+
+      # Custom parsers
+      customParsers: |
+        [PARSER]
+            Name        cri
+            Format      regex
+            Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+            Time_Key    time
+            Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+            Time_Keep   On
+
+    # Monitoring - ServiceMonitor for Prometheus/VictoriaMetrics
+    serviceMonitor:
+      enabled: true
+      namespace: fluent-bit
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        app.kubernetes.io/name: fluent-bit
+        app.kubernetes.io/component: monitoring
+        prometheus.io/scrape: "true"
+      annotations: {}
+
+    # Prometheus rules
+    prometheusRule:
+      enabled: false
+
+    # Dashboard
+    dashboards:
+      enabled: false
+
+    # Lifecycle hooks
+    lifecycle: {}
+
+    # Log level
+    logLevel: info
