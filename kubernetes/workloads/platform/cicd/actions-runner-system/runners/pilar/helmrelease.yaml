@@ -1,0 +1,295 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pilar-runner
+  namespace: actions-runner-system
+  labels:
+    app.kubernetes.io/name: pilar-runner
+    app.kubernetes.io/component: runner
+    app.kubernetes.io/part-of: actions-runner-system
+spec:
+  interval: 1h
+  timeout: 15m
+
+  chartRef:
+    kind: OCIRepository
+    name: gha-runner-scale-set
+    namespace: actions-runner-system
+
+  dependsOn:
+    - name: actions-runner-controller
+      namespace: actions-runner-system
+
+  maxHistory: 3
+
+  install:
+    crds: Skip
+    createNamespace: false
+    remediation:
+      retries: 3
+
+  upgrade:
+    crds: Skip
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+
+  rollback:
+    cleanupOnFail: true
+    recreate: true
+
+  values:
+    # GitHub configuration
+    githubConfigUrl: ${GITHUB_ARC_REPO}  # https://github.com/monosense/pilar
+    githubConfigSecret: pilar-runner-secret
+
+    # Runner scale set name (appears in GitHub UI)
+    runnerScaleSetName: ${GITHUB_ARC_RUNNER_SET_NAME}  # pilar-runner
+
+    # Scaling configuration
+    minRunners: 1  # Keep 1 warm runner for faster job pickup
+    maxRunners: 6  # Limit to 2 per node (3 nodes) to prevent resource exhaustion
+
+    # Container mode: DinD for Docker daemon access
+    containerMode:
+      type: "dind"
+
+    # Listener template for webhook receiver
+    listenerTemplate:
+      metadata:
+        labels:
+          app: pilar-runner-listener
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/path: "/metrics"
+          prometheus.io/port: "8080"
+      spec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+        containers:
+          - name: listener
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              runAsGroup: 1000
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+
+    # Runner pod template
+    template:
+      metadata:
+        labels:
+          app: pilar-runner
+          runner-type: dind-rootless
+        annotations:
+          cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+
+      spec:
+        # Service account with minimal permissions
+        serviceAccountName: pilar-runner
+        automountServiceAccountToken: false
+
+        # DNS configuration
+        dnsPolicy: ClusterFirst
+
+        # Restart policy for ephemeral runners
+        restartPolicy: Never
+
+        # Security context for pod
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          fsGroup: 1000
+          seccompProfile:
+            type: RuntimeDefault
+
+        # Init container: Set permissions for rootless Docker user (uid 1000)
+        initContainers:
+          - name: init-permissions
+            image: busybox:1.36
+            imagePullPolicy: IfNotPresent
+            command:
+              - sh
+              - -c
+              - |
+                echo "Setting permissions for rootless Docker (uid 1000:1000)..."
+                chown -R 1000:1000 /var/lib/docker || true
+                chmod -R 755 /var/lib/docker || true
+                echo "Permissions set successfully"
+            volumeMounts:
+              - name: work
+                mountPath: /var/lib/docker
+                subPath: docker
+            securityContext:
+              runAsUser: 0  # Init runs as root to set ownership
+              runAsNonRoot: false
+
+        containers:
+          # GitHub Actions Runner Container (Non-Root)
+          - name: runner
+            image: ghcr.io/actions/actions-runner:2.329.0
+            imagePullPolicy: IfNotPresent
+
+            securityContext:
+              runAsUser: 1000
+              runAsGroup: 1000
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false  # Runner needs write access
+              capabilities:
+                drop:
+                  - ALL
+
+            env:
+              # Docker socket for DinD sidecar
+              - name: DOCKER_HOST
+                value: unix:///var/run/docker.sock
+
+              # Disable job container requirement (DinD handles this)
+              - name: ACTIONS_RUNNER_REQUIRE_JOB_CONTAINER
+                value: "false"
+
+              # Runner working directory
+              - name: RUNNER_WORKDIR
+                value: /home/runner/_work
+
+            volumeMounts:
+              # Runner workspace (ephemeral PVC subpath)
+              - name: work
+                mountPath: /home/runner/_work
+                subPath: work
+
+              # Docker socket (shared with DinD via emptyDir)
+              - name: dind-sock
+                mountPath: /var/run
+
+              # Temporary directory (memory-backed)
+              - name: tmp
+                mountPath: /tmp
+
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+                ephemeral-storage: 5Gi
+              limits:
+                cpu: 4000m
+                memory: 8Gi
+                ephemeral-storage: 10Gi
+
+          # Rootless Docker-in-Docker Sidecar
+          - name: dind
+            image: docker:28.5.2-dind-rootless
+            imagePullPolicy: IfNotPresent
+
+            securityContext:
+              runAsUser: 1000
+              runAsGroup: 1000
+              runAsNonRoot: true
+              # Note: Rootless DinD doesn't require privileged mode
+              # User namespaces provide container isolation
+
+            env:
+              # Disable TLS for local socket communication
+              - name: DOCKER_TLS_CERTDIR
+                value: ""
+
+              # Storage driver for rootless mode
+              - name: DOCKER_DRIVER
+                value: overlay2
+
+              # Docker socket path (shared with runner)
+              - name: DOCKER_HOST
+                value: unix:///var/run/docker.sock
+
+              # Enable BuildKit for modern, secure builds
+              - name: DOCKER_BUILDKIT
+                value: "1"
+
+              # Rootless configuration
+              - name: DOCKERD_ROOTLESS_ROOTLESSKIT_FLAGS
+                value: "--net=slirp4netns --mtu=1500"
+
+            volumeMounts:
+              # Docker data directory (ephemeral PVC subpath)
+              - name: work
+                mountPath: /home/rootless/.local/share/docker
+                subPath: docker
+
+              # Docker socket (shared with runner via emptyDir)
+              - name: dind-sock
+                mountPath: /var/run
+
+              # Temporary directory (memory-backed)
+              - name: tmp
+                mountPath: /tmp
+
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+                ephemeral-storage: 5Gi
+              limits:
+                cpu: 4000m
+                memory: 8Gi
+                ephemeral-storage: 10Gi
+
+            # Health probes for Docker daemon
+            livenessProbe:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - docker info > /dev/null 2>&1
+              initialDelaySeconds: 30
+              periodSeconds: 30
+              timeoutSeconds: 10
+              failureThreshold: 3
+
+            readinessProbe:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - docker info > /dev/null 2>&1
+              initialDelaySeconds: 15
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+
+        volumes:
+          # Ephemeral PVC for Docker layers and build artifacts
+          # Uses OpenEBS LocalPV for high-performance local NVMe storage
+          - name: work
+            ephemeral:
+              volumeClaimTemplate:
+                metadata:
+                  labels:
+                    app: pilar-runner
+                    volume-type: work
+                spec:
+                  accessModes: ["ReadWriteOnce"]
+                  storageClassName: ${OPENEBS_LOCAL_SC}  # openebs-local-nvme
+                  resources:
+                    requests:
+                      storage: 75Gi
+
+          # Shared Docker socket (memory-backed for performance)
+          - name: dind-sock
+            emptyDir:
+              medium: Memory
+              sizeLimit: 128Mi
+
+          # Temporary directory (memory-backed)
+          - name: tmp
+            emptyDir:
+              medium: Memory
+              sizeLimit: 1Gi

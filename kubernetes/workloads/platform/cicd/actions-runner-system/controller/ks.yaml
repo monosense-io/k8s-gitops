@@ -1,0 +1,41 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-actions-runner-controller
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: gha-runner-scale-set-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: actions-runner-system
+    substitution.flux.home.arpa/disabled: "false"
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  path: ./kubernetes/workloads/platform/cicd/actions-runner-system/controller
+
+  prune: true
+  wait: true
+
+  # Dependencies: External Secrets for GitHub App credentials
+  dependsOn:
+    - name: cluster-external-secrets
+
+  # Health checks for controller deployment
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: actions-runner-controller-gha-runner-scale-set-controller
+      namespace: actions-runner-system
+
+  # Cluster-specific variable substitution
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

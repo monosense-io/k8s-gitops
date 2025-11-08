@@ -1,0 +1,221 @@
+---
+# Victoria Metrics alerting rules for GitHub Actions Runner Controller
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: actions-runner-system
+  namespace: actions-runner-system
+  labels:
+    app.kubernetes.io/name: actions-runner-system
+    app.kubernetes.io/component: alerting
+    app.kubernetes.io/part-of: actions-runner-system
+spec:
+  groups:
+    # Controller and Infrastructure Alerts
+    - name: arc.controller
+      interval: 30s
+      rules:
+        # Alert 1: ARC controller unavailable
+        - alert: ARCControllerDown
+          expr: |
+            kube_deployment_status_replicas_available{namespace="actions-runner-system",deployment=~".*gha-runner-scale-set-controller.*"} < 1
+          for: 5m
+          labels:
+            severity: critical
+            component: arc-controller
+            context: apps
+          annotations:
+            summary: "ARC controller is unavailable"
+            description: |
+              GitHub Actions Runner Controller has no available replicas for {{ $value }} minutes.
+              This prevents new runners from being created and existing runners from being managed.
+
+              Impact: No new workflow jobs can be picked up by self-hosted runners.
+              Action: Check controller pod logs and deployment status.
+
+        # Alert 2: No runners available
+        - alert: ARCNoRunnersAvailable
+          expr: |
+            arc_runner_registered_count{namespace="actions-runner-system"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: arc-runners
+            context: apps
+          annotations:
+            summary: "No GitHub Actions runners registered"
+            description: |
+              No self-hosted runners are registered with GitHub for over 5 minutes.
+
+              Impact: All workflow jobs will remain queued indefinitely.
+              Action: Check listener pod logs and GitHub App credentials.
+
+    # Runner Performance and Scaling Alerts
+    - name: arc.runners
+      interval: 30s
+      rules:
+        # Alert 3: High job backlog
+        - alert: ARCJobBacklog
+          expr: |
+            arc_job_assignment_backlog > 10
+          for: 10m
+          labels:
+            severity: warning
+            component: arc-scaling
+            context: apps
+          annotations:
+            summary: "High GitHub Actions job queue depth"
+            description: |
+              {{ $value }} workflow jobs have been waiting in the queue for over 10 minutes.
+
+              Possible causes:
+              - Insufficient maxRunners limit (current: 6)
+              - Runners slow to start (storage/network issues)
+              - All runners busy with long-running jobs
+
+              Action: Consider increasing maxRunners or investigate slow job startups.
+
+        # Alert 4: Slow job startup (P95 latency)
+        - alert: ARCSlowJobStartup
+          expr: |
+            histogram_quantile(0.95, rate(arc_job_startup_duration_seconds_bucket[5m])) > 120
+          for: 10m
+          labels:
+            severity: warning
+            component: arc-performance
+            context: apps
+          annotations:
+            summary: "ARC runners taking too long to start"
+            description: |
+              P95 runner startup latency is {{ $value | humanizeDuration }} (threshold: 2 minutes).
+
+              Possible causes:
+              - Slow PVC provisioning (OpenEBS storage)
+              - Image pull delays (ghcr.io, docker.io)
+              - Init container permission setting delays
+
+              Action: Check pod events, storage performance, and image pull times.
+
+        # Alert 5: High runner failure rate
+        - alert: ARCHighFailureRate
+          expr: |
+            rate(arc_runner_failed_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: arc-runners
+            context: apps
+          annotations:
+            summary: "High runner failure rate detected"
+            description: |
+              {{ $value | humanizePercentage }} of runners are failing to start or complete jobs.
+
+              Possible causes:
+              - Resource exhaustion (CPU, memory, storage)
+              - DinD liveness probe failures
+              - Network connectivity issues
+
+              Action: Check runner pod logs and describe failed pods.
+
+    # Storage and Resource Alerts
+    - name: arc.storage
+      interval: 30s
+      rules:
+        # Alert 6: Storage exhaustion
+        - alert: ARCStorageExhausted
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes{namespace="actions-runner-system",persistentvolumeclaim=~".*pilar-runner.*"}
+              /
+              kubelet_volume_stats_capacity_bytes{namespace="actions-runner-system",persistentvolumeclaim=~".*pilar-runner.*"}
+            ) > 0.8
+          for: 15m
+          labels:
+            severity: warning
+            component: arc-storage
+            context: apps
+          annotations:
+            summary: "ARC runner PVC storage above 80%"
+            description: |
+              Ephemeral PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full.
+
+              Threshold: 80% (current size: 75Gi per runner)
+
+              Possible causes:
+              - Large Docker images not cleaned up
+              - Build artifacts accumulating
+              - Docker layer cache excessive
+
+              Action: Jobs may fail with "no space left on device" errors.
+              Consider increasing PVC size or cleaning up Docker cache.
+
+        # Alert 7: DinD container restarting
+        - alert: ARCDinDLivenessFailed
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="actions-runner-system",container="dind"}[10m]) > 2
+          for: 5m
+          labels:
+            severity: warning
+            component: arc-dind
+            context: apps
+          annotations:
+            summary: "DinD container restarting frequently"
+            description: |
+              DinD sidecar in {{ $labels.pod }} has restarted {{ $value }} times in 10 minutes.
+
+              Possible causes:
+              - Docker daemon crashes (OOM, segfault)
+              - Liveness probe failing (docker info timeout)
+              - Resource limits too restrictive
+
+              Action: Check DinD container logs for crash reasons.
+
+        # Alert 8: Approaching max runners (capacity planning)
+        - alert: ARCApproachingMaxRunners
+          expr: |
+            (
+              arc_runner_running_total
+              /
+              arc_scale_set_max_runners
+            ) > 0.8
+          for: 10m
+          labels:
+            severity: info
+            component: arc-scaling
+            context: apps
+          annotations:
+            summary: "ARC approaching maximum runner capacity"
+            description: |
+              {{ $value | humanizePercentage }} of maximum runners (6) are currently in use.
+
+              This indicates sustained high load. Consider increasing maxRunners if:
+              - Jobs are frequently queued during peak hours
+              - More concurrent workflows are expected
+              - Cluster resources can support additional runners
+
+              Current limits: minRunners=1, maxRunners=6
+
+    # Listener and Webhook Alerts
+    - name: arc.listener
+      interval: 30s
+      rules:
+        # Alert 9: Listener pod not running
+        - alert: ARCListenerDown
+          expr: |
+            arc_listener_active_total{namespace="actions-runner-system"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: arc-listener
+            context: apps
+          annotations:
+            summary: "ARC listener pod is not running"
+            description: |
+              GitHub webhook listener is unavailable. No new jobs will be detected.
+
+              Possible causes:
+              - githubConfigSecret missing or invalid
+              - githubConfigUrl misconfigured
+              - Network connectivity to GitHub API failed
+
+              Action: Check listener pod logs and External Secret status.

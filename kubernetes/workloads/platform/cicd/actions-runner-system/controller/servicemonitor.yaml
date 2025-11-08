@@ -1,0 +1,36 @@
+---
+# Victoria Metrics ServiceMonitor for ARC Controller
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: actions-runner-controller
+  namespace: actions-runner-system
+  labels:
+    app.kubernetes.io/name: gha-runner-scale-set-controller
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: actions-runner-system
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gha-runner-scale-set-controller
+
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+
+      # Relabeling for consistent metric naming
+      relabelConfigs:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+
+      # Metric relabeling
+      metricRelabelConfigs:
+        - action: labeldrop
+          regex: (pod_template_hash|controller_revision_hash)

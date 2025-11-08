@@ -1,0 +1,118 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: actions-runner-controller
+  namespace: actions-runner-system
+  labels:
+    app.kubernetes.io/name: gha-runner-scale-set-controller
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/part-of: actions-runner-system
+spec:
+  interval: 1h
+  timeout: 10m
+
+  chartRef:
+    kind: OCIRepository
+    name: gha-runner-scale-set-controller
+    namespace: actions-runner-system
+
+  maxHistory: 3
+
+  install:
+    crds: CreateReplace
+    createNamespace: false
+    remediation:
+      retries: 3
+
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+
+  rollback:
+    cleanupOnFail: true
+    recreate: true
+
+  values:
+    # Controller replica count (single replica sufficient for home lab)
+    replicaCount: 1
+
+    # Controller image (pinned for reproducibility)
+    image:
+      repository: ghcr.io/actions/gha-runner-scale-set-controller
+      tag: "0.13.0"
+      pullPolicy: IfNotPresent
+
+    # Service account (use pre-created from RBAC manifest)
+    serviceAccount:
+      create: false
+      name: actions-runner-controller
+
+    # Webhook server configuration for GitHub events
+    webhook:
+      enabled: true
+      port: 9443
+      # TLS configuration handled by Flux
+
+    # Metrics for Victoria Metrics
+    metrics:
+      controllerManagerAddr: ":8080"
+      listenerAddr: ":8080"
+      listenerEndpoint: "/metrics"
+      # ServiceMonitor created separately for better control
+      serviceMonitor:
+        enabled: false
+
+    # Resource limits (conservative for home lab)
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+        ephemeral-storage: 1Gi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+        ephemeral-storage: 2Gi
+
+    # Security context (PSA baseline compliant)
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Container security context
+    containerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
+    # Pod anti-affinity for HA (optional with single replica)
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values:
+                      - gha-runner-scale-set-controller
+              topologyKey: kubernetes.io/hostname
+
+    # Pod annotations for metrics scraping
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/path: "/metrics"
+      prometheus.io/port: "8080"

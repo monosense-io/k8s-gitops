@@ -1,0 +1,43 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cluster-apps-actions-runner-pilar
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: pilar-runner
+    app.kubernetes.io/component: runner
+    app.kubernetes.io/part-of: actions-runner-system
+    substitution.flux.home.arpa/disabled: "false"
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 10m
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  path: ./kubernetes/workloads/platform/cicd/actions-runner-system/runners/pilar
+
+  prune: true
+  wait: true
+
+  # Dependencies: Controller must be ready before runners
+  dependsOn:
+    - name: cluster-apps-actions-runner-controller
+    - name: cluster-external-secrets
+    - name: openebs
+
+  # Health checks for runner scale set
+  healthChecks:
+    - apiVersion: actions.github.com/v1alpha1
+      kind: AutoscalingRunnerSet
+      name: ${GITHUB_ARC_RUNNER_SET_NAME}  # pilar-runner
+      namespace: actions-runner-system
+
+  # Cluster-specific variable substitution
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
