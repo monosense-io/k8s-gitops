@@ -88,6 +88,9 @@ data:
   OBSERVABILITY_LOG_TENANT: "apps"
   OBSERVABILITY_GRAFANA_SECRET_PATH: "kubernetes/apps/grafana-admin"
 
+  # Argo CD OIDC Secret Path (1Password Connect)
+  ARGOCD_OIDC_SECRET_PATH: "kubernetes/apps/argocd/oidc"
+
   # Dragonfly Configuration (apps)
   # Clients only; no operator on apps. Kept for potential future per-tenant instances.
   DRAGONFLY_STORAGE_CLASS: "openebs-local-nvme"
