@@ -1,0 +1,243 @@
+---
+# Allow Fluent Bit to send logs to VictoriaLogs via vmauth
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs-ingress-fluentbit
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vmauth
+      app.kubernetes.io/instance: victoria-logs
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: fluent-bit
+      ports:
+        - protocol: TCP
+          port: 8427  # vmauth endpoint
+
+---
+# Allow Fluent Bit to send logs directly to VictoriaLogs server (fallback)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs-ingress-fluentbit-direct
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: fluent-bit
+      ports:
+        - protocol: TCP
+          port: 9428  # VictoriaLogs HTTP API
+
+---
+# Allow vmauth to route to VictoriaLogs server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmauth-to-victoria-logs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmauth
+              app.kubernetes.io/instance: victoria-logs
+      ports:
+        - protocol: TCP
+          port: 9428
+
+---
+# Allow Grafana to query logs via vmauth
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-to-victoria-logs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vmauth
+      app.kubernetes.io/instance: victoria-logs
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 8427
+
+---
+# Allow vmagent to scrape metrics from VictoriaLogs server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmagent-to-victoria-logs-metrics
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmagent
+      ports:
+        - protocol: TCP
+          port: 9428  # Metrics endpoint
+
+---
+# Allow vmagent to scrape metrics from vmauth
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmagent-to-vmauth-metrics
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vmauth
+      app.kubernetes.io/instance: victoria-logs
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmagent
+      ports:
+        - protocol: TCP
+          port: 8427  # vmauth metrics
+
+---
+# Egress policy for VictoriaLogs to access Rook-Ceph storage
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs-egress-storage
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Egress
+  egress:
+    # Allow communication with Rook-Ceph storage
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rook-ceph
+      ports:
+        - protocol: TCP
+          port: 6789  # Ceph monitor
+        - protocol: TCP
+          port: 6800  # Ceph OSD
+        - protocol: TCP
+          port: 3300  # Ceph mgr
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+# Egress policy for vmauth to access VictoriaLogs server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmauth-egress-victoria-logs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: networkpolicy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vmauth
+      app.kubernetes.io/instance: victoria-logs
+  policyTypes:
+    - Egress
+  egress:
+    # Allow vmauth to route to VictoriaLogs server
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: victoria-logs
+              app.kubernetes.io/component: server
+      ports:
+        - protocol: TCP
+          port: 9428
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

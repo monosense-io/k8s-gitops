@@ -1,0 +1,170 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: victoria-logs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/managed-by: flux
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: victoria-logs-single
+    namespace: flux-system
+  version: "0.11.12"
+  interval: 1h
+  timeout: 15m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    fullnameOverride: victoria-logs
+
+    # Global configuration with Quay.io registry (matching VictoriaMetrics)
+    global:
+      imageRegistry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+      imagePullSecrets: []
+
+    # VictoriaLogs server configuration
+    server:
+      enabled: true
+      name: victoria-logs-server
+      replicaCount: 3
+
+      # Image configuration
+      image:
+        registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+        repository: victorialogs
+        tag: "v1.36.1-victorialogs"
+        pullPolicy: IfNotPresent
+
+      # Data retention
+      retentionPeriod: "${OBSERVABILITY_LOGS_RETENTION}"
+
+      # Storage configuration
+      persistentVolume:
+        enabled: true
+        storageClass: "${BLOCK_SC}"
+        accessModes:
+          - ReadWriteOnce
+        size: "${OBSERVABILITY_LOGS_STORAGE_SIZE}"
+        mountPath: /storage
+
+      # Resource limits (matching VictoriaMetrics pattern)
+      resources:
+        limits:
+          cpu: 2
+          memory: 4Gi
+        requests:
+          cpu: 500m
+          memory: 2Gi
+
+      # Service configuration
+      service:
+        type: ClusterIP
+        port: 9428
+        targetPort: 9428
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9428"
+
+      # Extra arguments for VictoriaLogs
+      extraArgs:
+        - -loggerFormat=json
+        - -loggerLevel=INFO
+        - -retentionPeriod=${OBSERVABILITY_LOGS_RETENTION}
+        - -storageDataPath=/storage
+        - -httpListenAddr=:9428
+
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        readOnlyRootFilesystem: false
+
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # Health checks
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 9428
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 9428
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 3
+
+      # Pod annotations
+      podAnnotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9428"
+        prometheus.io/path: "/metrics"
+
+    # VMAuth for authentication and routing
+    vmauth:
+      enabled: true
+      name: vmauth-victoria-logs
+      replicaCount: 2
+
+      # Image configuration
+      image:
+        registry: "${VICTORIAMETRICS_IMAGE_REGISTRY}"
+        repository: vmauth
+        tag: "${VICTORIAMETRICS_VERSION}"
+        pullPolicy: IfNotPresent
+
+      # Authentication config - unauthorized access for internal use
+      config:
+        users:
+          - username: ""
+            url_prefix:
+              - http://victoria-logs-server:9428
+            unauthorized_user: true
+
+      # Resource limits
+      resources:
+        limits:
+          cpu: 500m
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 256Mi
+
+      # Service configuration
+      service:
+        type: ClusterIP
+        port: 8427
+        targetPort: 8427
+
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        readOnlyRootFilesystem: true
+
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+    # ServiceMonitor for metrics collection (disabled, using VMServiceScrape)
+    serviceMonitor:
+      enabled: false

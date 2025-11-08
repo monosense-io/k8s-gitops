@@ -1,0 +1,35 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability-victoria-logs
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: observability
+spec:
+  interval: 30m
+  timeout: 15m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./kubernetes/infrastructure/observability/victoria-logs
+  prune: true
+  wait: true
+  dependsOn:
+    - name: observability-victoria-metrics-vmcluster
+    - name: infrastructure-storage-rook-ceph-cluster
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: victoria-logs-server
+      namespace: observability
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: vmauth-victoria-logs
+      namespace: observability

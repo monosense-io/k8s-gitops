@@ -1,0 +1,33 @@
+---
+# PodDisruptionBudget for VictoriaLogs server
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: victoria-logs-server
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-logs
+    app.kubernetes.io/component: server
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-logs
+      app.kubernetes.io/component: server
+
+---
+# PodDisruptionBudget for vmauth
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vmauth-victoria-logs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vmauth
+    app.kubernetes.io/instance: victoria-logs
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vmauth
+      app.kubernetes.io/instance: victoria-logs
