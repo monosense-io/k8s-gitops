@@ -27,7 +27,7 @@ spec:
   chart:
     spec:
       chart: openebs
-      version: 4.3.2
+      version: 4.3.3
       sourceRef:
         kind: HelmRepository
         name: openebs
@@ -65,6 +65,14 @@ spec:
         name: ${OPENEBS_LOCAL_SC}
         basePath: ${OPENEBS_BASEPATH}
         isDefaultClass: false
+      # Resource limits for provisioner DaemonSet
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
 
     # Observability
     serviceMonitor:

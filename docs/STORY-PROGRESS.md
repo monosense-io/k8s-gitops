@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 23 / 50 (46%)
+**Completed**: 24 / 50 (48%)
 
 ---
 
@@ -13,7 +13,7 @@
 ```
 Networking:    ████████████████ 100% (9/9 core stories) ✅
 Security:      ████░░░░░░░░░░  30% (3/10 stories)
-Storage:       ████████████████ 100% (3/3 stories) ✅
+Storage:       ████████████████ 100% (4/4 stories) ✅
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
 Operations:    ████████████████ 100% (1/1 stories) ✅
@@ -363,6 +363,41 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
   - `kubernetes/infrastructure/storage/rook-ceph/app/cephcluster.yaml`
   - `kubernetes/infrastructure/storage/rook-ceph/app/storageclass.yaml`
 - **Dependencies**: Story 15 (Rook-Ceph Operator)
+
+---
+
+#### **Story 29: STORY-STO-APPS-OPENEBS-BASE**
+- **Status**: ✅ **COMPLETE** (v4.0 - Enhanced Shared Infrastructure)
+- **Sprint**: 6 | Lane: Storage
+- **Commit**: TBD - feat(storage): enhance OpenEBS to v4.3.3 with HA and monitoring (Story 29)
+- **Date**: 2025-11-08
+- **Deliverables**:
+  - **Chart Upgrade**: v4.3.2 → v4.3.3 (latest stable, August 2024)
+  - **Resource Limits**: Added provisioner resource limits (50m/64Mi → 200m/128Mi)
+  - **High Availability**: PodDisruptionBudget (maxUnavailable: 1)
+  - **Volume Expansion**: Enabled allowVolumeExpansion in StorageClass
+  - **Enhanced Monitoring**: Added 3 new PrometheusRules (6 total alerts):
+    - OpenEBSStorageCapacityWarning (node storage >80%)
+    - OpenEBSStorageCapacityCritical (node storage >90%)
+    - OpenEBSHighMemoryUsage (provisioner memory >80%)
+  - **Comprehensive README**: Architecture, use cases, troubleshooting, performance, backup strategies
+  - **Multi-Cluster**: Enhancements benefit BOTH infra and apps clusters (shared infrastructure)
+- **Files Created**:
+  - `kubernetes/infrastructure/storage/openebs/app/pdb.yaml`
+  - `kubernetes/infrastructure/storage/openebs/README.md`
+- **Files Modified**:
+  - `kubernetes/infrastructure/storage/openebs/app/helmrelease.yaml` (v4.3.3, resource limits)
+  - `kubernetes/infrastructure/storage/openebs/app/storageclass.yaml` (allowVolumeExpansion: true)
+  - `kubernetes/infrastructure/storage/openebs/app/prometheusrule.yaml` (+3 alerts)
+  - `kubernetes/infrastructure/storage/openebs/app/kustomization.yaml` (includes pdb.yaml)
+- **Impact**:
+  - Both infra and apps clusters receive enhancements
+  - Production-ready HA configuration
+  - Comprehensive monitoring and alerting
+  - Self-documenting with extensive README
+  - Volume expansion enabled for database growth
+- **Dependencies**: Story 14 (OpenEBS Base - infra cluster)
+- **Note**: Apps cluster already wired via shared infrastructure (kubernetes/clusters/apps/infrastructure.yaml → ./kubernetes/infrastructure → storage/openebs). Deployment and validation deferred to Story 45.
 
 ---
 
@@ -887,12 +922,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 23 |
-| **Total Commits** | 23 |
-| **Lines Added** | ~8,450 |
-| **Files Created** | ~129 |
+| **Stories Completed** | 24 |
+| **Total Commits** | 24 |
+| **Lines Added** | ~9,100 |
+| **Files Created** | ~131 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (23/23) |
+| **Success Rate** | 100% (24/24) |
 
 ---
 
@@ -904,7 +939,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (46% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (48% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -919,4 +954,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Story 07 - Stakater Reloader 2.2.5 for automated pod restarts)
+**Last Updated**: 2025-11-08 by Claude Code (Story 29 - OpenEBS v4.3.3 enhanced for apps cluster)

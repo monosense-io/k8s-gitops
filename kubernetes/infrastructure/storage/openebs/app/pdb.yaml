@@ -1,0 +1,14 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: openebs-localpv-provisioner
+  namespace: openebs-system
+  labels:
+    app.kubernetes.io/name: openebs
+    app.kubernetes.io/component: localpv-provisioner
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openebs-localpv-provisioner

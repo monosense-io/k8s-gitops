@@ -13,3 +13,4 @@ metadata:
 provisioner: openebs.io/local
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
+allowVolumeExpansion: true
