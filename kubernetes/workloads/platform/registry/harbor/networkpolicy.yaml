@@ -1,0 +1,132 @@
+---
+# Harbor Egress NetworkPolicy
+# Allows Harbor components to communicate with external dependencies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-egress
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution (covered by baseline allow-dns policy)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow connection to CNPG Pooler (PostgreSQL)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+          podSelector:
+            matchLabels:
+              cnpg.io/poolerName: harbor-pooler
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow connection to DragonflyDB (Redis)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: dragonfly-system
+          podSelector:
+            matchLabels:
+              app: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow connection to MinIO (S3) - External endpoint
+    # Note: MinIO is external (10.25.11.3:9000), needs egress to any IP
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9000
+
+    # Allow HTTPS for Trivy CVE database updates
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow HTTP for Trivy CVE database updates (fallback)
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+
+---
+# Harbor Ingress NetworkPolicy
+# Allows ingress from Gateway and internal Harbor components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-ingress
+  namespace: harbor
+spec:
+  podSelector:
+    matchLabels:
+      app: harbor
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow ingress from Cilium Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cilium
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080
+
+    # Allow ingress from within Harbor namespace (inter-component communication)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbor
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5000   # Registry
+        - protocol: TCP
+          port: 8080   # Core API
+        - protocol: TCP
+          port: 8001   # Metrics
+
+    # Allow ingress from VictoriaMetrics for metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmagent
+      ports:
+        - protocol: TCP
+          port: 8001   # Metrics endpoint

@@ -1,0 +1,119 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: harbor-alerts
+  namespace: harbor
+  labels:
+    app.kubernetes.io/name: harbor
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    - name: harbor.availability
+      interval: 30s
+      rules:
+        - alert: HarborCoreUnavailable
+          expr: |
+            sum(up{job="harbor-core"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: harbor-core
+          annotations:
+            summary: "Harbor Core service unavailable"
+            description: "Harbor Core has no running replicas for 5 minutes. API and authentication unavailable."
+
+        - alert: HarborRegistryUnavailable
+          expr: |
+            sum(up{job="harbor-registry"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: harbor-registry
+          annotations:
+            summary: "Harbor Registry service unavailable"
+            description: "Harbor Registry has no running replicas for 5 minutes. Image push/pull operations unavailable."
+
+    - name: harbor.database
+      interval: 30s
+      rules:
+        - alert: HarborDatabaseConnectivityIssue
+          expr: |
+            increase(harbor_core_db_errors_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: critical
+            component: harbor-database
+          annotations:
+            summary: "Harbor database connectivity issues"
+            description: "Harbor Core is experiencing database connection errors ({{ $value }} errors in 5 minutes)."
+
+    - name: harbor.redis
+      interval: 30s
+      rules:
+        - alert: HarborRedisConnectivityIssue
+          expr: |
+            increase(harbor_core_redis_errors_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: critical
+            component: harbor-redis
+          annotations:
+            summary: "Harbor Redis connectivity issues"
+            description: "Harbor Core is experiencing Redis connection errors ({{ $value }} errors in 5 minutes)."
+
+    - name: harbor.storage
+      interval: 30s
+      rules:
+        - alert: HarborStorageErrors
+          expr: |
+            increase(registry_storage_action_errors_total[10m]) > 50
+          for: 10m
+          labels:
+            severity: warning
+            component: harbor-storage
+          annotations:
+            summary: "Harbor storage operation errors"
+            description: "Harbor Registry is experiencing S3 storage errors ({{ $value }} errors in 10 minutes)."
+
+    - name: harbor.scanning
+      interval: 30s
+      rules:
+        - alert: HarborTrivyScanFailures
+          expr: |
+            increase(harbor_jobservice_scan_errors_total[15m]) > 20
+          for: 15m
+          labels:
+            severity: warning
+            component: harbor-trivy
+          annotations:
+            summary: "Harbor Trivy scan failures"
+            description: "Harbor Trivy is experiencing scan failures ({{ $value }} failures in 15 minutes)."
+
+    - name: harbor.performance
+      interval: 30s
+      rules:
+        - alert: HarborHighLatency
+          expr: |
+            histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="harbor-core"}[10m])) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: harbor-core
+          annotations:
+            summary: "Harbor high request latency"
+            description: "Harbor Core P95 request latency is {{ $value }}s (threshold: 5s)."
+
+    - name: harbor.certificates
+      interval: 1h
+      rules:
+        - alert: HarborCertificateExpiringSoon
+          expr: |
+            (harbor_certificate_expiry_timestamp - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+            component: harbor-certificates
+          annotations:
+            summary: "Harbor TLS certificate expiring soon"
+            description: "Harbor TLS certificate expires in {{ $value }} days (threshold: 30 days)."

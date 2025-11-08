@@ -1,0 +1,44 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: harbor
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: harbor
+    cluster: infra
+spec:
+  interval: 10m
+  path: ./kubernetes/workloads/platform/registry/harbor
+  prune: true
+  wait: true
+  timeout: 15m
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  dependsOn:
+    - name: cloudnative-pg       # PostgreSQL pooler
+    - name: dragonfly            # Redis cache
+    - name: external-secrets-app # ExternalSecrets
+    - name: cilium-gateway       # Gateway API
+
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: harbor-core
+      namespace: harbor
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: harbor-registry
+      namespace: harbor
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: harbor-portal
+      namespace: harbor
+
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

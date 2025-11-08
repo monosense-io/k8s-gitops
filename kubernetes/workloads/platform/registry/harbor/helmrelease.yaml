@@ -1,0 +1,309 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+  namespace: harbor
+spec:
+  interval: 30m
+  timeout: 15m
+  chart:
+    spec:
+      chart: harbor
+      version: 1.18.0  # Harbor v2.14.0
+      sourceRef:
+        kind: HelmRepository
+        name: harbor
+        namespace: harbor
+      interval: 12h
+
+  maxHistory: 3
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+
+  valuesFrom:
+    # Database credentials
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_HOSTNAME
+      targetPath: database.external.host
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_PORT
+      targetPath: database.external.port
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_DATABASE
+      targetPath: database.external.coreDatabase
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_USERNAME
+      targetPath: database.external.username
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_PASSWORD
+      targetPath: database.external.password
+    - kind: Secret
+      name: harbor-db-credentials
+      valuesKey: HARBOR_DATABASE_SSLMODE
+      targetPath: database.external.sslmode
+
+    # Redis credentials
+    - kind: Secret
+      name: harbor-redis-credentials
+      valuesKey: HARBOR_REDIS_ADDR
+      targetPath: redis.external.addr
+    - kind: Secret
+      name: harbor-redis-credentials
+      valuesKey: HARBOR_REDIS_PASSWORD
+      targetPath: redis.external.password
+
+    # S3 storage credentials
+    - kind: Secret
+      name: harbor-s3-credentials
+      valuesKey: HARBOR_STORAGE_S3_REGIONENDPOINT
+      targetPath: persistence.imageChartStorage.s3.regionendpoint
+    - kind: Secret
+      name: harbor-s3-credentials
+      valuesKey: HARBOR_STORAGE_S3_BUCKET
+      targetPath: persistence.imageChartStorage.s3.bucket
+    - kind: Secret
+      name: harbor-s3-credentials
+      valuesKey: HARBOR_STORAGE_S3_ACCESSKEY
+      targetPath: persistence.imageChartStorage.s3.accesskey
+    - kind: Secret
+      name: harbor-s3-credentials
+      valuesKey: HARBOR_STORAGE_S3_SECRETKEY
+      targetPath: persistence.imageChartStorage.s3.secretkey
+    - kind: Secret
+      name: harbor-s3-credentials
+      valuesKey: HARBOR_STORAGE_S3_REGION
+      targetPath: persistence.imageChartStorage.s3.region
+
+    # Admin password
+    - kind: Secret
+      name: harbor-admin-credentials
+      valuesKey: HARBOR_ADMIN_PASSWORD
+      targetPath: harborAdminPassword
+
+    # Core secret keys
+    - kind: Secret
+      name: harbor-core-secret
+      valuesKey: HARBOR_SECRET_KEY
+      targetPath: core.secret
+    - kind: Secret
+      name: harbor-core-secret
+      valuesKey: HARBOR_XSRF_KEY
+      targetPath: core.xsrfKey
+    - kind: Secret
+      name: harbor-core-secret
+      valuesKey: HARBOR_REGISTRY_PASSWORD
+      targetPath: registry.credentials.password
+
+  values:
+    # External URL (behind Gateway API)
+    externalURL: https://${HARBOR_HOST}
+
+    # Expose configuration (use ClusterIP, Gateway handles ingress)
+    expose:
+      type: clusterIP
+      tls:
+        enabled: false  # TLS terminated at Gateway
+      clusterIP:
+        name: harbor
+        ports:
+          httpPort: 80
+
+    # Internal TLS (disabled, using cluster internal traffic)
+    internalTLS:
+      enabled: false
+
+    # External Database (CNPG Pooler)
+    database:
+      type: external
+      external:
+        # Values injected from ExternalSecret
+        # host, port, coreDatabase, username, password, sslmode
+        notaryServerDatabase: harbor_notary_server
+        notarySignerDatabase: harbor_notary_signer
+
+    # External Redis (DragonflyDB)
+    redis:
+      type: external
+      external:
+        # Values injected from ExternalSecret
+        # addr: dragonfly.dragonfly-system.svc.cluster.local:6379
+        # password: <from secret>
+        coreDatabaseIndex: "0"
+        jobserviceDatabaseIndex: "1"
+        registryDatabaseIndex: "2"
+        trivyAdapterDatabaseIndex: "5"
+        # Harbor does NOT support Redis TLS
+
+    # S3 Object Storage (MinIO)
+    persistence:
+      persistentVolumeClaim:
+        registry:
+          # Disable PVC for registry (using S3)
+          storageClass: ""
+          size: 5Gi
+        jobservice:
+          # Enable PVC for job logs
+          storageClass: rook-ceph-block
+          size: 10Gi
+        trivy:
+          # Enable PVC for Trivy vulnerability database
+          storageClass: rook-ceph-block
+          size: 5Gi
+
+      imageChartStorage:
+        type: s3
+        disableredirect: true  # CRITICAL: MinIO doesn't support S3 redirects
+        s3:
+          # Values injected from ExternalSecret
+          # regionendpoint, bucket, accesskey, secretkey, region
+          secure: false  # MinIO is HTTP (internal network)
+          v4auth: true
+          chunksize: 5242880  # 5MB
+          rootdirectory: /
+          storageclass: STANDARD
+
+    # Harbor Core (API server, authentication)
+    core:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+      # Security context
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containerSecurityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+
+      # High availability
+      podDisruptionBudget:
+        minAvailable: 1
+
+      # Secrets pulled from ExternalSecret via valuesFrom
+
+    # Harbor Portal (Web UI)
+    portal:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+      podDisruptionBudget:
+        minAvailable: 1
+
+    # Harbor Registry (Image push/pull)
+    registry:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+      podDisruptionBudget:
+        minAvailable: 1
+
+      # Registry configuration
+      relativeurls: true  # CRITICAL: Gateway-fronted Harbor needs relative URLs
+      credentials:
+        username: harbor_registry_user
+        # Password pulled from ExternalSecret via valuesFrom
+
+      # Middleware
+      middleware:
+        enabled: true
+        type: cloudFront
+
+    # Harbor JobService (Replication, scanning, garbage collection)
+    jobservice:
+      replicas: 1
+      maxJobWorkers: 10
+      jobLoggers:
+        - file
+        - stdout
+
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+      # Secret pulled from ExternalSecret via valuesFrom
+
+    # Trivy Scanner (Vulnerability scanning)
+    trivy:
+      enabled: true
+      replicas: 2
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+
+      podDisruptionBudget:
+        minAvailable: 1
+
+      # Vulnerability database updates
+      offlineScan: false  # Online mode updates DB automatically
+      timeout: 5m0s
+      severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+      ignoreUnfixed: false
+
+    # ChartMuseum (Helm chart storage) - DISABLED
+    chartmuseum:
+      enabled: false  # Use OCI artifacts instead
+
+    # Notary (Content trust / image signing) - DISABLED
+    notary:
+      enabled: false  # Can enable later if needed
+
+    # Metrics
+    metrics:
+      enabled: true
+      core:
+        path: /metrics
+        port: 8001
+      registry:
+        path: /metrics
+        port: 8001
+      jobservice:
+        path: /metrics
+        port: 8001
+      exporter:
+        path: /metrics
+        port: 8001
+
+    # Update strategy
+    updateStrategy:
+      type: RollingUpdate

@@ -179,3 +179,22 @@ data:
   VM_RETENTION_PERIOD: "30d"
   VM_STORAGE_SIZE: "50Gi"
   VM_REPLICATION_FACTOR: "2"
+
+  # Harbor Configuration
+  HARBOR_HOST: "harbor.infra.monosense.io"
+  HARBOR_VERSION: "2.14.0"
+  HARBOR_CHART_VERSION: "1.18.0"
+
+  # Harbor Secret Paths (1Password) - All sensitive data stored here
+  HARBOR_DB_SECRET_PATH: "kubernetes/infra/harbor/database"
+  HARBOR_REDIS_SECRET_PATH: "kubernetes/infra/harbor/redis"
+  HARBOR_S3_SECRET_PATH: "kubernetes/infra/harbor/s3"
+  HARBOR_ADMIN_SECRET_PATH: "kubernetes/infra/harbor/admin"
+  HARBOR_CORE_SECRET_PATH: "kubernetes/infra/harbor/core"
+
+  # Harbor Component Resources (10-50 users)
+  HARBOR_CORE_REPLICAS: "2"
+  HARBOR_REGISTRY_REPLICAS: "2"
+  HARBOR_PORTAL_REPLICAS: "2"
+  HARBOR_JOBSERVICE_REPLICAS: "1"
+  HARBOR_TRIVY_REPLICAS: "2"

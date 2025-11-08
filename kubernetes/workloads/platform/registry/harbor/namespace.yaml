@@ -1,0 +1,13 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbor
+  labels:
+    app.kubernetes.io/name: harbor
+    app.kubernetes.io/managed-by: flux
+    toolkit.fluxcd.io/tenant: platform
+    # Pod Security Admission: baseline (Harbor components run as non-root)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
