@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    config.kubernetes.io/origin: workloads/platform/observability/fluent-bit
+data:
+  # Main configuration file
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        5
+        Daemon       Off
+        Log_Level    info
+        Parsers_File parsers.conf
+        HTTP_Server  On
+        HTTP_Listen  0.0.0.0
+        HTTP_Port    2020
+        Health_Check On
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Exclude_Path      /var/log/containers/*fluent-bit*.log
+        Parser            cri
+        Tag               kube.*
+        DB                /var/log/flb_kube.db
+        DB.Sync           Normal
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+        Rotate_Wait       30
+        Buffer_Chunk_Size 512KB
+        Buffer_Max_Size   5MB
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Merge_Log_Key       log_processed
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude On
+        Labels              On
+        Annotations         On
+
+    [FILTER]
+        Name          modify
+        Match         kube.*
+        Add           cluster apps
+        Add           tenant ${OBSERVABILITY_LOG_TENANT}
+        Add           log_source container
+        Add           collector fluent-bit
+
+    [FILTER]
+        Name          nest
+        Match         kube.*
+        Operation     lift
+        Nested_under  kubernetes
+        Add_prefix    kubernetes.
+
+    [FILTER]
+        Name          grep
+        Match         kube.*
+        Exclude       log ^$
+
+    [OUTPUT]
+        Name          http
+        Match         kube.*
+        Host          ${OBSERVABILITY_LOG_ENDPOINT_HOST}
+        Port          ${OBSERVABILITY_LOG_ENDPOINT_PORT}
+        URI           ${OBSERVABILITY_LOG_ENDPOINT_PATH}
+        Format        json
+        Header        X-Scope-OrgID ${OBSERVABILITY_LOG_TENANT}
+        Header        Content-Type application/json
+        compress      gzip
+        Retry_Limit   5
+        Retry_Retryable_Status_Codes 502,503,504,429
+
+    [OUTPUT]
+        Name          stdout
+        Match         *
+        Format        json_lines
+
+  # Parsers configuration
+  parsers.conf: |
+    [PARSER]
+        Name   cri
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+        # CRI Log format fields
+        Field_name message
+        Field_name stream
+        Field_name time
+
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+        # Docker log format fields
+        Field_name log
+        Field_name stream
+        Field_name time
+
+  # Custom parsers for specific applications
+  custom_parsers.conf: |
+    [PARSER]
+        Name        nginx
+        Format      regex
+        Regex       ^(?<remote>[^ ]*) (?<host>[^ ]*) (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$
+        Time_Key    time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+
+    [PARSER]
+        Name        json_time
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On

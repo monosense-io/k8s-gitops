@@ -1,0 +1,59 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fluent-bit
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: flux
+    release: victoria-metrics
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+      app.kubernetes.io/component: daemonset
+  namespaceSelector:
+    matchNames:
+      - fluent-bit
+  endpoints:
+    - port: http-metrics
+      path: /api/v1/metrics/prometheus
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      metricRelabelings:
+        # Add cluster label to all metrics
+        - sourceLabels: []
+          targetLabel: cluster
+          replacement: infra
+        # Add component label
+        - sourceLabels: []
+          targetLabel: component
+          replacement: fluent-bit
+        # Add tenant label
+        - sourceLabels: []
+          targetLabel: tenant
+          replacement: infra
+        # Clean up unnecessary labels
+        - regex: pod|namespace|container|endpoint|service
+          action: labeldrop
+      relabelings:
+        # Only scrape pods with the correct label
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          action: keep
+          regex: fluent-bit
+        # Add pod namespace label
+        - sourceLabels: [__meta_kubernetes_pod_namespace]
+          action: replace
+          targetLabel: namespace
+        # Add pod name label
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          action: replace
+          targetLabel: pod
+        # Add node name label
+        - sourceLabels: [__meta_kubernetes_pod_label_kubernetes_io_hostname]
+          action: replace
+          targetLabel: node
+          replacement: ${1}

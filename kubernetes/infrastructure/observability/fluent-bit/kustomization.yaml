@@ -1,0 +1,105 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: fluent-bit-infra
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: infrastructure
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: flux
+
+resources:
+  # Infrastructure-specific resources
+  - configmap.yaml
+  - daemonset.yaml
+  - rbac.yaml
+  - servicemonitor.yaml
+  - networkpolicy.yaml
+
+# Variables are injected via Flux postBuild substitution
+
+# Common labels for all resources
+commonLabels:
+  app.kubernetes.io/name: fluent-bit
+  app.kubernetes.io/component: infrastructure
+  app.kubernetes.io/part-of: logging
+  app.kubernetes.io/managed-by: flux
+  cluster: infra
+
+# Common annotations
+commonAnnotations:
+  config.kubernetes.io/origin: infrastructure/observability/fluent-bit
+
+# Namespace override
+namespace: fluent-bit
+
+# Replicas (for resources that support it)
+replicas:
+  - name: fluent-bit
+    count: 1
+
+# Patches for environment variables and cluster-specific settings
+patches:
+  # Environment variables from cluster-settings
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/envFrom
+        value:
+          - configMapRef:
+              name: cluster-settings
+              optional: true
+    target:
+      kind: DaemonSet
+      name: fluent-bit
+      namespace: fluent-bit
+
+  # Cluster-specific environment variables
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: CLUSTER
+          value: "infra"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OBSERVABILITY_LOG_ENDPOINT_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-settings
+              key: OBSERVABILITY_LOG_ENDPOINT_HOST
+              optional: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OBSERVABILITY_LOG_ENDPOINT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-settings
+              key: OBSERVABILITY_LOG_ENDPOINT_PORT
+              optional: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OBSERVABILITY_LOG_ENDPOINT_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-settings
+              key: OBSERVABILITY_LOG_ENDPOINT_PATH
+              optional: true
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OBSERVABILITY_LOG_TENANT
+          valueFrom:
+            configMapKeyRef:
+              name: cluster-settings
+              key: OBSERVABILITY_LOG_TENANT
+              optional: true
+    target:
+      kind: DaemonSet
+      name: fluent-bit
+      namespace: fluent-bit
+
+# Configurations for variable substitution handled by Flux

@@ -2,31 +2,7 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: cluster-infra-infrastructure
-  namespace: flux-system
-spec:
-  interval: 10m
-  retryInterval: 1m
-  timeout: 5m
-  prune: true
-  wait: false
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-    namespace: flux-system
-  path: ./kubernetes/infrastructure
-  dependsOn:
-    - name: cilium-core
-      namespace: flux-system
-  postBuild:
-    substituteFrom:
-      - kind: ConfigMap
-        name: cluster-settings
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: cluster-infra-fluent-bit
+  name: cluster-apps-fluent-bit
   namespace: flux-system
   labels:
     app.kubernetes.io/name: fluent-bit
@@ -34,7 +10,7 @@ metadata:
     app.kubernetes.io/part-of: logging
 spec:
   interval: 15m
-  path: ./kubernetes/infrastructure/observability/fluent-bit
+  path: ./kubernetes/workloads/platform/observability/fluent-bit
   prune: true
   sourceRef:
     kind: GitRepository
@@ -47,7 +23,7 @@ spec:
   healthChecks:
     - apiVersion: apps/v1
       kind: DaemonSet
-      name: fluent-bit
+      name: fluent-bit-apps-fluent-bit
       namespace: fluent-bit
     - apiVersion: v1
       kind: ServiceAccount
@@ -56,13 +32,12 @@ spec:
 
   # Dependencies - ensure logging infrastructure is ready
   dependsOn:
-    - name: cluster-infra-infrastructure
-    - name: cluster-infra-victoria-logs
+    - name: cluster-apps-infrastructure
 
   # Post build substitution from cluster settings
   postBuild:
     substitute:
-      cluster: "infra"
+      cluster: "apps"
     substituteFrom:
       - kind: ConfigMap
         name: cluster-settings

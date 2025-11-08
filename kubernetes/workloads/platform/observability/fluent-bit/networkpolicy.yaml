@@ -1,0 +1,85 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fluent-bit
+  namespace: fluent-bit
+  labels:
+    app.kubernetes.io/name: fluent-bit
+    app.kubernetes.io/component: networkpolicy
+    app.kubernetes.io/part-of: logging
+    app.kubernetes.io/managed-by: flux
+  annotations:
+    config.kubernetes.io/origin: workloads/platform/observability/fluent-bit
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+      app.kubernetes.io/component: daemonset
+  policyTypes:
+    - Egress
+    - Ingress
+
+  # Ingress rules - allow monitoring and health checks
+  ingress:
+    # Allow monitoring from VictoriaMetrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vmauth
+      ports:
+        - protocol: TCP
+          port: 2020
+
+    # Allow Prometheus scraping from flux-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: flux-system
+      ports:
+        - protocol: TCP
+          port: 2020
+
+    # Allow health checks from kubelet
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 2020
+
+  # Egress rules - allow log forwarding and API access
+  egress:
+    # Allow access to Kubernetes API server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow cross-cluster log forwarding to infra VictoriaLogs via vmauth
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 8427
+      # Note: This allows egress to any IP on port 8427 for cross-cluster communication
+
+    # Allow fallback direct to VictoriaLogs server
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 9428
+      # Note: This allows egress to any IP on port 9428 for cross-cluster communication
+
+    # Allow access to kubelet for node metrics
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 10250
