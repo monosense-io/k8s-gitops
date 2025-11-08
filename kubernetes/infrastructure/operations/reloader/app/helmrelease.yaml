@@ -1,0 +1,102 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: reloader
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: reloader
+    app.kubernetes.io/component: operations
+spec:
+  interval: 12h
+  url: oci://ghcr.io/stakater/charts/reloader
+  ref:
+    tag: 2.2.5
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: reloader
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: reloader
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/managed-by: flux
+spec:
+  interval: 1h
+  timeout: 5m
+
+  chartRef:
+    kind: OCIRepository
+    name: reloader
+    namespace: flux-system
+
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+
+  values:
+    fullnameOverride: reloader
+
+    # High availability
+    replicaCount: 2
+
+    # Security hardening (PSA restricted compliant)
+    reloader:
+      readOnlyRootFileSystem: true
+
+      # Monitoring
+      podMonitor:
+        enabled: true
+        namespace: kube-system
+
+    # Pod security context
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      fsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Container security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
+    # PodDisruptionBudget for high availability
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    # Resource limits
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+    # Pod anti-affinity for distribution across nodes
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: reloader
+              topologyKey: kubernetes.io/hostname

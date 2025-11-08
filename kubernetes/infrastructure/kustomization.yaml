@@ -7,4 +7,5 @@ resources:
   - networking/
   - databases/
   - observability/
+  - operations/
   # Note: gitops/ components wired separately if needed
