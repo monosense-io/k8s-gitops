@@ -8,4 +8,5 @@ resources:
   - databases/
   - observability/
   - operations/
+  - messaging/
   # Note: gitops/ components wired separately if needed

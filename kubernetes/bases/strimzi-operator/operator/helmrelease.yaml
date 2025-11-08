@@ -1,0 +1,140 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: strimzi-operator
+  namespace: strimzi-operator-system
+  labels:
+    app.kubernetes.io/name: strimzi-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: strimzi
+spec:
+  interval: 30m
+  timeout: 10m
+
+  chart:
+    spec:
+      chart: strimzi-kafka-operator
+      version: 0.48.0  # Exact version pinning
+      sourceRef:
+        kind: HelmRepository
+        name: strimzi
+        namespace: flux-system
+      interval: 12h
+
+  # CRD management
+  install:
+    crds: CreateReplace
+    createNamespace: false
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace  # Note: Helm doesn't upgrade CRDs, manual update required
+    remediation:
+      retries: 3
+      strategy: rollback
+    cleanupOnFail: true
+  rollback:
+    recreate: true
+    cleanupOnFail: true
+
+  values:
+    # High availability configuration
+    replicas: 2
+
+    # Namespace watching - scoped to messaging namespace only
+    watchNamespaces:
+      - messaging
+
+    # Watch any namespace disabled (use explicit namespace list)
+    watchAnyNamespace: false
+
+    # Feature gates - KRaft mode and Kafka Node Pools (enabled by default in 0.48.0)
+    featureGates: "+UseKRaft,+KafkaNodePools"
+
+    # Log level
+    logLevel: INFO
+
+    # Generate NetworkPolicy resources
+    generateNetworkPolicy: true
+
+    # Resource limits (production-ready)
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+
+    # Pod anti-affinity for HA
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: strimzi-cluster-operator
+              topologyKey: kubernetes.io/hostname
+
+    # Security context (PSA restricted compliant)
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+
+    # Pod disruption budget (ensure HA during node maintenance)
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    # Image configuration (use default registry: quay.io/strimzi)
+    image:
+      registry: quay.io
+      repository: strimzi
+      name: operator
+      # tag: Managed by chart version
+
+    # Default image settings for all Strimzi components
+    defaultImageRegistry: quay.io
+    defaultImageRepository: strimzi
+
+    # Labels and annotations
+    labels:
+      app.kubernetes.io/name: strimzi-operator
+      app.kubernetes.io/component: operator
+      app.kubernetes.io/part-of: strimzi
+
+    # Tolerations (none by default)
+    tolerations: []
+
+    # Node selector (none by default)
+    nodeSelector: {}
+
+    # Priority class (none by default)
+    priorityClassName: ""
+
+    # RBAC configuration
+    rbac:
+      create: true
+
+    # Service account configuration
+    serviceAccount:
+      create: true
+      name: strimzi-cluster-operator
+
+    # Lease duration for leader election
+    leaderElection:
+      enabled: true

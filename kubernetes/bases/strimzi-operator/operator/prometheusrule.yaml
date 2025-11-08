@@ -1,0 +1,131 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: strimzi-operator
+  namespace: strimzi-operator-system
+  labels:
+    app.kubernetes.io/name: strimzi-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: strimzi
+spec:
+  groups:
+    - name: strimzi.operator.availability
+      interval: 30s
+      rules:
+        # Alert 1: Operator Down
+        - alert: StrimziOperatorDown
+          expr: |
+            up{job="strimzi-operator-system/strimzi-operator"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi operator is down"
+            description: "Strimzi operator pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been down for more than 5 minutes."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+        # Alert 2: High Pod Restarts
+        - alert: StrimziOperatorHighRestarts
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="strimzi-operator-system",pod=~"strimzi-cluster-operator.*"}[15m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi operator restarting frequently"
+            description: "Strimzi operator pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+        # Alert 3: Not Highly Available
+        - alert: StrimziOperatorNotHighlyAvailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="strimzi-operator-system",deployment="strimzi-cluster-operator"} < 2
+          for: 15m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi operator not highly available"
+            description: "Strimzi operator has only {{ $value }} replica(s) available (expected 2 for HA)."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+    - name: strimzi.operator.reconciliation
+      interval: 30s
+      rules:
+        # Alert 4: Reconciliation Errors
+        - alert: StrimziReconciliationErrors
+          expr: |
+            rate(strimzi_reconciliations_failed_total[5m]) > 0.1
+          for: 15m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi reconciliation errors detected"
+            description: "Strimzi operator is experiencing reconciliation errors at {{ $value }} errors/second for {{ $labels.kind }}."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+        # Alert 5: Slow Reconciliation
+        - alert: StrimziSlowReconciliation
+          expr: |
+            histogram_quantile(0.99, rate(strimzi_reconciliations_duration_seconds_bucket[5m])) > 300
+          for: 15m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi reconciliation is slow"
+            description: "99th percentile reconciliation duration for {{ $labels.kind }} is {{ $value }}s (threshold: 300s)."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+    - name: strimzi.operator.resources
+      interval: 30s
+      rules:
+        # Alert 6: High Memory Usage
+        - alert: StrimziOperatorHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="strimzi-operator-system",pod=~"strimzi-cluster-operator.*",container="strimzi-cluster-operator"}
+              /
+              container_spec_memory_limit_bytes{namespace="strimzi-operator-system",pod=~"strimzi-cluster-operator.*",container="strimzi-cluster-operator"}
+            ) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi operator high memory usage"
+            description: "Strimzi operator pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of its memory limit."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+        # Alert 7: High CPU Throttling
+        - alert: StrimziOperatorHighCPUThrottling
+          expr: |
+            rate(container_cpu_cfs_throttled_seconds_total{namespace="strimzi-operator-system",pod=~"strimzi-cluster-operator.*",container="strimzi-cluster-operator"}[5m]) > 0.5
+          for: 10m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi operator experiencing CPU throttling"
+            description: "Strimzi operator pod {{ $labels.pod }} is being CPU throttled {{ $value | humanizePercentage }} of the time."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#proc-deploying-cluster-operator-str"
+
+    - name: strimzi.operator.crds
+      interval: 30s
+      rules:
+        # Alert 8: CRD Validation Errors
+        - alert: StrimziCRDValidationErrors
+          expr: |
+            rate(strimzi_reconciliations_failed_total{kind=~"Kafka|KafkaTopic|KafkaUser"}[5m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+            component: strimzi-operator
+          annotations:
+            summary: "Strimzi CRD validation errors detected"
+            description: "Invalid {{ $labels.kind }} custom resources are causing reconciliation failures at {{ $value }} errors/second."
+            runbook_url: "https://strimzi.io/docs/operators/latest/deploying.html#ref-operator-cluster-str"

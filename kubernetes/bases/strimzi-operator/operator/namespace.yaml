@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: strimzi-operator-system
+  labels:
+    # Pod Security Admission - restricted (operator doesn't need privileged access)
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+    # Standard labels
+    app.kubernetes.io/name: strimzi-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: strimzi

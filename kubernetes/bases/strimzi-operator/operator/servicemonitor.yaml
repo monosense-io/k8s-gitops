@@ -1,0 +1,19 @@
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: strimzi-operator
+  namespace: strimzi-operator-system
+  labels:
+    app.kubernetes.io/name: strimzi-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: strimzi
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: strimzi-cluster-operator
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
