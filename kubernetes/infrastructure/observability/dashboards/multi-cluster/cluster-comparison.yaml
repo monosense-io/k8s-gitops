@@ -1,0 +1,125 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-cluster-comparison
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    dashboard.grafana.io/custom: "true"
+    dashboard.grafana.io/source: "Migrated from backup and modernized for VictoriaMetrics"
+    dashboard.grafana.io/created-date: "2025-11-08"
+data:
+  cluster-comparison.json: |-
+    {
+      "dashboard": {
+        "title": "Multi-Cluster - Cluster Comparison",
+        "uid": "cluster-comparison",
+        "tags": ["multi-cluster", "comparison", "infrastructure"],
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-6h",
+          "to": "now"
+        },
+        "templating": {
+          "list": [
+            {
+              "name": "cluster",
+              "type": "query",
+              "datasource": "VictoriaMetrics",
+              "query": "label_values(up, cluster)",
+              "refresh": 1,
+              "multi": true,
+              "includeAll": true
+            }
+          ]
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Cluster Node Count",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 12, "x": 0, "y": 0},
+            "targets": [{
+              "expr": "count by (cluster) (kube_node_info{cluster=~\"$cluster\"})",
+              "legendFormat": "{{cluster}}"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "CPU Usage by Cluster",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+            "targets": [{
+              "expr": "sum by (cluster) (rate(node_cpu_seconds_total{mode!=\"idle\",cluster=~\"$cluster\"}[5m]))",
+              "legendFormat": "{{cluster}}"
+            }]
+          },
+          {
+            "id": 3,
+            "title": "Memory Usage by Cluster",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+            "targets": [{
+              "expr": "sum by (cluster) (node_memory_MemTotal_bytes{cluster=~\"$cluster\"} - node_memory_MemAvailable_bytes{cluster=~\"$cluster\"})",
+              "legendFormat": "{{cluster}}"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Pod Count by Cluster",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+            "targets": [{
+              "expr": "sum by (cluster) (kube_pod_info{cluster=~\"$cluster\"})",
+              "legendFormat": "{{cluster}}"
+            }]
+          },
+          {
+            "id": 5,
+            "title": "Storage Usage by Cluster",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+            "targets": [{
+              "expr": "sum by (cluster) (kubelet_volume_stats_used_bytes{cluster=~\"$cluster\"})",
+              "legendFormat": "{{cluster}}"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "title": "Network Traffic by Cluster",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+            "targets": [{
+              "expr": "sum by (cluster) (rate(node_network_receive_bytes_total{cluster=~\"$cluster\"}[5m]))",
+              "legendFormat": "RX - {{cluster}}"
+            }, {
+              "expr": "sum by (cluster) (rate(node_network_transmit_bytes_total{cluster=~\"$cluster\"}[5m]))",
+              "legendFormat": "TX - {{cluster}}"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "Bps"
+              }
+            }
+          }
+        ]
+      }
+    }

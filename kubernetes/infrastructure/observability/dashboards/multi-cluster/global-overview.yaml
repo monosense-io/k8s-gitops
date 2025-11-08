@@ -1,0 +1,184 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-global-overview
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    dashboard.grafana.io/custom: "true"
+    dashboard.grafana.io/source: "Migrated from backup and modernized for VictoriaMetrics"
+    dashboard.grafana.io/created-date: "2025-11-08"
+data:
+  global-overview.json: |-
+    {
+      "dashboard": {
+        "title": "Multi-Cluster - Global Overview",
+        "uid": "global-overview",
+        "tags": ["multi-cluster", "overview", "global"],
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Total Clusters",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+            "targets": [{
+              "expr": "count(count by (cluster) (up))",
+              "legendFormat": "Clusters"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Total Nodes",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+            "targets": [{
+              "expr": "count(kube_node_info)",
+              "legendFormat": "Nodes"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Total Pods",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+            "targets": [{
+              "expr": "count(kube_pod_info)",
+              "legendFormat": "Pods"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Alerting Status",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+            "targets": [{
+              "expr": "count(ALERTS{alertstate=\"firing\"})",
+              "legendFormat": "Firing Alerts"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              },
+              "colorMode": "background",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"value": 0, "color": "green"},
+                  {"value": 1, "color": "yellow"},
+                  {"value": 5, "color": "red"}
+                ]
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "VictoriaMetrics Storage",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+            "targets": [{
+              "expr": "sum(vm_data_size_bytes)",
+              "legendFormat": "Total Data Size"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 6,
+            "title": "VictoriaLogs Storage",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+            "targets": [{
+              "expr": "sum(vl_data_size_bytes)",
+              "legendFormat": "Total Log Data"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 7,
+            "title": "Database Clusters",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 12},
+            "targets": [{
+              "expr": "count(cnpg_pg_postmaster_up == 1)",
+              "legendFormat": "PostgreSQL Instances"
+            }, {
+              "expr": "count(dragonfly_uptime_in_seconds)",
+              "legendFormat": "DragonflyDB Instances"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 8,
+            "title": "Storage Health",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 8, "x": 8, "y": 12},
+            "targets": [{
+              "expr": "ceph_health_status",
+              "legendFormat": "Ceph Health"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {"value": 0, "color": "green"},
+                  {"value": 1, "color": "yellow"},
+                  {"value": 2, "color": "red"}
+                ]
+              }
+            }
+          },
+          {
+            "id": 9,
+            "title": "Certificate Expiry",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 8, "x": 16, "y": 12},
+            "targets": [{
+              "expr": "min(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400",
+              "legendFormat": "Days until expiry"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "days"
+              }
+            }
+          }
+        ]
+      }
+    }

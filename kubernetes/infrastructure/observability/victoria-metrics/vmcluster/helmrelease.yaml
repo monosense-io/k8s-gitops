@@ -230,14 +230,54 @@ spec:
         dashboardproviders.yaml:
           apiVersion: 1
           providers:
-            - name: 'default'
+            - name: 'infrastructure'
               orgId: 1
-              folder: ''
+              folder: 'Infrastructure'
               type: file
               disableDeletion: false
               editable: true
               options:
-                path: /var/lib/grafana/dashboards/default
+                path: /var/lib/grafana/dashboards/infrastructure
+            - name: 'databases'
+              orgId: 1
+              folder: 'Databases'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/databases
+            - name: 'observability'
+              orgId: 1
+              folder: 'Observability'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/observability
+            - name: 'workloads'
+              orgId: 1
+              folder: 'Workloads'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/workloads
+            - name: 'multi-cluster'
+              orgId: 1
+              folder: 'Multi-Cluster'
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/multi-cluster
+      sidecar:
+        dashboards:
+          enabled: true
+          searchNamespace: observability
+          label: grafana_dashboard
+          labelValue: "1"
+          provider:
+            foldersFromFilesStructure: true
       resources:
         limits:
           cpu: 1

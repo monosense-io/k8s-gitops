@@ -1,0 +1,112 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-dragonfly
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    dashboard.grafana.io/custom: "true"
+    dashboard.grafana.io/source: "Created for DragonflyDB monitoring"
+    dashboard.grafana.io/created-date: "2025-11-08"
+data:
+  dragonfly-cache.json: |-
+    {
+      "dashboard": {
+        "title": "DragonflyDB - Cache Performance [${CLUSTER}]",
+        "uid": "dragonfly-cache",
+        "tags": ["dragonfly", "cache", "redis", "${CLUSTER}"],
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "templating": {
+          "list": [
+            {
+              "name": "namespace",
+              "type": "constant",
+              "current": {
+                "value": "dragonfly-system"
+              }
+            },
+            {
+              "name": "instance",
+              "type": "query",
+              "datasource": "VictoriaMetrics",
+              "query": "label_values(dragonfly_uptime_in_seconds{namespace=\"$namespace\"}, pod)",
+              "refresh": 1,
+              "multi": false,
+              "includeAll": false
+            }
+          ]
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "DragonflyDB Status",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+            "targets": [{
+              "expr": "dragonfly_uptime_in_seconds{namespace=\"$namespace\",pod=\"$instance\"}",
+              "legendFormat": "Uptime (seconds)"
+            }],
+            "options": {
+              "reduceOptions": {
+                "calcs": ["lastNotNull"]
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Connected Clients",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+            "targets": [{
+              "expr": "dragonfly_connected_clients{namespace=\"$namespace\",pod=\"$instance\"}",
+              "legendFormat": "Clients"
+            }]
+          },
+          {
+            "id": 3,
+            "title": "Memory Usage (RSS)",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+            "targets": [{
+              "expr": "dragonfly_used_memory_rss{namespace=\"$namespace\",pod=\"$instance\"}",
+              "legendFormat": "RSS Memory"
+            }],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "bytes"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Commands Processed",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+            "targets": [{
+              "expr": "rate(dragonfly_commands_processed_total{namespace=\"$namespace\",pod=\"$instance\"}[5m])",
+              "legendFormat": "Commands/sec"
+            }]
+          },
+          {
+            "id": 5,
+            "title": "Keyspace Operations",
+            "type": "timeseries",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+            "targets": [{
+              "expr": "rate(dragonfly_keyspace_hits_total{namespace=\"$namespace\",pod=\"$instance\"}[5m])",
+              "legendFormat": "Hits/sec"
+            }, {
+              "expr": "rate(dragonfly_keyspace_misses_total{namespace=\"$namespace\",pod=\"$instance\"}[5m])",
+              "legendFormat": "Misses/sec"
+            }]
+          }
+        ]
+      }
+    }
