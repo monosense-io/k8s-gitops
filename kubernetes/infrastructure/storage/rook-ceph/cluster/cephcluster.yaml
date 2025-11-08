@@ -78,26 +78,36 @@ spec:
       databaseSizeMB: "10240"  # 10GB RocksDB metadata
       walSizeMB: "1024"  # 1GB Write-Ahead Log
 
-    # Per-node device specification using stable EUI identifiers
+    # Per-node device specification using stable identifiers
     # Device allocation:
-    # - 512GB NVMe: Reserved for OpenEBS (/var/mnt/openebs)
+    # - 512GB NVMe (TEAM TM8FP6512G): Reserved for OpenEBS (/var/mnt/openebs)
     # - 1TB NVMe: Reserved for Rook-Ceph (below paths)
+    #
+    # Infra cluster uses:
+    # - infra-01: /dev/disk/by-id/nvme-eui.6479a7726a304b94 (1TB PNY CS1031)
+    # - infra-02: /dev/disk/by-id/nvme-eui.6479a77cda30650b (1TB PNY CS2241)
+    # - infra-03: /dev/disk/by-id/nvme-eui.6479a7726a3054e5 (1TB PNY CS1031)
+    #
+    # Apps cluster uses:
+    # - apps-01: /dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301178 (1TB TEAM)
+    # - apps-02: /dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301595 (1TB TEAM)
+    # - apps-03: /dev/disk/by-id/nvme-eui.6479a7726a304bbf (1TB PNY CS1031)
     nodes:
-      - name: "infra-01"
+      - name: "apps-01"
         devices:
-          - name: "/dev/disk/by-id/nvme-eui.6479a7726a304b94"  # 1TB PNY CS1031
+          - name: "/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301178"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
-      - name: "infra-02"
+      - name: "apps-02"
         devices:
-          - name: "/dev/disk/by-id/nvme-eui.6479a77cda30650b"  # 1TB PNY CS2241
+          - name: "/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301595"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
-      - name: "infra-03"
+      - name: "apps-03"
         devices:
-          - name: "/dev/disk/by-id/nvme-eui.6479a7726a3054e5"  # 1TB PNY CS1031
+          - name: "/dev/disk/by-id/nvme-eui.6479a7726a304bbf"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
