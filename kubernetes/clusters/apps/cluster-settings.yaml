@@ -71,6 +71,14 @@ data:
   ROOK_CEPH_OSD_DEVICE_CLASS: "ssd"
   ROOK_CEPH_MON_COUNT: "3"
 
+  # Rook-Ceph Operator Configuration
+  ROOK_CEPH_OPERATOR_VERSION: "v1.18.6"
+  ROOK_CEPH_OPERATOR_REPLICAS: "1"
+  ROOK_CEPH_LOG_LEVEL: "INFO"
+  ROOK_CEPH_CSI_ENABLE_RBD: "true"
+  ROOK_CEPH_CSI_ENABLE_CEPHFS: "true"
+  ROOK_CEPH_CSI_LOG_LEVEL: "3"
+
   # Storage Classes
   BLOCK_SC: "rook-ceph-block"  # Generic Rook-Ceph block storage (RBD)
   OPENEBS_LOCAL_SC: "openebs-local-nvme"  # Local NVMe storage

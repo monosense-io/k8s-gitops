@@ -1,0 +1,18 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rook-ceph-operator
+  namespace: rook-ceph
+  labels:
+    app.kubernetes.io/name: rook-ceph-operator
+    app.kubernetes.io/component: operator
+spec:
+  selector:
+    matchLabels:
+      app: rook-ceph-operator
+  podMetricsEndpoints:
+    - port: http-metrics  # Port 9090
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

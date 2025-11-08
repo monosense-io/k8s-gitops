@@ -44,3 +44,22 @@ spec:
           annotations:
             summary: "Rook-Ceph discovery daemon is down"
             description: "Rook-Ceph discovery daemon pod {{ $labels.pod }} is down"
+
+        - alert: RookCephOperatorCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="rook-ceph",pod=~"rook-ceph-operator.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rook-Ceph operator is crashlooping"
+            description: "Rook-Ceph operator pod {{ $labels.pod }} is restarting frequently ({{ $value }} restarts/sec)"
+
+        - alert: RookCephOperatorHighMemory
+          expr: |
+            (container_memory_working_set_bytes{namespace="rook-ceph",container="rook-ceph-operator"} / container_spec_memory_limit_bytes{namespace="rook-ceph",container="rook-ceph-operator"}) > 0.80
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Rook-Ceph operator high memory usage"
+            description: "Rook-Ceph operator pod {{ $labels.pod }} memory usage is above 80% ({{ $value | humanizePercentage }})"

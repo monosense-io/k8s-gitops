@@ -401,6 +401,50 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+#### **Story 30: STORY-STO-APPS-ROOK-CEPH-OPERATOR**
+- **Status**: ✅ **COMPLETE** (Enhanced Shared Operator)
+- **Sprint**: 6 | Lane: Storage
+- **Commit**: TBD - feat(storage): enhance Rook-Ceph operator documentation and monitoring (Story 30)
+- **Date**: 2025-11-08
+- **Chart Version**: v1.18.6 (already latest stable - no upgrade needed!)
+- **Deliverables**:
+  - **Comprehensive README** (650+ lines):
+    - Operator architecture and components (operator, CSI drivers, discovery daemon, webhooks)
+    - CSI drivers explained (RBD vs CephFS use cases)
+    - Node preparation (disk cleanup commands, Talos considerations)
+    - Troubleshooting procedures (operator, CSI, discovery daemon issues)
+    - Upgrade procedures (operator → Ceph version path)
+    - Multi-cluster isolation details
+    - Rook-Ceph vs OpenEBS comparison matrix
+  - **Explicit PodMonitor**: Direct control vs Helm-managed ServiceMonitor
+  - **Enhanced Monitoring**: Added 2 new PrometheusRules (6 total alerts):
+    - RookCephOperatorCrashLooping (restart rate increasing)
+    - RookCephOperatorHighMemory (memory usage >80%)
+    - (Existing: OperatorDown, ReconcileErrors, CRDMissing, DiscoveryDaemonDown)
+  - **Cluster-Settings Variables**: Operator-specific configuration for both clusters:
+    - ROOK_CEPH_OPERATOR_VERSION, ROOK_CEPH_OPERATOR_REPLICAS
+    - ROOK_CEPH_LOG_LEVEL, ROOK_CEPH_CSI_ENABLE_RBD, ROOK_CEPH_CSI_ENABLE_CEPHFS
+    - ROOK_CEPH_CSI_LOG_LEVEL
+  - **Multi-Cluster**: Enhancements benefit BOTH infra and apps clusters (shared operator in bases/)
+- **Files Created**:
+  - `kubernetes/bases/rook-ceph-operator/operator/README.md`
+  - `kubernetes/bases/rook-ceph-operator/operator/podmonitor.yaml`
+- **Files Modified**:
+  - `kubernetes/bases/rook-ceph-operator/operator/prometheusrule.yaml` (+2 alerts)
+  - `kubernetes/bases/rook-ceph-operator/operator/kustomization.yaml` (includes podmonitor)
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (operator variables)
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (operator variables)
+- **Impact**:
+  - Both infra and apps clusters receive enhancements
+  - Self-documenting operator with comprehensive troubleshooting guide
+  - Improved monitoring coverage (crashloop, memory alerts)
+  - Operator already at latest stable version (v1.18.6)
+  - Ready for CephCluster deployment (Story 31)
+- **Dependencies**: Story 15 (Rook-Ceph Operator - infra cluster)
+- **Note**: Apps cluster already wired via shared operator in bases/rook-ceph-operator/operator/. Deployment and validation deferred to Story 45.
+
+---
+
 ### 📊 Observability Layer
 
 #### **Story 17: STORY-OBS-VM-STACK**
