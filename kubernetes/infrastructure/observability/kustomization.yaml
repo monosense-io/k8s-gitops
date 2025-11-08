@@ -5,4 +5,3 @@ resources:
   - victoria-metrics/vmcluster/ks.yaml
   - victoria-metrics/vmagent/ks.yaml
   - victoria-logs/ks.yaml
-  - fluent-bit-operator/ks.yaml
