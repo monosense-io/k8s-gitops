@@ -1,44 +1,20 @@
+---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: fluent-bit
   namespace: fluent-bit
-  labels:
-    app.kubernetes.io/name: fluent-bit
-    app.kubernetes.io/component: operator
-    app.kubernetes.io/part-of: logging
-    app.kubernetes.io/managed-by: flux
 spec:
   interval: 30m
   chartRef:
     kind: OCIRepository
     name: fluent-bit
-    namespace: fluent-bit
   driftDetection:
     mode: enabled
-  install:
-    crds: Create
-    remediation:
-      retries: 3
-  upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 3
   values:
     image:
       repository: fluent/fluent-bit
       tag: "4.1.1"
-
-    # ServiceAccount configuration
-    serviceAccount:
-      create: true
-      annotations:
-        kubectl.kubernetes.io/default-container: fluent-bit
-
-    # RBAC configuration
-    rbac:
-      create: true
-      nodeAccess: true
 
     # DaemonSet configuration
     daemonSet:
@@ -46,22 +22,6 @@ spec:
         type: RollingUpdate
         rollingUpdate:
           maxUnavailable: 1
-
-    # Pod configuration
-    podAnnotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "2020"
-      prometheus.io/path: "/api/v1/metrics/prometheus"
-
-    podSecurityContext:
-      runAsUser: 0
-      fsGroup: 0
-
-    containerSecurityContext:
-      privileged: true
-      readOnlyRootFilesystem: false
-      capabilities:
-        drop: []
 
     # Resources
     resources:
@@ -102,36 +62,110 @@ spec:
     tolerations:
       - operator: Exists
 
-    # Node selector for all nodes
-    nodeSelector: {}
+    # Security
+    podSecurityContext:
+      runAsUser: 0
+      fsGroup: 0
+    containerSecurityContext:
+      privileged: true
+      readOnlyRootFilesystem: false
 
-    # Affinity rules
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: kubernetes.io/os
-                  operator: In
-                  values:
-                    - linux
+    # Priority
+    priorityClassName: system-node-critical
+
+    # RBAC
+    rbac:
+      create: true
+      nodeAccess: true
+
+    # Service account
+    serviceAccount:
+      create: true
+
+    # Configuration
+    config:
+      service: |
+        [SERVICE]
+            Flush        5
+            Daemon       Off
+            Log_Level    info
+            Parsers_File parsers.conf
+            HTTP_Server  On
+            HTTP_Listen  0.0.0.0
+            HTTP_Port    2020
+            Health_Check On
+
+      inputs: |
+        [INPUT]
+            Name              tail
+            Path              /var/log/containers/*.log
+            Exclude_Path      /var/log/containers/*fluent-bit*.log
+            Parser            cri
+            Tag               kube.*
+            DB                /var/log/flb_kube.db
+            DB.Sync           Normal
+            Mem_Buf_Limit     5MB
+            Skip_Long_Lines   On
+            Refresh_Interval  10
+            Rotate_Wait       30
+
+      filters: |
+        [FILTER]
+            Name                kubernetes
+            Match               kube.*
+            Kube_URL            https://kubernetes.default.svc:443
+            Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+            Merge_Log           On
+            Merge_Log_Key       log_processed
+            K8S-Logging.Parser  On
+            K8S-Logging.Exclude On
+            Labels              On
+            Annotations         On
+
+        [FILTER]
+            Name          modify
+            Match         kube.*
+            Add           cluster ${CLUSTER}
+            Add           tenant ${OBSERVABILITY_LOG_TENANT}
+
+        [FILTER]
+            Name          grep
+            Match         kube.*
+            Exclude       log ^$
+
+      outputs: |
+        [OUTPUT]
+            Name          http
+            Match         kube.*
+            Host          ${OBSERVABILITY_LOG_ENDPOINT_HOST}
+            Port          ${OBSERVABILITY_LOG_ENDPOINT_PORT}
+            URI           ${OBSERVABILITY_LOG_ENDPOINT_PATH}
+            Format        json
+            Header        X-Scope-OrgID ${OBSERVABILITY_LOG_TENANT}
+            compress      gzip
+            Retry_Limit   3
+
+        [OUTPUT]
+            Name          stdout
+            Match         *
+            Format        json_lines
+
+      parsers: |
+        [PARSER]
+            Name   cri
+            Format json
+            Time_Key time
+            Time_Format %Y-%m-%dT%H:%M:%S.%L
+            Time_Keep   On
+            Field_name message
+            Field_name stream
+            Field_name time
 
     # Monitoring
     serviceMonitor:
       enabled: true
       namespace: fluent-bit
-      annotations:
-        prometheus.io/scrape: "true"
       labels:
         app.kubernetes.io/name: fluent-bit
         app.kubernetes.io/component: monitoring
-        app.kubernetes.io/part-of: logging
-
-    # Anti-Affinity for pod distribution
-    antiAffinity: soft
-
-    # Priority class for critical system component
-    priorityClassName: system-node-critical
-
-    # Termination grace period
-    terminationGracePeriodSeconds: 30
