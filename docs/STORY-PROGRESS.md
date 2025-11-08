@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 27 / 50 (54%)
+**Completed**: 28 / 50 (56%)
 
 ---
 
@@ -17,7 +17,7 @@ Storage:       ████████████████ 100% (5/5 storie
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
 Operations:    ████████████████ 100% (1/1 stories) ✅
-CI/CD:         ██░░░░░░░░░░░░  13% (2/15 stories)
+CI/CD:         ███░░░░░░░░░░░  20% (3/15 stories)
 Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 ```
 
@@ -1068,6 +1068,92 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+#### **Story 34: STORY-CICD-HARBOR-APPS**
+- **Status**: ✅ **COMPLETE** (v1.0 - Manifests-First with Zero Secrets in Git)
+- **Sprint**: 7 | Lane: CI/CD
+- **Commit**: `630f81e` - feat(harbor): add Harbor v2.14.0 container registry with external state (Story 34)
+- **Date**: 2025-11-08
+- **Version**: Harbor v2.14.0 (Helm chart 1.18.0, September 2024)
+- **Deliverables**:
+  - **Harbor Container Registry**:
+    - Self-managed Harbor v2.14.0 on infra cluster
+    - External PostgreSQL via CNPG pooler (harbor-pooler-rw.cnpg-system, transaction mode, 200 connections)
+    - External Redis via DragonflyDB v1.34.2 (dragonfly.dragonfly-system)
+    - External S3 via MinIO (http://10.25.11.3:9000, bucket: harbor)
+    - Gateway API HTTPS: harbor.infra.monosense.io
+    - Components: Core (2), Portal (2), Registry (2), JobService (1, 10Gi PVC), Trivy (2, 5Gi PVC)
+  - **Disabled Components**:
+    - ChartMuseum: Disabled (use OCI artifacts instead)
+    - Notary: Disabled (content trust can be enabled later)
+  - **Critical MinIO Configuration**:
+    - `persistence.imageChartStorage.disableredirect: true` - REQUIRED for MinIO (no S3 redirects)
+    - `registry.relativeurls: true` - REQUIRED for Gateway-fronted Harbor (avoid HTTPS→HTTP downgrade)
+  - **External Dependencies** (5 ExternalSecrets from 1Password):
+    - Database: `kubernetes/infra/harbor/database` (host, port, database, username, password, sslmode)
+    - Redis: `kubernetes/infra/harbor/redis` (addr, password)
+    - S3: `kubernetes/infra/harbor/s3` (regionendpoint, bucket, accesskey, secretkey, region)
+    - Admin: `kubernetes/infra/harbor/admin` (password)
+    - Core: `kubernetes/infra/harbor/core` (secret_key, xsrf_key, registry_password)
+  - **Networking & Security**:
+    - Gateway API HTTPRoute (harbor.infra.monosense.io)
+    - NetworkPolicies: Egress to CNPG, DragonflyDB, MinIO, Trivy CVE updates
+    - PSA baseline (Harbor runs as non-root)
+    - Trivy scanner: Automatic vulnerability scanning on image push
+  - **Monitoring**:
+    - 8 VMRule alerts: core/registry availability, DB/Redis/S3 connectivity, scan failures, latency, cert expiry
+    - Metrics endpoints: core, registry, jobservice (port 8001)
+  - **Documentation**:
+    - Comprehensive README (640+ lines): architecture, external dependencies, troubleshooting, maintenance, security, integrations
+    - External dependency setup and testing procedures
+    - Docker login, image push/pull operations
+    - Integration examples: GitLab CI/CD, GitHub Actions, Kubernetes deployments
+- **Files Created** (12 files, 1,430 lines):
+  - `kubernetes/workloads/platform/registry/harbor/namespace.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/helmrepository.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/externalsecrets.yaml` (5 ExternalSecrets)
+  - `kubernetes/workloads/platform/registry/harbor/helmrelease.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/httproute.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/networkpolicy.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/kustomization.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/ks.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/monitoring/vmrule.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/monitoring/kustomization.yaml`
+  - `kubernetes/workloads/platform/registry/harbor/README.md`
+- **Files Modified**:
+  - `kubernetes/clusters/infra/cluster-settings.yaml` (+11 non-sensitive variables)
+- **Security Highlights** ✨:
+  - **Zero secrets in git**: All credentials ONLY in 1Password (5 separate secrets)
+  - PSA baseline enforcement
+  - NetworkPolicies with zero-trust egress
+  - ExternalSecrets with 1h refresh interval
+  - Trivy vulnerability scanning on push
+  - TLS everywhere (Gateway API + Let's Encrypt)
+- **Resource Estimates** (10-50 users):
+  - CPU: ~2 cores (requests), ~4.5 cores (limits)
+  - Memory: ~2.5Gi (requests), ~5Gi (limits)
+  - Storage: 15Gi (10Gi JobService + 5Gi Trivy on Rook-Ceph)
+- **Breaking Changes from Story Spec**:
+  - Chart version: Pinned 1.18.0 (vs >=1.14.0 <2.0.0 semver)
+  - Harbor version: Pinned 2.14.0 (latest stable)
+  - Monitoring: VMRule (vs PrometheusRule, using VictoriaMetrics)
+  - Alerts: 8 alerts (vs 6, added latency + cert expiry)
+  - Trivy: 2 replicas (vs 1, for HA scanning)
+- **Prerequisites for Story 45 Deployment**:
+  - 5 1Password secrets created (database, redis, s3, admin, core)
+  - MinIO deployed at http://10.25.11.3:9000 (external to k8s)
+  - MinIO bucket 'harbor' created
+  - DNS record for harbor.infra.monosense.io
+  - Core secret keys generated (secret_key, xsrf_key, registry_password)
+- **Dependencies**: Story 23-24 (CNPG), Story 25 (DragonflyDB), Story 05 (External Secrets), Story 06 (cert-manager), Story 03 (Gateway API), Story 16 (Rook-Ceph), Story 17 (VictoriaMetrics)
+- **Impact**:
+  - Self-hosted container registry (no external fees)
+  - Automatic vulnerability scanning with Trivy
+  - Integration ready for GitLab (Story 33) and GitHub ARC (Story 32)
+  - HA configuration with PodDisruptionBudgets
+- **Note**: Deployment and validation deferred to Story 45. All secrets properly secured in 1Password (zero secrets in git repository).
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -1164,12 +1250,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 27 |
-| **Total Commits** | 27 |
-| **Lines Added** | ~14,118 |
-| **Files Created** | ~172 |
+| **Stories Completed** | 28 |
+| **Total Commits** | 28 |
+| **Lines Added** | ~15,548 |
+| **Files Created** | ~184 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (27/27) |
+| **Success Rate** | 100% (28/28) |
 
 ---
 
@@ -1181,7 +1267,7 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 | Phase | Status | Stories |
 |---|---|---|
-| **Phase 1**: Manifest Creation | 🚧 In Progress (50% done) | Stories 01-44 |
+| **Phase 1**: Manifest Creation | 🚧 In Progress (56% done) | Stories 01-44 |
 | **Phase 2**: Cluster Deployment | ⏸️ Not Started | Story 45 |
 | **Phase 3**: Integration Testing | ⏸️ Not Started | Stories 46-50 |
 
@@ -1196,4 +1282,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Added Story 33 tracking - GitLab CE with Kaniko runner)
+**Last Updated**: 2025-11-08 by Claude Code (Added Story 34 tracking - Harbor container registry)
