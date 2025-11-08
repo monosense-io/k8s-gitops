@@ -43,6 +43,10 @@ spec:
       type: wireguard
       nodeEncryption: false
 
+    # DNS Proxy (required for FQDN-based NetworkPolicies)
+    dnsProxy:
+      enabled: true
+
     # Hubble observability
     hubble:
       enabled: true

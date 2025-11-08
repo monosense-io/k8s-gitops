@@ -2,9 +2,9 @@
 
 **Project**: Multi-Cluster GitOps Home Lab (v3.0)
 **Approach**: Manifests-First (deployment deferred to Story 45)
-**Last Updated**: 2025-11-01
+**Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 19 / 50 (38%)
+**Completed**: 20 / 50 (40%)
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```
 Networking:  ████████████████ 100% (9/9 core stories) ✅
-Security:    ███░░░░░░░░░░░  20% (2/10 stories)
+Security:    ████░░░░░░░░░░  30% (3/10 stories)
 Storage:     ████████████████ 100% (3/3 stories) ✅
 Observability: ████░░░░░░░░░░  25% (1/4 stories)
 Databases:   ████████████████ 100% (3/3 stories) ✅
@@ -263,6 +263,50 @@ Validation:  ░░░░░░░░░░░░░   0% (0/6 stories)
   - `kubernetes/infrastructure/security/cert-manager/app/certificate-wildcard.yaml`
   - `kubernetes/infrastructure/security/cert-manager/app/externalsecret-cloudflare.yaml`
 - **Dependencies**: Story 05 (External Secrets)
+
+---
+
+#### **Story 26: STORY-SEC-NP-BASELINE**
+- **Status**: ✅ **COMPLETE** (v1.0 - Baseline NetworkPolicy Infrastructure)
+- **Sprint**: 5 | Lane: Security
+- **Commit**: TBD - feat(security): enable baseline NetworkPolicy infrastructure (Story 26 - v1.0)
+- **Date**: 2025-11-08
+- **Deliverables**:
+  - **Reusable NetworkPolicy Components** (5 components in `kubernetes/components/networkpolicy/`):
+    - `deny-all/` - Default deny all ingress/egress (K8s NP + Cilium CNP)
+    - `allow-dns/` - DNS resolution policies (K8s NP + Cilium CNP)
+    - `allow-kube-api/` - Kubernetes API access (K8s NP + Cilium CNP)
+    - `allow-internal/` - Pod-to-pod within namespace (K8s NP + Cilium CNP)
+    - `allow-fqdn/` - FQDN-based egress filtering (Cilium CNP only)
+  - **Baseline Policies for 15 Platform Namespaces**:
+    - Infrastructure: flux-system, cert-manager, external-secrets, kube-system
+    - Networking: networking
+    - Storage: rook-ceph, openebs-system
+    - Observability: observability
+    - Databases: cnpg-system, dragonfly-system, dragonfly-operator-system
+    - Identity: keycloak-operator-system, keycloak-system
+    - Applications: harbor, gitlab-system (future)
+  - **DNS Proxy Explicit Configuration**: Added `dnsProxy.enabled: true` to Cilium HelmRelease
+  - **Infrastructure Enabled**: NetworkPolicy infrastructure active in security kustomization
+  - **135 Network Policies Generated**: 9 policies per namespace (default-deny, DNS, kube-api, internal)
+  - **Zero-Trust Foundation**: All platform namespaces now have default-deny baseline with explicit allow rules
+- **Files Created**:
+  - 15 namespace overlay directories in `kubernetes/infrastructure/security/networkpolicy/`
+  - Each namespace contains `kustomization.yaml` referencing baseline components
+  - All 5 reusable components already existed, validated for compliance
+- **Files Modified**:
+  - `kubernetes/infrastructure/security/kustomization.yaml` (enabled networkpolicy/ks.yaml)
+  - `kubernetes/infrastructure/networking/cilium/core/app/helmrelease.yaml` (added dnsProxy.enabled)
+  - `kubernetes/components/networkpolicy/*/kustomization.yaml` (corrected to kind: Component)
+- **Impact**:
+  - **Zero-Trust Security**: All platform namespaces protected by default-deny policies
+  - **DNS Resolution**: Explicit allow for kube-dns (port 53 UDP/TCP)
+  - **Kubernetes API**: Explicit allow for kube-apiserver access (ports 443/6443)
+  - **Internal Communication**: Pod-to-pod allowed within namespaces
+  - **FQDN Support**: Cilium DNS proxy explicitly enabled for future FQDN policies
+  - **Comprehensive Coverage**: 100% of platform infrastructure secured
+- **Dependencies**: Story 01 (Cilium Core)
+- **Note**: Deployment and runtime validation deferred to Story 45 per v3.0 manifests-first approach
 
 ---
 
@@ -585,12 +629,53 @@ None currently.
 
 ## 📋 Next Candidates (Prioritized)
 
-### **Priority 1: Story 28 - SPIRE + Cilium Auth** 🔐
+### **Story 18: STORY-OBS-VICTORIALOGS** 📊 ⭐ NEXT
 - **Status**: 📋 **READY**
-- **Dependencies**: ✅ ALL SATISFIED (Storage now available)
-- **Strategic Value**: Completes ClusterMesh security with workload identity
-- **Effort**: 3-4 hours
-- **Unlocks**: Zero-trust policies, CiliumAuthPolicy
+- **Sprint**: 3 | Lane: Observability
+- **Dependencies**: ✅ Storage (Stories 14-16)
+- **Strategic Value**: Complete observability stack (metrics ✅, logs ⏳)
+- **Effort**: 2-3 hours
+- **Deliverables**: VictoriaLogs cluster, centralized logging foundation
+
+### **Story 19: STORY-OBS-FLUENT-BIT** 📤
+- **Status**: ⏸️ **BLOCKED** (requires Story 18)
+- **Sprint**: 3 | Lane: Observability
+- **Dependencies**: Story 18 (VictoriaLogs)
+- **Strategic Value**: Log collection and forwarding
+- **Effort**: 2-3 hours
+- **Deliverables**: Fluent Bit DaemonSet, log parsing and forwarding
+
+### **Story 7: STORY-OPS-STAKATER-RELOADER** 🔄
+- **Status**: 📋 **READY**
+- **Sprint**: 2 | Lane: Operations
+- **Dependencies**: ✅ None
+- **Strategic Value**: Auto-restart pods on secret/configmap rotation
+- **Effort**: 1-2 hours
+- **Deliverables**: Stakater Reloader operator for automated rollouts
+
+---
+
+## ⏸️ Deferred Stories
+
+### **Story 28: STORY-SEC-SPIRE-CILIUM-AUTH** ⛔
+- **Status**: ⏸️ **DEFERRED** (ClusterMesh incompatibility)
+- **Sprint**: 6 | Lane: Security
+- **Blocker**: ⚠️ **CRITICAL** - Cilium Mutual Authentication NOT compatible with Cluster Mesh (as of v1.18.3)
+- **Reason**: ClusterMesh is higher priority for cross-cluster service discovery and DragonflyDB access
+- **Alternative**: WireGuard node-to-node encryption + NetworkPolicies + App-level TLS (current architecture)
+- **Additional Concerns**:
+  - Beta status (not GA)
+  - Eventual consistency security risks (auth cache delays can allow unauthorized traffic)
+  - "mTLess" architecture (no end-to-end encryption, requires separate WireGuard/IPsec)
+  - Manual SPIRE entry creation for auto-scaling nodes (no Helm automation)
+  - Cross-node traffic issues with entry deletion
+  - 99% latency increase in benchmarks
+- **Reevaluation**: Check Cilium v1.19+ release notes for ClusterMesh + Mutual Auth compatibility
+- **Fallback**: Deploy Istio to specific namespaces if L7 mTLS becomes critical
+- **References**:
+  - [Cilium Docs: ClusterMesh incompatibility](https://docs.cilium.io/en/stable/network/servicemesh/mutual-authentication/mutual-authentication/)
+  - [GitHub Issue #28986: Mutual Auth Maturity](https://github.com/cilium/cilium/issues/28986)
+  - [The New Stack: Cilium Mutual Auth Security Concerns](https://thenewstack.io/how-ciliums-mutual-authentication-can-compromise-security/)
 
 ---
 

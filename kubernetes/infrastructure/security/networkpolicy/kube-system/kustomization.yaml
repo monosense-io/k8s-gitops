@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kube-system
+
+# IMPORTANT: kube-system contains critical components (Cilium, CoreDNS, Spegel)
+# Baseline policies are applied, but additional policies may be needed for:
+# - Cilium agents (cluster-wide communication)
+# - CoreDNS (accessible by all pods cluster-wide)
+# - kube-proxy replacement components
+
+components:
+  - ../../../../components/networkpolicy/deny-all
+  - ../../../../components/networkpolicy/allow-dns
+  - ../../../../components/networkpolicy/allow-kube-api
+  - ../../../../components/networkpolicy/allow-internal

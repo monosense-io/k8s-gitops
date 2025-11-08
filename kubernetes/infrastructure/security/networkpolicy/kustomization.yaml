@@ -4,14 +4,31 @@ kind: Kustomization
 # Apply baseline network policies to platform namespaces
 
 resources:
+  # Infrastructure namespaces (Critical)
+  - flux-system
+  - cert-manager
+  - external-secrets
+  - kube-system
+
+  # Networking namespaces
+  - networking
+
+  # Storage namespaces
+  - rook-ceph
+  - openebs-system
+
   # Observability namespace
-  - observability-policies.yaml
+  - observability
 
   # Database namespaces
-  - cnpg-system-policies.yaml
-  - dragonfly-system-policies.yaml
+  - cnpg-system
+  - dragonfly-system
+  - dragonfly-operator-system
 
-  # Platform namespaces
-  - harbor-policies.yaml
-  - gitlab-system-policies.yaml
-  - flux-system-policies.yaml
+  # Identity namespaces
+  - keycloak-operator-system
+  - keycloak-system
+
+  # Application namespaces (future)
+  - harbor
+  - gitlab-system

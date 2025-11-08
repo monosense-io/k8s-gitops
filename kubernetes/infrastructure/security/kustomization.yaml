@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - external-secrets/ks.yaml
   - cert-manager/ks.yaml
+  - networkpolicy/ks.yaml

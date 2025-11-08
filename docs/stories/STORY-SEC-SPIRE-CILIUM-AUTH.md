@@ -4,10 +4,60 @@ Sequence: 28/50 | Prev: STORY-IDP-KEYCLOAK-OPERATOR.md | Next: STORY-STO-APPS-OP
 Sprint: 6 | Lane: Security
 Global Sequence: 28/50
 
-Status: Draft (v3.0 Refinement)
+**Status**: ⛔ **DEFERRED** (ClusterMesh Incompatibility - Blocker)
 Owner: Platform Engineering
-Date: 2025-10-26
+Date: 2025-10-26 (Original) | 2025-11-08 (Deferred)
 Links: docs/architecture.md §20, §21; kubernetes/infrastructure/security/spire/; kubernetes/infrastructure/networking/cilium/core/helmrelease.yaml; kubernetes/components/networkpolicy/auth/
+
+---
+
+## ⚠️ CRITICAL BLOCKER - STORY DEFERRED
+
+**Blocker**: Cilium Mutual Authentication is **NOT compatible with Cluster Mesh** as of Cilium v1.18.3.
+
+**From Cilium Official Documentation**:
+> "Clusters connected in a Cluster Mesh are not currently compatible with Mutual Authentication."
+
+**Impact**:
+- ClusterMesh (Story 12 - completed) is **required** for cross-cluster service discovery and DragonflyDB access
+- Cannot enable both ClusterMesh AND SPIRE-based mutual authentication simultaneously
+- This is a **hard architectural incompatibility**, not a configuration issue
+
+**Chosen Architecture** (from docs/architecture.md):
+- **Layer 1**: WireGuard node-to-node encryption (deployed via Story 01)
+- **Layer 2**: CiliumNetworkPolicy for L3/L4 filtering (Story 26 - next priority)
+- **Layer 3**: App-level TLS for sensitive cross-cluster traffic (PostgreSQL SSL, Redis TLS)
+- **Fallback**: Deploy Istio to specific namespaces if L7 mTLS becomes critical
+
+**Additional Concerns with Cilium SPIRE Integration**:
+1. **Beta Status**: Feature not GA (Generally Available) as of v1.18.3
+2. **Eventual Consistency Security Risk**: Auth cache delays can allow unauthorized traffic during propagation
+3. **"mTLess" Architecture**: Performs mTLS handshake for auth but discards encryption, requires separate WireGuard/IPsec
+4. **Auto-Scaling Incompatibility**: Manual SPIRE entry creation for each node, no Helm automation for ASGs/spot instances
+5. **Cross-Node Issues**: SPIFFE entry IDs won't auto-recreate after deletion, requires namespace redeployment
+6. **Performance Impact**: 99% latency increase in production benchmarks (vs Linkerd 33%, Istio Ambient 8%)
+
+**Reevaluation Criteria**:
+- [ ] Cilium v1.19+ adds ClusterMesh + Mutual Auth compatibility
+- [ ] Cilium documents production-ready cross-cluster SPIRE implementation
+- [ ] Feature graduates to GA with security model completeness
+- [ ] Performance benchmarks improve significantly
+
+**References**:
+- [Cilium v1.18 Docs: Mutual Authentication (Beta)](https://docs.cilium.io/en/stable/network/servicemesh/mutual-authentication/mutual-authentication/)
+- [GitHub Issue #28986: CFP - Completing Mutual Authentication + Stable Maturity](https://github.com/cilium/cilium/issues/28986)
+- [GitHub Issue #41250: SPIRE Integration Lacks Automatic Entry Creation](https://github.com/cilium/cilium/issues/41250)
+- [The New Stack: How Cilium's Mutual Authentication Can Compromise Security](https://thenewstack.io/how-ciliums-mutual-authentication-can-compromise-security/)
+- [arXiv: Performance Comparison of Service Mesh Frameworks (mTLS benchmarks)](https://arxiv.org/html/2411.02267v1)
+
+**Alternative Implementations** (if requirements change):
+1. **Standalone SPIRE**: Deploy SPIRE for application-level SPIFFE identities without Cilium integration
+2. **Istio for Specific Namespaces**: Deploy Istio sidecar to workloads requiring L7 mTLS (GitLab, Harbor, Mattermost)
+3. **Wait for Cilium v1.19+**: Monitor release notes for ClusterMesh compatibility improvements
+
+**Decision**: Story 28 remains **DEFERRED** indefinitely until Cilium resolves ClusterMesh incompatibility.
+
+---
 
 ## Story
 
