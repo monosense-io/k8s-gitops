@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 26 / 50 (52%)
+**Completed**: 27 / 50 (54%)
 
 ---
 
@@ -17,7 +17,7 @@ Storage:       ████████████████ 100% (5/5 storie
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
 Operations:    ████████████████ 100% (1/1 stories) ✅
-CI/CD:         █░░░░░░░░░░░░░   7% (1/15 stories)
+CI/CD:         ██░░░░░░░░░░░░  13% (2/15 stories)
 Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 ```
 
@@ -995,6 +995,79 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+#### **Story 33: STORY-CICD-GITLAB-APPS**
+- **Status**: ✅ **COMPLETE** (v3.0 - Manifests-First with Kaniko Security Enhancement)
+- **Sprint**: 7 | Lane: CI/CD
+- **Commit**: `31194f2` - feat(gitlab): add GitLab CE with external state and Kaniko runner (Story 33)
+- **Date**: 2025-11-08
+- **Version**: GitLab 18.5.1 (Helm chart 9.5.1) / Runner 0.70.0
+- **Deliverables**:
+  - **GitLab CE Application**:
+    - Self-managed GitLab 18.5.1 with external dependencies
+    - External PostgreSQL via CNPG pooler (transaction mode, 300 connections)
+    - External Redis via DragonflyDB v1.34.2 (Redis 7.x compatible)
+    - External S3 via MinIO (http://10.25.11.3:9000) - 6 buckets
+    - Keycloak OIDC SSO integration (sso.monosense.io on infra cluster)
+    - Gateway API HTTPS: gitlab.apps.monosense.io, registry.gitlab.apps.monosense.io
+    - Container Registry enabled with S3 backend
+    - Components: Webservice (2), Sidekiq (1), Gitaly (1), Registry (1), Shell (1), Toolbox (1)
+  - **GitLab Runner with Kaniko** ✨ **SECURITY IMPROVEMENT**:
+    - Kubernetes executor with Kaniko (rootless builds, NO privileged mode!)
+    - Story spec deviation: Replaced DIND with Kaniko (baseline PSA vs privileged)
+    - 10 concurrent jobs, auto-scaling
+    - S3 cache integration (gitlab-cache bucket)
+    - Tags: kubernetes, kaniko, apps-cluster
+    - Runner manager: 1 replica, 100m/128Mi resources
+  - **External Dependencies**:
+    - 5 ExternalSecrets: DB, Redis, S3, root password, OIDC credentials
+    - 1 Runner ExternalSecret: registration token
+    - All credentials from 1Password (1h refresh)
+  - **Networking & Security**:
+    - 2 Gateway API HTTPRoutes (web + registry)
+    - 3 NetworkPolicies (GitLab egress/ingress, Runner egress, Runner jobs egress)
+    - Baseline PSA for both namespaces (Kaniko = no privileged needed!)
+    - Non-root execution (UID 1000)
+  - **Monitoring**:
+    - 8 VMRule alerts (web availability, Sidekiq backlog, DB/Redis/S3 connectivity, cert expiry, error rates)
+    - VMServiceScrape for metrics collection
+  - **Documentation**:
+    - Comprehensive README (387 lines): architecture, dependencies, OIDC setup, troubleshooting
+    - Kaniko pipeline example (215 lines): secure rootless builds (primary)
+    - DIND pipeline example (269 lines): fallback with security warnings
+- **Files Created** (20 files, 2,322 lines):
+  - `kubernetes/workloads/tenants/gitlab/*` (9 files)
+  - `kubernetes/workloads/tenants/gitlab-runner/*` (8 files)
+  - `kubernetes/infrastructure/networking/cilium/gateway/gitlab-httproutes.yaml`
+  - `kubernetes/workloads/tenants/gitlab/examples/kaniko-pipeline.yml`
+  - `kubernetes/workloads/tenants/gitlab/examples/dind-pipeline.yml`
+  - `kubernetes/workloads/tenants/gitlab/README.md`
+- **Files Modified**:
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (+21 variables)
+- **Breaking Changes from Story Spec**:
+  - **Runner Security**: Kaniko instead of privileged DIND (PSA baseline vs privileged)
+  - **Keycloak Location**: Infra cluster (sso.monosense.io) not apps cluster
+  - **S3 Backend**: External MinIO (10.25.11.3:9000) not Rook-Ceph RGW
+- **Security Highlights**:
+  - NO privileged containers (Kaniko rootless builds)
+  - Baseline PSA for both namespaces
+  - NetworkPolicies with strict egress rules
+  - ExternalSecrets with 1h rotation
+  - OIDC SSO with JIT provisioning
+  - TLS everywhere (Gateway API + Let's Encrypt)
+- **Resource Requirements**:
+  - CPU: ~2.3 cores (requests), ~8 cores (limits)
+  - Memory: ~5.5Gi (requests), ~12Gi (limits)
+  - Storage: 50Gi (Gitaly PVC on Rook-Ceph)
+- **Prerequisites for Story 45 Deployment**:
+  - 6 1Password secrets (DB, Redis, S3, root, OIDC, runner token)
+  - 6 MinIO S3 buckets (artifacts, lfs, uploads, packages, registry, cache)
+  - Keycloak OIDC client (gitlab, confidential, RS256)
+  - DNS records (gitlab.apps.monosense.io, registry.gitlab.apps.monosense.io)
+- **Dependencies**: Story 23-24 (CNPG), Story 25 (DragonflyDB), Story 05 (External Secrets), Story 06 (cert-manager), Story 03 (Gateway API), Story 17 (VictoriaMetrics)
+- **Note**: Deployment and validation deferred to Story 45. Kaniko replaces DIND for production-grade security (no privileged containers). DIND documented as fallback option.
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -1091,12 +1164,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 26 |
-| **Total Commits** | 26 |
-| **Lines Added** | ~11,796 |
-| **Files Created** | ~152 |
+| **Stories Completed** | 27 |
+| **Total Commits** | 27 |
+| **Lines Added** | ~14,118 |
+| **Files Created** | ~172 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (26/26) |
+| **Success Rate** | 100% (27/27) |
 
 ---
 
@@ -1123,4 +1196,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Added Story 31 tracking - Rook-Ceph apps cluster configuration)
+**Last Updated**: 2025-11-08 by Claude Code (Added Story 33 tracking - GitLab CE with Kaniko runner)
