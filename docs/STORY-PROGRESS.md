@@ -4,7 +4,7 @@
 **Approach**: Manifests-First (deployment deferred to Story 45)
 **Last Updated**: 2025-11-08
 **Total Stories**: 50
-**Completed**: 25 / 50 (50%)
+**Completed**: 26 / 50 (52%)
 
 ---
 
@@ -13,7 +13,7 @@
 ```
 Networking:    ████████████████ 100% (9/9 core stories) ✅
 Security:      ████░░░░░░░░░░  30% (3/10 stories)
-Storage:       ████████████████ 100% (4/4 stories) ✅
+Storage:       ████████████████ 100% (5/5 stories) ✅
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
 Operations:    ████████████████ 100% (1/1 stories) ✅
@@ -369,7 +369,7 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 #### **Story 29: STORY-STO-APPS-OPENEBS-BASE**
 - **Status**: ✅ **COMPLETE** (v4.0 - Enhanced Shared Infrastructure)
 - **Sprint**: 6 | Lane: Storage
-- **Commit**: TBD - feat(storage): enhance OpenEBS to v4.3.3 with HA and monitoring (Story 29)
+- **Commit**: `bb60360` - feat(storage): enhance OpenEBS to v4.3.3 with HA and monitoring (Story 29)
 - **Date**: 2025-11-08
 - **Deliverables**:
   - **Chart Upgrade**: v4.3.2 → v4.3.3 (latest stable, August 2024)
@@ -404,7 +404,7 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 #### **Story 30: STORY-STO-APPS-ROOK-CEPH-OPERATOR**
 - **Status**: ✅ **COMPLETE** (Enhanced Shared Operator)
 - **Sprint**: 6 | Lane: Storage
-- **Commit**: TBD - feat(storage): enhance Rook-Ceph operator documentation and monitoring (Story 30)
+- **Commit**: `df1975f` - feat(storage): enhance Rook-Ceph operator with documentation and monitoring (Story 30)
 - **Date**: 2025-11-08
 - **Chart Version**: v1.18.6 (already latest stable - no upgrade needed!)
 - **Deliverables**:
@@ -442,6 +442,53 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
   - Ready for CephCluster deployment (Story 31)
 - **Dependencies**: Story 15 (Rook-Ceph Operator - infra cluster)
 - **Note**: Apps cluster already wired via shared operator in bases/rook-ceph-operator/operator/. Deployment and validation deferred to Story 45.
+
+---
+
+#### **Story 31: STORY-STO-APPS-ROOK-CEPH-CLUSTER**
+- **Status**: ✅ **COMPLETE** (Apps Cluster Configuration)
+- **Sprint**: 6 | Lane: Storage
+- **Commit**: `7537d4a` - feat(storage): enhance Rook-Ceph cluster with apps cluster configuration and documentation (Story 31)
+- **Date**: 2025-11-08
+- **Deliverables**:
+  - **CephCluster Configuration Updates**:
+    - Updated node names from infra cluster (infra-01/02/03) to apps cluster (apps-01/02/03)
+    - Configured discovered NVMe device paths for apps cluster nodes:
+      - apps-01: `/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301178` (1TB TEAM)
+      - apps-02: `/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301595` (1TB TEAM)
+      - apps-03: `/dev/disk/by-id/nvme-eui.6479a7726a304bbf` (1TB PNY CS1031)
+    - Maintained existing configuration: 3 MONs, 2 MGRs, BlueStore with 10GB RocksDB metadata
+  - **Comprehensive Documentation** (550+ lines):
+    - Architecture overview: 3-node Ceph cluster with component descriptions (MON, MGR, OSD, MDS)
+    - Capacity planning: Raw vs usable capacity calculations with replication overhead
+    - Toolbox usage guide: Essential Ceph commands for cluster management
+    - Troubleshooting procedures: Common issues and resolution steps
+    - Monitoring metrics and alerting information
+    - Scaling and upgrade procedures
+    - Security considerations and storage class usage patterns
+    - Hybrid storage strategy: OpenEBS LocalPV vs Rook-Ceph comparison
+  - **Shared Architecture**:
+    - CephCluster manifest shared between infra and apps clusters
+    - Cluster-specific node names and device paths documented inline
+    - Both clusters use 3-node HA configuration with 3x replication
+    - Usable capacity: ~900GB per cluster (3TB raw ÷ 3 replication)
+  - **Apps Cluster Storage Architecture**:
+    - 512GB NVMe per node for OpenEBS LocalPV (high-performance workloads)
+    - 1TB NVMe per node for Rook-Ceph (distributed HA storage)
+- **Files Created**:
+  - `kubernetes/infrastructure/storage/rook-ceph/cluster/README.md` (550 lines)
+- **Files Modified**:
+  - `kubernetes/infrastructure/storage/rook-ceph/cluster/cephcluster.yaml` (26 changes: node names + device paths)
+- **Versions**:
+  - Rook Operator: v1.18.6 (latest stable, configured in Story 30)
+  - Ceph: v19.2.3 Squid (latest stable release July 28, 2025)
+- **Impact**:
+  - Apps cluster ready for Rook-Ceph deployment (Story 45)
+  - Comprehensive documentation for cluster operations and troubleshooting
+  - Production-ready 3-node HA configuration with device-by-id stability
+  - Shared manifest enables consistent configuration across clusters
+- **Dependencies**: Story 30 (Rook-Ceph Operator apps enhancements), Story 29 (OpenEBS apps for MON PVCs)
+- **Note**: Device paths discovered via talosctl on apps cluster nodes. Deployment and health validation deferred to Story 45.
 
 ---
 
@@ -1036,7 +1083,7 @@ Foundation:
 | **Sprint 3** | Security + Observability | 3/3 ✅ | 0 |
 | **Sprint 4** | Networking Core | 6/6 ✅ | 0 |
 | **Sprint 5** | Storage Infrastructure | 3/3 ✅ | 0 |
-| **Sprint 6** | Multi-Cluster + Databases | 7/7 ✅ | 0 |
+| **Sprint 6** | Multi-Cluster + Databases | 8/8 ✅ | 0 |
 
 ---
 
@@ -1044,12 +1091,12 @@ Foundation:
 
 | Metric | Value |
 |---|---|
-| **Stories Completed** | 25 |
-| **Total Commits** | 25 |
-| **Lines Added** | ~11,228 |
-| **Files Created** | ~151 |
+| **Stories Completed** | 26 |
+| **Total Commits** | 26 |
+| **Lines Added** | ~11,796 |
+| **Files Created** | ~152 |
 | **Average Story Time** | 2-4 hours |
-| **Success Rate** | 100% (25/25) |
+| **Success Rate** | 100% (26/26) |
 
 ---
 
@@ -1076,4 +1123,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Story 32 - GitHub ARC with rootless DinD for pilar runners)
+**Last Updated**: 2025-11-08 by Claude Code (Added Story 31 tracking - Rook-Ceph apps cluster configuration)
