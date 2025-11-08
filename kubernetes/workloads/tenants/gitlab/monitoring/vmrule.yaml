@@ -1,0 +1,212 @@
+---
+# Victoria Metrics alerting rules for GitLab
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: gitlab
+  namespace: gitlab-system
+  labels:
+    app.kubernetes.io/name: gitlab
+    app.kubernetes.io/component: alerting
+spec:
+  groups:
+    # GitLab Availability Alerts
+    - name: gitlab.availability
+      interval: 30s
+      rules:
+        # Alert 1: GitLab web unavailable
+        - alert: GitLabWebUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="gitlab-system",deployment="gitlab-webservice-default"} < 1
+          for: 5m
+          labels:
+            severity: critical
+            component: gitlab-web
+            context: apps
+          annotations:
+            summary: "GitLab web service is unavailable"
+            description: |
+              GitLab webservice deployment has no available replicas for {{ $value }} minutes.
+
+              Impact: Users cannot access GitLab web UI or API.
+              Action: Check webservice pod logs, database connectivity, and Redis connectivity.
+
+        # Alert 2: Sidekiq queue backlog
+        - alert: GitLabSidekiqQueueBacklog
+          expr: |
+            gitlab_sidekiq_queue_size > 1000
+          for: 15m
+          labels:
+            severity: warning
+            component: gitlab-sidekiq
+            context: apps
+          annotations:
+            summary: "GitLab Sidekiq queue backlog detected"
+            description: |
+              Sidekiq queue {{ $labels.queue }} has {{ $value }} jobs waiting for over 15 minutes.
+
+              Possible causes:
+              - Sidekiq workers overwhelmed
+              - Slow background job processing
+              - External service delays (SMTP, webhooks)
+
+              Action: Consider scaling up Sidekiq replicas or investigating slow jobs.
+
+    # GitLab External Dependencies Alerts
+    - name: gitlab.dependencies
+      interval: 30s
+      rules:
+        # Alert 3: Database connectivity issues
+        - alert: GitLabDatabaseConnectivityIssue
+          expr: |
+            increase(gitlab_database_connection_errors_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: critical
+            component: gitlab-database
+            context: apps
+          annotations:
+            summary: "GitLab database connectivity issues"
+            description: |
+              {{ $value }} database connection errors detected in the last 5 minutes.
+
+              Database: gitlab-pooler-rw.cnpg-system.svc.cluster.local:5432
+
+              Possible causes:
+              - CNPG pooler down or restarting
+              - PostgreSQL cluster unavailable
+              - Connection pool exhausted (max 300 connections)
+
+              Action: Check CNPG pooler status and PostgreSQL cluster health.
+
+        # Alert 4: Redis connectivity issues
+        - alert: GitLabRedisConnectivityIssue
+          expr: |
+            increase(gitlab_redis_connection_errors_total[5m]) > 10
+          for: 5m
+          labels:
+            severity: critical
+            component: gitlab-redis
+            context: apps
+          annotations:
+            summary: "GitLab Redis connectivity issues"
+            description: |
+              {{ $value }} Redis connection errors detected in the last 5 minutes.
+
+              Redis: dragonfly.dragonfly-system.svc.cluster.local:6379
+
+              Possible causes:
+              - DragonflyDB pod down or restarting
+              - Network policy blocking traffic
+              - Authentication failure
+
+              Action: Check DragonflyDB pod status and GitLab Redis credentials.
+
+        # Alert 5: S3 object storage errors
+        - alert: GitLabS3Errors
+          expr: |
+            increase(gitlab_object_storage_errors_total[10m]) > 50
+          for: 10m
+          labels:
+            severity: warning
+            component: gitlab-s3
+            context: apps
+          annotations:
+            summary: "GitLab S3 object storage errors"
+            description: |
+              {{ $value }} S3 errors detected in the last 10 minutes.
+
+              S3 Endpoint: http://10.25.11.3:9000 (MinIO)
+              Buckets: artifacts, lfs, uploads, packages, registry
+
+              Possible causes:
+              - MinIO server unavailable
+              - S3 credentials expired or invalid
+              - Network connectivity issues
+              - Bucket permission issues
+
+              Action: Check MinIO server status and S3 credentials in ExternalSecret.
+
+    # GitLab Security and Compliance Alerts
+    - name: gitlab.security
+      interval: 30s
+      rules:
+        # Alert 6: TLS certificate expiring soon
+        - alert: GitLabCertificateExpiringSoon
+          expr: |
+            (x509_cert_not_after{job="gitlab"} - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+            component: gitlab-cert
+            context: apps
+          annotations:
+            summary: "GitLab TLS certificate expiring soon"
+            description: |
+              Certificate {{ $labels.subject }} expires in {{ $value }} days.
+
+              Domains affected:
+              - gitlab.apps.monosense.io
+              - registry.gitlab.apps.monosense.io
+
+              Action: Verify cert-manager is renewing certificates automatically.
+
+    # GitLab Performance Alerts
+    - name: gitlab.performance
+      interval: 30s
+      rules:
+        # Alert 7: High error rate (5xx responses)
+        - alert: GitLabHighErrorRate
+          expr: |
+            (
+              rate(gitlab_http_requests_total{status=~"5.."}[5m])
+              /
+              rate(gitlab_http_requests_total[5m])
+            ) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            component: gitlab-web
+            context: apps
+          annotations:
+            summary: "GitLab high HTTP error rate"
+            description: |
+              {{ $value | humanizePercentage }} of HTTP requests are returning 5xx errors.
+
+              Threshold: 5%
+
+              Possible causes:
+              - Application errors (check webservice logs)
+              - Database query timeouts
+              - Redis connection issues
+              - S3 object storage failures
+
+              Action: Check GitLab logs for error patterns and external dependency health.
+
+        # Alert 8: Low success rate (2xx responses)
+        - alert: GitLabLowSuccessRate
+          expr: |
+            (
+              rate(gitlab_http_requests_total{status=~"2.."}[5m])
+              /
+              rate(gitlab_http_requests_total[5m])
+            ) < 0.9
+          for: 15m
+          labels:
+            severity: warning
+            component: gitlab-web
+            context: apps
+          annotations:
+            summary: "GitLab low HTTP success rate"
+            description: |
+              Only {{ $value | humanizePercentage }} of HTTP requests are successful (2xx status).
+
+              Threshold: 90%
+
+              Possible causes:
+              - High authentication failures (401)
+              - Permission issues (403)
+              - Not found errors (404)
+              - Rate limiting (429)
+
+              Action: Review HTTP status code distribution and investigate non-2xx responses.

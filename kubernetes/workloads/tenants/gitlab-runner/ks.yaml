@@ -1,0 +1,33 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gitlab-runner
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: gitlab-runner
+    cluster: apps
+spec:
+  interval: 10m
+  path: ./kubernetes/workloads/tenants/gitlab-runner
+  prune: true
+  wait: true
+  timeout: 5m
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  dependsOn:
+    - name: gitlab  # Runner needs GitLab API to register
+
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: gitlab-runner
+      namespace: gitlab-runner
+
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings

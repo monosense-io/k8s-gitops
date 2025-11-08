@@ -1,0 +1,215 @@
+# GitLab CI/CD Pipeline with Kaniko (Rootless Container Builds)
+#
+# This pipeline demonstrates secure container image builds using Kaniko.
+# Kaniko builds images WITHOUT privileged mode - no root access to host!
+#
+# Usage:
+#   1. Copy this file to your project as .gitlab-ci.yml
+#   2. Ensure Dockerfile exists in project root
+#   3. Push to GitLab - pipeline runs automatically
+#
+# Security: Runs as non-root user (UID 1000), no privileged containers
+
+stages:
+  - build
+  - test
+  - push
+
+variables:
+  # Kaniko executor version
+  KANIKO_VERSION: "v1.24.0"
+
+  # Image destinations
+  IMAGE_TAG: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+  IMAGE_TAG_LATEST: "${CI_REGISTRY_IMAGE}:latest"
+
+  # Kaniko cache configuration
+  KANIKO_CACHE_REPO: "${CI_REGISTRY_IMAGE}/cache"
+
+# Build stage: Build container image with Kaniko
+build-image:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  tags:
+    - kubernetes
+    - kaniko
+    - apps-cluster
+  script:
+    # Prepare Kaniko Docker config for GitLab registry authentication
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+
+    # Build and push image with Kaniko
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${IMAGE_TAG}"
+      --cache=true
+      --cache-repo="${KANIKO_CACHE_REPO}"
+      --cache-ttl=168h
+      --cleanup
+  only:
+    - branches
+    - tags
+
+# Test stage: Run tests on built image
+test-image:
+  stage: test
+  image: ${IMAGE_TAG}
+  tags:
+    - kubernetes
+    - kaniko
+    - apps-cluster
+  script:
+    # Example: Run tests inside the built image
+    - echo "Running tests..."
+    # - npm test
+    # - pytest
+    # - go test ./...
+  only:
+    - branches
+    - tags
+
+# Push stage: Tag and push to latest (only for main branch)
+push-latest:
+  stage: push
+  image:
+    name: gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  tags:
+    - kubernetes
+    - kaniko
+    - apps-cluster
+  script:
+    # Re-tag and push as latest
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${IMAGE_TAG_LATEST}"
+      --cache=true
+      --cache-repo="${KANIKO_CACHE_REPO}"
+      --cleanup
+  only:
+    - main
+    - master
+
+# Push stage: Tag and push release tags
+push-release:
+  stage: push
+  image:
+    name: gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  tags:
+    - kubernetes
+    - kaniko
+    - apps-cluster
+  script:
+    # Push with semantic version tag
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+      --cache=true
+      --cache-repo="${KANIKO_CACHE_REPO}"
+      --cleanup
+  only:
+    - tags
+
+# ============================================================================
+# Advanced Examples
+# ============================================================================
+
+# Build with custom Dockerfile location
+build-custom-dockerfile:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  tags:
+    - kubernetes
+    - kaniko
+  script:
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/docker/Dockerfile.production"
+      --destination "${IMAGE_TAG}-prod"
+      --cache=true
+      --cache-repo="${KANIKO_CACHE_REPO}"
+  only:
+    - main
+  when: manual
+
+# Build multi-platform image (amd64 + arm64)
+build-multiarch:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:${KANIKO_VERSION}-debug
+    entrypoint: [""]
+  tags:
+    - kubernetes
+    - kaniko
+  script:
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"auth\":\"$(printf "%s:%s" "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "${IMAGE_TAG}-amd64"
+      --custom-platform=linux/amd64
+      --cache=true
+      --cache-repo="${KANIKO_CACHE_REPO}"
+  only:
+    - main
+  when: manual
+
+# ============================================================================
+# Security Best Practices
+# ============================================================================
+#
+# 1. Credentials:
+#    - NEVER hardcode secrets in .gitlab-ci.yml
+#    - Use GitLab CI/CD variables (Settings → CI/CD → Variables)
+#    - Mark sensitive variables as "Masked" and "Protected"
+#
+# 2. Image Scanning:
+#    - Add image vulnerability scanning stage (Trivy, Snyk, etc.)
+#    - Fail pipeline if critical vulnerabilities found
+#
+# 3. Registry Access:
+#    - GitLab provides CI_REGISTRY_USER and CI_REGISTRY_PASSWORD automatically
+#    - For external registries, use CI/CD variables
+#
+# 4. Base Images:
+#    - Use minimal base images (alpine, distroless)
+#    - Pin image versions (avoid :latest in Dockerfile)
+#    - Scan base images regularly
+#
+# 5. Build Context:
+#    - Use .dockerignore to exclude sensitive files
+#    - Never include .git, .env, credentials.json, etc.
+#
+# ============================================================================
+# Troubleshooting
+# ============================================================================
+#
+# Error: "permission denied"
+#   - Verify runner is NOT using privileged mode
+#   - Check Kaniko executor has correct entrypoint override
+#
+# Error: "unauthorized: authentication required"
+#   - Check CI_REGISTRY_USER and CI_REGISTRY_PASSWORD are set
+#   - Verify Docker config.json creation in script
+#
+# Error: "no space left on device"
+#   - Increase runner PVC size (currently 75Gi)
+#   - Enable Kaniko cleanup: --cleanup flag
+#
+# Error: "failed to resolve base image"
+#   - Check network connectivity from runner
+#   - Verify base image exists and is accessible
+#   - Check NetworkPolicy allows egress to container registries
+#
+# ============================================================================

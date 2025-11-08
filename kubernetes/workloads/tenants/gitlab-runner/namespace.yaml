@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitlab-runner
+  labels:
+    app.kubernetes.io/managed-by: flux
+    toolkit.fluxcd.io/tenant: gitlab-runner
+    # Baseline PSA: Kaniko does not require privileged containers
+    # For DIND fallback, temporarily change to 'privileged' enforcement
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline

@@ -1,0 +1,174 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitlab-runner
+  namespace: gitlab-runner
+  labels:
+    app.kubernetes.io/name: gitlab-runner
+spec:
+  interval: 1h
+  timeout: 5m
+
+  chart:
+    spec:
+      chart: gitlab-runner
+      version: 0.70.0
+      sourceRef:
+        kind: HelmRepository
+        name: gitlab
+        namespace: gitlab-system
+      interval: 12h
+
+  maxHistory: 3
+
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+    timeout: 5m
+
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+    timeout: 5m
+
+  values:
+    # GitLab URL
+    gitlabUrl: https://${GITLAB_HOST}
+
+    # Runner registration token
+    runnerToken: ""  # Will use runnerRegistrationToken for initial registration
+
+    runnerRegistrationToken:
+      secret: gitlab-runner-registration
+      key: runner-registration-token
+
+    # Concurrent jobs
+    concurrent: 10
+
+    # Check interval
+    checkInterval: 30
+
+    # RBAC
+    rbac:
+      create: false
+      serviceAccountName: gitlab-runner
+
+    # Metrics
+    metrics:
+      enabled: true
+      portName: metrics
+      port: 9252
+      serviceMonitor:
+        enabled: true
+
+    # Runner configuration
+    runners:
+      # Config template
+      config: |
+        [[runners]]
+          [runners.kubernetes]
+            namespace = "{{.Release.Namespace}}"
+            image = "ubuntu:22.04"
+
+            # Kaniko: No privileged mode required!
+            privileged = false
+
+            # Service account
+            service_account = "gitlab-runner"
+
+            # Resource limits for runner jobs
+            cpu_limit = "2"
+            cpu_request = "500m"
+            memory_limit = "4Gi"
+            memory_request = "1Gi"
+
+            # Helper image
+            helper_image = "gitlab/gitlab-runner-helper:x86_64-v18.5.1"
+
+            # Pull policy
+            pull_policy = ["if-not-present"]
+
+            # DNS policy
+            dns_policy = "cluster-first"
+
+            # Pod labels
+            [runners.kubernetes.pod_labels]
+              "app.kubernetes.io/managed-by" = "gitlab-runner"
+              "app.kubernetes.io/component" = "ci-job"
+
+            # Pod annotations
+            [runners.kubernetes.pod_annotations]
+              "container.apparmor.security.beta.kubernetes.io/build" = "runtime/default"
+              "container.apparmor.security.beta.kubernetes.io/helper" = "runtime/default"
+
+            # Volume for Kaniko cache
+            [[runners.kubernetes.volumes.empty_dir]]
+              name = "kaniko-cache"
+              mount_path = "/cache"
+              medium = "Memory"
+
+            # Volume for Docker config (Kaniko)
+            [[runners.kubernetes.volumes.empty_dir]]
+              name = "docker-config"
+              mount_path = "/kaniko/.docker"
+
+          [runners.cache]
+            Type = "s3"
+            Shared = true
+            [runners.cache.s3]
+              ServerAddress = "${GITLAB_S3_ENDPOINT}"
+              BucketName = "${GITLAB_S3_BUCKET_CACHE}"
+              BucketLocation = "${GITLAB_S3_REGION}"
+              Insecure = true
+
+          [[runners.kubernetes.pod_security_context]]
+            run_as_non_root = true
+            run_as_user = 1000
+            fs_group = 1000
+
+      # Runner tags
+      tags: "kubernetes,kaniko,apps-cluster"
+
+      # Run untagged jobs
+      runUntagged: true
+
+      # Protected branches only (set to true for production)
+      protected: false
+
+      # Executor
+      executor: kubernetes
+
+      # Environment variables
+      env:
+        - name: FF_USE_KANIKO_FOR_BUILDS
+          value: "true"
+
+    # Resources for runner manager pod
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 100
+      fsGroup: 65533
+
+    # Pod labels
+    podLabels:
+      app.kubernetes.io/name: gitlab-runner
+      app.kubernetes.io/component: ci-cd
+
+    # Pod annotations
+    podAnnotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9252"
+      prometheus.io/path: "/metrics"

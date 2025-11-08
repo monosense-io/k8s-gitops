@@ -1,0 +1,317 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: gitlab
+  namespace: gitlab-system
+spec:
+  interval: 12h
+  url: https://charts.gitlab.io
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitlab
+  namespace: gitlab-system
+  labels:
+    app.kubernetes.io/name: gitlab
+spec:
+  interval: 1h
+  timeout: 15m
+
+  chart:
+    spec:
+      chart: gitlab
+      version: 9.5.1
+      sourceRef:
+        kind: HelmRepository
+        name: gitlab
+      interval: 12h
+
+  maxHistory: 3
+
+  install:
+    createNamespace: false
+    remediation:
+      retries: 3
+    timeout: 15m
+
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+    timeout: 15m
+
+  values:
+    # Global configuration
+    global:
+      # Application version
+      gitlabVersion: "18.5.1"
+
+      # Domain and hosts
+      hosts:
+        domain: ${SECRET_DOMAIN}
+        https: true
+        gitlab:
+          name: ${GITLAB_HOST}
+        registry:
+          name: ${GITLAB_REGISTRY_HOST}
+
+      # Ingress: Disabled, using Gateway API
+      ingress:
+        enabled: false
+        configureCertmanager: false
+
+      # External PostgreSQL (CNPG pooler)
+      psql:
+        host: gitlab-pooler-rw.cnpg-system.svc.cluster.local
+        port: 5432
+        database: gitlab
+        username: gitlab_app
+        password:
+          useSecret: true
+          secret: gitlab-db-credentials
+          key: password
+
+      # External Redis (DragonflyDB)
+      redis:
+        host: dragonfly.dragonfly-system.svc.cluster.local
+        port: 6379
+        auth:
+          enabled: true
+          secret: gitlab-redis-credentials
+          key: password
+
+      # Disable in-chart MinIO
+      minio:
+        enabled: false
+
+      # External S3 Object Storage (MinIO - Consolidated Configuration)
+      appConfig:
+        # Enable consolidated object storage configuration
+        object_store:
+          enabled: true
+          proxy_download: true
+          connection:
+            secret: gitlab-s3-credentials
+            key: connection
+
+        # Artifacts
+        artifacts:
+          enabled: true
+          proxy_download: true
+          bucket: ${GITLAB_S3_BUCKET_ARTIFACTS}
+          connection:
+            secret: gitlab-s3-credentials
+            key: connection
+
+        # LFS
+        lfs:
+          enabled: true
+          proxy_download: true
+          bucket: ${GITLAB_S3_BUCKET_LFS}
+          connection:
+            secret: gitlab-s3-credentials
+            key: connection
+
+        # Uploads
+        uploads:
+          enabled: true
+          proxy_download: true
+          bucket: ${GITLAB_S3_BUCKET_UPLOADS}
+          connection:
+            secret: gitlab-s3-credentials
+            key: connection
+
+        # Packages
+        packages:
+          enabled: true
+          proxy_download: true
+          bucket: ${GITLAB_S3_BUCKET_PACKAGES}
+          connection:
+            secret: gitlab-s3-credentials
+            key: connection
+
+        # External Diffs
+        externalDiffs:
+          enabled: false
+
+        # Terraform State
+        terraformState:
+          enabled: false
+
+        # Dependency Proxy
+        dependencyProxy:
+          enabled: false
+
+        # OmniAuth (Keycloak OIDC)
+        omniauth:
+          enabled: true
+          allowSingleSignOn: ['openid_connect']
+          autoLinkUser: ['openid_connect']
+          blockAutoCreatedUsers: false
+          syncProfileFromProvider: ['openid_connect']
+          syncProfileAttributes: ['name', 'email']
+          providers:
+            - secret: gitlab-oidc-credentials
+              key: oidc-provider
+
+      # Initial root password
+      initialRootPassword:
+        secret: gitlab-root-password
+        key: password
+
+      # GitLab Shell (SSH)
+      shell:
+        port: 22
+
+      # Time zone
+      time_zone: UTC
+
+      # Email (SMTP disabled for now)
+      email:
+        from: gitlab@${SECRET_DOMAIN}
+        display_name: GitLab
+        reply_to: noreply@${SECRET_DOMAIN}
+
+      # Edition (CE)
+      edition: ce
+
+    # Disable cert-manager (already deployed)
+    certmanager:
+      install: false
+
+    # Disable nginx-ingress (using Cilium Gateway)
+    nginx-ingress:
+      enabled: false
+
+    # Disable Prometheus (using VictoriaMetrics)
+    prometheus:
+      install: false
+
+    # Disable in-chart PostgreSQL
+    postgresql:
+      install: false
+
+    # Disable in-chart Redis
+    redis:
+      install: false
+
+    # Container Registry
+    registry:
+      enabled: true
+      hpa:
+        minReplicas: 1
+        maxReplicas: 2
+      storage:
+        secret: gitlab-s3-credentials
+        key: connection
+        extraKey: registry
+      bucket: ${GITLAB_S3_BUCKET_REGISTRY}
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    # GitLab components
+    gitlab:
+      # Webservice (Rails)
+      webservice:
+        replicaCount: 2
+        workerProcesses: 2
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        workhorse:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        metrics:
+          enabled: true
+
+      # Sidekiq (background jobs)
+      sidekiq:
+        replicaCount: 1
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        metrics:
+          enabled: true
+
+      # Gitaly (Git repository storage)
+      gitaly:
+        persistence:
+          enabled: true
+          storageClass: ${BLOCK_SC}
+          size: 50Gi
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        metrics:
+          enabled: true
+
+      # GitLab Shell (Git SSH)
+      gitlab-shell:
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        metrics:
+          enabled: true
+
+      # Toolbox (admin CLI)
+      toolbox:
+        replicas: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        backups:
+          objectStorage:
+            config:
+              secret: gitlab-s3-credentials
+              key: connection
+
+      # Migrations
+      migrations:
+        enabled: true
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+
+    # Shared Secrets
+    shared-secrets:
+      enabled: true
+      rbac:
+        create: true

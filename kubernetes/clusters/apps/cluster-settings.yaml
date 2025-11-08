@@ -107,10 +107,31 @@ data:
   DRAGONFLY_AUTH_SECRET_PATH: "kubernetes/apps/dragonfly/auth"
 
   # GitLab Configuration
+  GITLAB_HOST: "gitlab.apps.monosense.io"
+  GITLAB_REGISTRY_HOST: "registry.gitlab.apps.monosense.io"
+
+  # GitLab Secret Paths (1Password)
   GITLAB_DB_SECRET_PATH: "kubernetes/apps/gitlab/db"
   GITLAB_REDIS_SECRET_PATH: "kubernetes/apps/gitlab/redis"
   GITLAB_S3_SECRET_PATH: "kubernetes/apps/gitlab/s3"
   GITLAB_ROOT_SECRET_PATH: "kubernetes/apps/gitlab/root"
+  GITLAB_OIDC_SECRET_PATH: "kubernetes/apps/gitlab/oidc"
+  GITLAB_RUNNER_REG_TOKEN_PATH: "kubernetes/apps/gitlab/runner-token"
+
+  # GitLab S3 Configuration (External MinIO)
+  GITLAB_S3_ENDPOINT: "http://10.25.11.3:9000"
+  GITLAB_S3_REGION: "us-east-1"
+  GITLAB_S3_BUCKET_ARTIFACTS: "gitlab-artifacts"
+  GITLAB_S3_BUCKET_LFS: "gitlab-lfs"
+  GITLAB_S3_BUCKET_UPLOADS: "gitlab-uploads"
+  GITLAB_S3_BUCKET_PACKAGES: "gitlab-packages"
+  GITLAB_S3_BUCKET_REGISTRY: "gitlab-registry"
+  GITLAB_S3_BUCKET_CACHE: "gitlab-cache"
+
+  # Keycloak OIDC Configuration (Infra Cluster)
+  KEYCLOAK_HOST: "sso.monosense.io"
+  KEYCLOAK_REALM: "master"
+  GITLAB_OIDC_CLIENT_ID: "gitlab"
 
   # VictoriaMetrics Configuration (Quay.io Registry)
   VICTORIAMETRICS_IMAGE_REGISTRY: "quay.io/victoriametrics"

@@ -1,0 +1,269 @@
+# GitLab CI/CD Pipeline with Docker-in-Docker (DIND) - FALLBACK ONLY
+#
+# ⚠️ WARNING: This pipeline requires PRIVILEGED mode = full root access to host!
+#
+# ONLY use DIND for:
+#   - Docker commands that Kaniko cannot support (docker run, docker compose, etc.)
+#   - Testing Docker daemon functionality
+#   - Legacy pipelines during migration to Kaniko
+#
+# NEVER use DIND for:
+#   - Standard image builds (use Kaniko instead)
+#   - Production workloads
+#   - Untrusted code or repositories
+#
+# Prerequisites to enable DIND:
+#   1. Edit gitlab-runner/namespace.yaml: Change PSA to 'privileged'
+#   2. Edit gitlab-runner/helmrelease.yaml: Set privileged = true
+#   3. Redeploy runner: flux reconcile kustomization gitlab-runner
+#
+# Security Risk: HIGH - Compromised job = compromised Kubernetes node!
+
+stages:
+  - build
+  - test
+  - push
+
+variables:
+  # Docker-in-Docker configuration
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
+  # Image destinations
+  IMAGE_TAG: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHORT_SHA}"
+  IMAGE_TAG_LATEST: "${CI_REGISTRY_IMAGE}:latest"
+
+# Build stage: Build container image with Docker
+build-image:
+  stage: build
+  image: docker:27.4.1
+  services:
+    - docker:27.4.1-dind
+  tags:
+    - kubernetes
+    - dind  # ⚠️ Requires privileged runner!
+    - apps-cluster
+  before_script:
+    # Wait for Docker daemon to be ready
+    - until docker info; do sleep 1; done
+
+    # Login to GitLab container registry
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # Build image
+    - docker build -t "${IMAGE_TAG}" .
+
+    # Save image as artifact (optional)
+    - docker save "${IMAGE_TAG}" -o image.tar
+  artifacts:
+    paths:
+      - image.tar
+    expire_in: 1 day
+  only:
+    - branches
+    - tags
+
+# Test stage: Run tests in container
+test-image:
+  stage: test
+  image: docker:27.4.1
+  services:
+    - docker:27.4.1-dind
+  tags:
+    - kubernetes
+    - dind
+    - apps-cluster
+  before_script:
+    - until docker info; do sleep 1; done
+  script:
+    # Load image from artifacts
+    - docker load -i image.tar
+
+    # Run tests inside container
+    - docker run --rm "${IMAGE_TAG}" /bin/sh -c "echo 'Running tests...'"
+    # - docker run --rm "${IMAGE_TAG}" npm test
+    # - docker run --rm "${IMAGE_TAG}" pytest
+  dependencies:
+    - build-image
+  only:
+    - branches
+    - tags
+
+# Push stage: Push to registry
+push-image:
+  stage: push
+  image: docker:27.4.1
+  services:
+    - docker:27.4.1-dind
+  tags:
+    - kubernetes
+    - dind
+    - apps-cluster
+  before_script:
+    - until docker info; do sleep 1; done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # Load image
+    - docker load -i image.tar
+
+    # Tag and push
+    - docker tag "${IMAGE_TAG}" "${IMAGE_TAG_LATEST}"
+    - docker push "${IMAGE_TAG}"
+    - docker push "${IMAGE_TAG_LATEST}"
+  dependencies:
+    - build-image
+  only:
+    - main
+    - master
+
+# ============================================================================
+# Advanced DIND Examples (Privileged Mode Required)
+# ============================================================================
+
+# Example: Docker Compose testing
+docker-compose-test:
+  stage: test
+  image: docker:27.4.1
+  services:
+    - docker:27.4.1-dind
+  tags:
+    - kubernetes
+    - dind
+  before_script:
+    - until docker info; do sleep 1; done
+    - apk add --no-cache docker-compose
+  script:
+    # Start services with docker-compose
+    - docker-compose up -d
+
+    # Run integration tests
+    - docker-compose exec -T app /bin/sh -c "npm test"
+
+    # Cleanup
+    - docker-compose down -v
+  only:
+    - main
+  when: manual
+
+# Example: Docker build with BuildKit
+buildkit-build:
+  stage: build
+  image: docker:27.4.1
+  services:
+    - docker:27.4.1-dind
+  tags:
+    - kubernetes
+    - dind
+  variables:
+    DOCKER_BUILDKIT: 1
+  before_script:
+    - until docker info; do sleep 1; done
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # Build with BuildKit (faster, better caching)
+    - docker build
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from "${IMAGE_TAG_LATEST}"
+      -t "${IMAGE_TAG}"
+      -t "${IMAGE_TAG_LATEST}"
+      .
+
+    # Push
+    - docker push "${IMAGE_TAG}"
+    - docker push "${IMAGE_TAG_LATEST}"
+  only:
+    - main
+  when: manual
+
+# ============================================================================
+# Security Best Practices for DIND
+# ============================================================================
+#
+# ⚠️ CRITICAL SECURITY WARNINGS:
+#
+# 1. Privileged Mode Risk:
+#    - DIND requires privileged containers (root access to host)
+#    - Compromised job = compromised Kubernetes worker node
+#    - Potential lateral movement to entire cluster
+#
+# 2. Mitigation Strategies:
+#    - Isolate DIND runners: Dedicated namespace with privileged PSA
+#    - Network segmentation: NetworkPolicies restrict egress
+#    - Resource limits: Prevent resource exhaustion attacks
+#    - Protected branches only: Restrict DIND jobs to trusted branches
+#    - Manual approval: Add 'when: manual' for DIND jobs
+#
+# 3. Runner Configuration:
+#    - Use tags to control access: 'dind' tag = privileged mode
+#    - Limit concurrency to prevent resource exhaustion
+#    - Monitor runner resource usage
+#
+# 4. Alternative to DIND (Recommended):
+#    - Kaniko: Rootless builds, no privileged mode (see kaniko-pipeline.yml)
+#    - BuildKit: Rootless mode available
+#    - img: Unprivileged container builds
+#    - Buildah: Rootless builds
+#
+# 5. Compliance:
+#    - Document DIND usage and justification
+#    - Regular security audits of DIND pipelines
+#    - Plan migration to Kaniko/rootless alternatives
+#
+# ============================================================================
+# Troubleshooting DIND
+# ============================================================================
+#
+# Error: "Cannot connect to the Docker daemon"
+#   - Check Docker service is in services list
+#   - Wait for daemon: 'until docker info; do sleep 1; done'
+#   - Verify DOCKER_HOST is correct
+#
+# Error: "permission denied" (accessing /var/run/docker.sock)
+#   - Runner must have privileged: true
+#   - Namespace must have PSA: privileged
+#
+# Error: "no space left on device"
+#   - Increase runner PVC size
+#   - Clean up unused images: 'docker system prune -af'
+#   - Use --rm flag for temporary containers
+#
+# Error: "TLS handshake timeout"
+#   - Check DOCKER_TLS_CERTDIR configuration
+#   - Use DOCKER_TLS_CERTDIR: "" to disable TLS (less secure)
+#
+# Error: Runner pod stuck in "CrashLoopBackOff"
+#   - Check runner namespace PSA allows privileged
+#   - Check runner helmrelease has privileged: true
+#   - View logs: kubectl -n gitlab-runner logs -l app=gitlab-runner
+#
+# ============================================================================
+# Migration Path: DIND → Kaniko
+# ============================================================================
+#
+# Step 1: Identify DIND usage
+#   - Audit .gitlab-ci.yml files for docker:dind service
+#   - Document why DIND is needed (usually it's not!)
+#
+# Step 2: Migrate simple builds to Kaniko
+#   - Replace 'docker build' with Kaniko executor
+#   - See kaniko-pipeline.yml for examples
+#
+# Step 3: Handle special cases
+#   - docker run → Use image directly (image: myapp:latest)
+#   - docker-compose → Use separate services in CI/CD
+#   - docker push → Kaniko handles this natively
+#
+# Step 4: Disable DIND
+#   - Remove dind service from .gitlab-ci.yml
+#   - Update runner to privileged: false
+#   - Update namespace PSA to baseline
+#
+# Benefits of migration:
+#   ✅ Security: No privileged containers
+#   ✅ Compliance: Pass security audits
+#   ✅ Performance: Kaniko caching often faster
+#   ✅ Simplicity: No Docker daemon management
+#
+# ============================================================================

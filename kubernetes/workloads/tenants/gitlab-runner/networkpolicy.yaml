@@ -1,0 +1,121 @@
+---
+# GitLab Runner Egress Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitlab-runner-egress
+  namespace: gitlab-runner
+  labels:
+    app.kubernetes.io/name: gitlab-runner
+spec:
+  podSelector:
+    matchLabels:
+      app: gitlab-runner
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow GitLab API
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitlab-system
+        - podSelector:
+            matchLabels:
+              app: webservice
+      ports:
+        - protocol: TCP
+          port: 8181
+        - protocol: TCP
+          port: 8080
+
+    # Allow container registries (HTTPS)
+    # Includes: GitLab Registry, Harbor, Docker Hub, gcr.io (for Kaniko)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5000
+
+    # Allow S3 cache (MinIO)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9000
+
+    # Allow Kubernetes API (for job pod management)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: TCP
+          port: 6443
+
+---
+# GitLab Runner Job Pods Egress Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitlab-runner-jobs-egress
+  namespace: gitlab-runner
+  labels:
+    app.kubernetes.io/name: gitlab-runner
+    app.kubernetes.io/component: ci-job
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: gitlab-runner
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow container registries (for Kaniko image push)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5000
+
+    # Allow S3 cache
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9000
+
+    # Allow HTTPS for package downloads (apt, pip, npm, etc.)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

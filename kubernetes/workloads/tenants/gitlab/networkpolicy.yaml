@@ -1,0 +1,114 @@
+---
+# GitLab Egress Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitlab-egress
+  namespace: gitlab-system
+  labels:
+    app.kubernetes.io/name: gitlab
+spec:
+  podSelector:
+    matchLabels:
+      app: gitlab
+  policyTypes:
+    - Egress
+
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # Allow PostgreSQL (CNPG pooler)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+        - podSelector:
+            matchLabels:
+              cnpg.io/poolerName: gitlab-pooler
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow Redis/DragonflyDB
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: dragonfly-system
+        - podSelector:
+            matchLabels:
+              app: dragonfly
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow S3 (MinIO external - need egress to external IP)
+    - to:
+        - podSelector: {}  # Allow to any pod for S3
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 9000
+
+    # Allow HTTPS for external integrations (Keycloak OIDC, webhooks)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # Allow SMTP (optional, for email notifications)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 587
+        - protocol: TCP
+          port: 25
+
+---
+# GitLab Ingress Network Policy (from Gateway)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitlab-ingress
+  namespace: gitlab-system
+  labels:
+    app.kubernetes.io/name: gitlab
+spec:
+  podSelector:
+    matchLabels:
+      app: webservice
+  policyTypes:
+    - Ingress
+
+  ingress:
+    # Allow from Cilium Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              io.cilium.gateway/owning-gateway: ${CILIUM_GATEWAY_EXTERNAL_NAME}
+      ports:
+        - protocol: TCP
+          port: 8181
+
+    # Allow from same namespace (inter-pod communication)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gitlab
+      ports:
+        - protocol: TCP
+          port: 8181

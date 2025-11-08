@@ -1,0 +1,43 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gitlab
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: gitlab
+    cluster: apps
+spec:
+  interval: 10m
+  path: ./kubernetes/workloads/tenants/gitlab
+  prune: true
+  wait: true
+  timeout: 15m  # GitLab takes time to initialize
+
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+
+  dependsOn:
+    - name: cluster-apps-infrastructure  # Base infrastructure
+    - name: cluster-apps-networking      # Gateway API
+    - name: external-secrets            # ExternalSecrets operator
+    - name: cert-manager                # Certificate management
+    - name: cnpg-shared-cluster         # PostgreSQL pooler
+    - name: dragonfly                   # Redis/Dragonfly
+    - name: victoria-metrics-stack      # Monitoring
+
+  healthChecks:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: gitlab-webservice-default
+      namespace: gitlab-system
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: gitlab-sidekiq-all-in-1-v2
+      namespace: gitlab-system
+
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-settings
