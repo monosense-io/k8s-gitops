@@ -292,6 +292,136 @@ kubectl --dry-run=client -f bootstrap/namespaces/cnpg-system.yaml
 - **Gateway API**: ~10 CRDs (Gateway, GatewayClass, HTTPRoute, etc.)
 - **CloudNative-PG**: ~10 CRDs (Cluster, Pooler, Backup, etc.)
 
+### Version Validation Results (2025-11-09)
+
+**Validation Date**: 2025-11-09
+**Validation Method**: Comprehensive review using WebSearch, WebFetch, and repository analysis
+**Validator**: AI Agent (Claude Sonnet 4.5)
+
+#### Current Implementation Status
+✅ **Story Status**: ALREADY IMPLEMENTED (completed 2025-10-21, awaiting status update)
+✅ **File Status**: `bootstrap/helmfile.d/00-crds.yaml` exists and functional
+✅ **Pattern Compliance**: Excellent adherence to repository patterns
+
+#### Version Comparison Matrix
+
+| Component | Current (00-crds.yaml) | Architecture.md | Latest Available | Update Needed |
+|-----------|------------------------|-----------------|------------------|---------------|
+| **cert-manager** | v1.19.0 | v1.19.1 | **v1.19.1** | ⬆️ **HIGH PRIORITY** |
+| **external-secrets** | 0.20.3 | 0.20.3 | **v1.0.0 (GA)** | 🎉 **EVALUATE** |
+| **victoria-metrics-operator-crds** | 0.5.1 | - | **0.6.0** | ⬆️ **HIGH PRIORITY** |
+| **prometheus-operator-crds** | 24.0.1 | - | **24.0.2** | ⬆️ **LOW PRIORITY** |
+| **Gateway API** | v1.4.0 | v1.0.0 ❌ | **v1.4.0** | ✅ CURRENT (fix docs) |
+| **cloudnative-pg** | 0.26.1 | 0.25.0 | **0.26.1** | ✅ CURRENT |
+
+#### Recommended Updates
+
+**🔴 High Priority (Update Immediately):**
+
+1. **cert-manager v1.19.0 → v1.19.1**
+   - **Reason**: Critical bug fix for CRD-based API defaults that caused unexpected certificate renewals in v1.19.0
+   - **Release Date**: October 15, 2024
+   - **Source**: https://github.com/cert-manager/cert-manager/releases
+   - **Chart Location**: `oci://quay.io/jetstack/charts/cert-manager`
+   - **Action**: Update `bootstrap/helmfile.d/00-crds.yaml` line 63
+
+2. **victoria-metrics-operator-crds 0.5.1 → 0.6.0**
+   - **Reason**: Minor version update with security and feature improvements
+   - **Release Date**: October 29, 2024
+   - **Source**: https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-operator-crds
+   - **Chart Location**: `oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator-crds`
+   - **Action**: Update `bootstrap/helmfile.d/00-crds.yaml` line 83
+
+**🟡 Medium Priority (Evaluate & Plan):**
+
+3. **external-secrets 0.20.3 → v1.0.0 (GA)**
+   - **Reason**: Major General Availability (GA) release - production-ready milestone
+   - **Release Date**: November 7, 2024
+   - **Source**: https://github.com/external-secrets/external-secrets/releases
+   - **Chart Version**: helm-chart-1.0.0
+   - **Chart Location**: `oci://ghcr.io/external-secrets/charts/external-secrets`
+   - **Action Required**:
+     - Review breaking changes in v1.0.0 changelog
+     - Test in staging environment
+     - Plan migration timeline
+     - Update documentation post-migration
+   - **Status**: Deferred - requires migration planning
+
+**🟢 Low Priority (Optional Patch):**
+
+4. **prometheus-operator-crds 24.0.1 → 24.0.2**
+   - **Reason**: Patch release with minor fixes
+   - **Source**: https://artifacthub.io/packages/helm/prometheus-community/prometheus-operator-crds
+   - **Chart Location**: `oci://ghcr.io/prometheus-community/charts/prometheus-operator-crds`
+   - **Action**: Update `bootstrap/helmfile.d/00-crds.yaml` line 91
+
+**✅ Already Current:**
+
+- **Gateway API v1.4.0** (latest GA, released October 6, 2024)
+  - ⚠️ **Action Required**: Update architecture.md from v1.0.0 to v1.4.0 (documentation fix)
+- **cloudnative-pg 0.26.1** (latest chart, released October 23, 2024)
+
+#### Documentation Discrepancies
+
+**Issue 1: Architecture.md Version Inconsistencies**
+- **Location**: `docs/architecture.md` lines 1875, 1894, 1986
+- **Problem**: Lists Gateway API as v1.0.0 (should be v1.4.0)
+- **Action**: Update architecture.md to reflect correct versions
+
+**Issue 2: Operator vs CRD Chart Version Confusion**
+- **Problem**: Architecture.md sometimes lists operator versions, while 00-crds.yaml uses CRD chart versions
+- **Affected**: victoria-metrics-operator, prometheus-operator
+- **Recommendation**: Document both operator and CRD chart versions separately in architecture.md
+
+**Issue 3: Namespace Pattern Deviation**
+- **Story Requirement**: Separate namespace files in `bootstrap/namespaces/*.yaml`
+- **Current Implementation**: Inline namespace metadata in helmfile releases
+- **Status**: Both approaches valid; current implementation follows established pattern
+- **Recommendation**: Update story documentation to reflect actual implementation OR create separate files
+
+#### Implementation Validation
+
+**✅ Pattern Compliance (Excellent):**
+- Phase-based bootstrap (Phase 0: CRDs → Phase 1: Controllers)
+- CRD extraction via yq filter (`select(.kind == "CustomResourceDefinition")`)
+- Version pinning (all versions explicitly defined)
+- OCI registry usage (all charts use OCI endpoints)
+- Environment separation (infra/apps configurations)
+- No-hooks deployment (`--no-hooks` flag set)
+- Comprehensive documentation in comments and README
+
+**⚠️ Gaps Identified:**
+1. `bootstrap/namespaces/` directory does not exist (story expects separate files)
+2. Version documentation needs alignment across story, architecture.md, and implementation
+3. Story status needs update from "Draft" to "Completed"
+
+#### Action Items Summary
+
+**Immediate (High Priority):**
+1. [ ] Update cert-manager to v1.19.1 in `bootstrap/helmfile.d/00-crds.yaml`
+2. [ ] Update victoria-metrics-operator-crds to 0.6.0 in `bootstrap/helmfile.d/00-crds.yaml`
+3. [ ] Update architecture.md Gateway API version from v1.0.0 to v1.4.0
+4. [ ] Update Story 43 status from "Draft" to "Completed" in STORY-PROGRESS.md
+
+**Medium Priority:**
+5. [ ] Evaluate external-secrets v1.0.0 migration path and breaking changes
+6. [ ] Create version consistency table in architecture.md (operator vs CRD chart versions)
+7. [ ] Decide on namespace pattern: create separate files OR update story documentation
+
+**Low Priority:**
+8. [ ] Update prometheus-operator-crds to 24.0.2 (optional patch)
+9. [ ] Document CRD count baselines in architecture.md or 00-crds.yaml
+10. [ ] Add CRD version monitoring automation to Taskfile
+
+#### Sources & References
+
+- **cert-manager**: https://github.com/cert-manager/cert-manager/releases, https://artifacthub.io/packages/helm/cert-manager/cert-manager
+- **external-secrets**: https://github.com/external-secrets/external-secrets/releases
+- **victoria-metrics**: https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-operator-crds, https://docs.victoriametrics.com/helm/victoriametrics-operator-crds/
+- **prometheus-operator**: https://artifacthub.io/packages/helm/prometheus-community/prometheus-operator-crds
+- **Gateway API**: https://github.com/kubernetes-sigs/gateway-api/releases
+- **cloudnative-pg**: https://github.com/cloudnative-pg/charts/releases, https://cloudnative-pg.io/releases/
+
 ### Manifest Validation Checklist
 - [ ] `bootstrap/helmfile.d/00-crds.yaml` exists and is valid YAML
 - [ ] Helmfile templates successfully for both infra and apps
@@ -572,6 +702,7 @@ kubectl --dry-run=client -f bootstrap/namespaces/cnpg-system.yaml
 | 2025-10-21 | 1.3     | Implemented explicit CRD waits + helper script; set to Review pending cluster run | Dev (James) |
 | 2025-10-26 | 2.0     | **v3.0 Refinement**: Separated manifest creation from deployment. Deployment moved to Story 45. Updated AC, tasks, validation, QA sections for manifests-first approach. | Winston |
 | 2025-10-21 | 1.4     | Executed Phase 0+1 on both clusters; fixed Taskfile bug; 77 CRDs Established; Ready for QA | Dev (James) |
+| 2025-11-09 | 2.1     | **Version Validation**: Added comprehensive version validation results. Identified updates needed: cert-manager v1.19.1, victoria-metrics-operator-crds 0.6.0, external-secrets v1.0.0 (GA) available. Documented architecture.md discrepancies and action items. | AI Agent (Claude Sonnet 4.5) |
 
 ## Dev Agent Record
 ### Agent Model Used

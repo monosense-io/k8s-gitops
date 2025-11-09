@@ -1983,7 +1983,7 @@ graph TD
 
 | Operator | Version | API Group | Custom Resources | Purpose |
 |---|---|---|---|---|
-| **🌉 Gateway API** | `v1.0.0` (GA) | `gateway.networking.k8s.io/v1` | `GatewayClass`, `Gateway`, `HTTPRoute`, `GRPCRoute`, `TLSRoute`, `TCPRoute`, `UDPRoute`, `ReferenceGrant`, `BackendTLSPolicy`, `GatewayPolicy` (experimental) | Modern API for load balancing and traffic routing |
+| **🌉 Gateway API** | `v1.4.0` (GA) | `gateway.networking.k8s.io/v1` | `GatewayClass`, `Gateway`, `HTTPRoute`, `GRPCRoute`, `TLSRoute`, `TCPRoute`, `UDPRoute`, `ReferenceGrant`, `BackendTLSPolicy`, `GatewayPolicy` (experimental) | Modern API for load balancing and traffic routing |
 | **🚪 Cilium Gateway** | `1.18.3` | `cilium.io/v2alpha1` | `CiliumGateway`, `CiliumGatewayConfiguration` | eBPF-based gateway implementation |
 
 ### 🔄 Messaging & Streaming CRDs

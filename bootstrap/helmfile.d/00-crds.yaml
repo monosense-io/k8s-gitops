@@ -21,14 +21,14 @@
 # - Resource validation failures
 # - Silent data loss or corruption
 #
-# Verified Alignments (as of 2025-10-21):
-#   cert-manager:      v1.19.0  (CRD ✓ Controller ✓)
-#   external-secrets:  0.20.3   (CRD ✓ Controller ✓)
+# Verified Alignments (as of 2025-11-09):
+#   cert-manager:      v1.19.1  (CRD ✓ Controller ✓) - Updated from v1.19.0
+#   external-secrets:  0.20.3   (CRD ✓ Controller ✓) - v1.0.0 GA available (requires migration)
 #
 # Future Flux Deployments (CRDs pre-installed, controllers deployed via Flux):
-#   victoria-metrics-operator: 0.5.1   (CRD only)
-#   prometheus-operator:       24.0.1  (CRD only)
-#   cloudnative-pg:            0.26.1  (CRD only)
+#   victoria-metrics-operator: 0.6.0   (CRD only) - Updated from 0.5.1
+#   prometheus-operator:       24.0.1  (CRD only) - 24.0.2 available
+#   cloudnative-pg:            0.26.1  (CRD only) - Latest
 #
 # When updating versions:
 # 1. Update CRD version in this file
@@ -60,7 +60,7 @@ releases:
   - name: cert-manager-crds
     namespace: cert-manager
     chart: oci://quay.io/jetstack/charts/cert-manager
-    version: v1.19.0
+    version: v1.19.1
     set:
       - name: crds.enabled
         value: true
@@ -80,7 +80,7 @@ releases:
   - name: victoria-metrics-operator-crds
     namespace: victoria-metrics
     chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator-crds
-    version: 0.5.1
+    version: 0.6.0
 
   # prometheus-operator CRDs (for Prometheus-compatible resources)
   # Provides: PrometheusRule, ServiceMonitor, PodMonitor, Probe

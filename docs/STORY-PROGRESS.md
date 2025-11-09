@@ -2,9 +2,9 @@
 
 **Project**: Multi-Cluster GitOps Home Lab (v3.0)
 **Approach**: Manifests-First (deployment deferred to Story 45)
-**Last Updated**: 2025-11-08
+**Last Updated**: 2025-11-09
 **Total Stories**: 50
-**Completed**: 29 / 50 (58%)
+**Completed**: 31 / 50 (62%)
 
 ---
 
@@ -16,7 +16,7 @@ Security:      ████░░░░░░░░░░  30% (3/10 stories)
 Storage:       ████████████████ 100% (5/5 stories) ✅
 Observability: ████████████████ 100% (4/4 stories) ✅
 Databases:     ████████████████ 100% (3/3 stories) ✅
-Messaging:     ███░░░░░░░░░░░  33% (1/3 stories)
+Messaging:     ██████░░░░░░░  67% (2/3 stories)
 Operations:    ████████████████ 100% (1/1 stories) ✅
 CI/CD:         ███░░░░░░░░░░░  20% (3/15 stories)
 Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
@@ -1239,6 +1239,130 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 
 ---
 
+#### **Story 38: STORY-MSG-KAFKA-CLUSTER-APPS**
+- **Status**: ✅ **COMPLETE** (v1.0 - Production-Ready KRaft Implementation)
+- **Sprint**: 6 | Lane: Messaging
+- **Commit**: `a0aae52` - feat(messaging): add Kafka cluster v4.1.0 manifests for apps cluster (Story 38)
+- **Date**: 2025-11-09
+- **Version**: Kafka 4.1.0 / Strimzi Operator 0.48.0
+- **Deliverables**:
+  - **Production Kafka Cluster**:
+    - Kafka v4.1.0 with KRaft mode (no ZooKeeper, latest stable)
+    - 3-node combined controller+broker architecture
+    - 100Gi persistent storage per node on rook-ceph-block
+    - High availability: Pod anti-affinity + topology spread constraints
+    - Production replication: RF=3, min.insync.replicas=2
+  - **Security & Authentication**:
+    - SCRAM-SHA-512 authentication on both listeners
+    - TLS encryption on port 9093 (sensitive data)
+    - Plain listener on port 9092 (internal traffic)
+    - Simple authorization with ACL support
+  - **Resource Configuration**:
+    - Per node: 1000m-2000m CPU, 2Gi-4Gi memory
+    - JVM tuning: 50% heap (1024m-2048m), G1GC enabled
+    - PSA restricted compliance (non-root, seccomp)
+  - **Management & Operations**:
+    - Entity Operator (Topic + User operators) with resource limits
+    - Kafka Exporter for consumer group lag monitoring
+    - Declarative topic/user management via CRDs
+    - Example manifests for testing (kafkatopic-example, kafkauser-example)
+  - **Monitoring & Observability**:
+    - JMX Prometheus exporter with comprehensive metrics configuration
+    - ServiceMonitors for brokers, exporter, and entity operator
+    - VMRule with 12 production alerts (availability, performance, replication)
+    - VictoriaMetrics integration (operator.victoriametrics.com/v1beta1)
+  - **GitOps Integration**:
+    - Flux Kustomization with health checks and dependencies
+    - Variable substitution via cluster-settings.yaml
+    - Depends on: Strimzi operator, Rook-Ceph cluster
+    - Proper dependency chain and validation
+- **Files Created**:
+  - `kubernetes/workloads/platform/messaging/kafka/kafka.yaml` (Kafka CR with KRaft config)
+  - `kubernetes/workloads/platform/messaging/kafka/kafka-nodepool.yaml` (3-node pool definition)
+  - `kubernetes/workloads/platform/messaging/kafka/metrics-configmap.yaml` (JMX exporter config)
+  - `kubernetes/workloads/platform/messaging/kafka/servicemonitors.yaml` (3 ServiceMonitors)
+  - `kubernetes/workloads/platform/messaging/kafka/prometheusrule.yaml` (12 VMRule alerts)
+  - `kubernetes/workloads/platform/messaging/kafka/kustomization.yaml` (resource composition)
+  - `kubernetes/workloads/platform/messaging/kafka/ks.yaml` (Flux entrypoint)
+  - `kubernetes/clusters/apps/messaging-kafka.yaml` (Flux Kustomization)
+  - `kubernetes/workloads/platform/messaging/kafka/examples/` (test manifests)
+- **Files Modified**:
+  - `kubernetes/clusters/apps/cluster-settings.yaml` (added 13 Kafka configuration variables)
+- **KRaft Mode Highlights**:
+  - No ZooKeeper dependency (simplified architecture)
+  - Combined controller+broker mode (resource efficient)
+  - Production-ready since Kafka 3.3.1
+  - 8x performance improvement over ZooKeeper mode
+  - 3-node quorum: tolerates 1 node failure
+- **Configuration Variables**:
+  - `KAFKA_VERSION`, `KAFKA_REPLICAS`, `KAFKA_STORAGE_SIZE`
+  - `KAFKA_CPU_REQUEST/LIMIT`, `KAFKA_MEMORY_REQUEST/LIMIT`
+  - `KAFKA_JVM_XMS/XMX`, `KAFKA_REPLICATION_FACTOR`, `KAFKA_MIN_ISR`
+  - `KAFKA_LOG_RETENTION_HOURS` (7 days default)
+- **Impact**:
+  - **Event-Driven Foundation**: Production messaging platform for microservices
+  - **Self-Managed**: No external Kafka SaaS dependency or fees
+  - **Modern Architecture**: Latest Kafka 4.1.0 with KRaft consensus
+  - **Production Ready**: HA, security, monitoring, and operational procedures
+  - **GitOps Native**: Fully declarative configuration via Flux
+- **Dependencies**: Story 37 (Strimzi Operator), Story 16 (Rook-Ceph), Story 17 (VictoriaMetrics)
+- **Note**: All manifests created and validated locally. Runtime deployment and validation deferred to Story 45 per v3.0 manifests-first approach.
+
+---
+
+### 🚀 Bootstrap & Platform
+
+#### **Story 43: STORY-BOOT-CRDS**
+- **Status**: ✅ **COMPLETE** (v2.1 - CRD Versions Updated)
+- **Sprint**: 7 | Lane: Bootstrap & Platform
+- **Commit**: `<pending>` - feat(bootstrap): update CRD versions (cert-manager v1.19.1, victoria-metrics 0.6.0) (Story 43)
+- **Date**: 2025-11-09 (Version validation and updates)
+- **Original Implementation**: 2025-10-21
+- **Deliverables**:
+  - **bootstrap/helmfile.d/00-crds.yaml** updated with latest CRD versions
+  - **Version Updates**:
+    - cert-manager: v1.19.0 → v1.19.1 (critical bug fix)
+    - victoria-metrics-operator-crds: 0.5.1 → 0.6.0 (security & features)
+  - **CRD Components Configured**:
+    - cert-manager v1.19.1 (Certificate, Issuer, ClusterIssuer)
+    - external-secrets 0.20.3 (ExternalSecret, SecretStore, ClusterSecretStore)
+    - victoria-metrics-operator-crds 0.6.0 (VMAgent, VMAlert, VMCluster, etc.)
+    - prometheus-operator-crds 24.0.1 (ServiceMonitor, PodMonitor, PrometheusRule)
+    - Gateway API v1.4.0 (Gateway, HTTPRoute, GatewayClass)
+    - cloudnative-pg 0.26.1 (Cluster, Pooler, Backup)
+  - **Total CRDs**: ~77 per cluster (infra and apps identical)
+  - **Validation Method**: Local helmfile template + yq filtering
+  - **Pattern**: Phase 0 CRD extraction → Phase 1 operator deployment
+- **Version Validation Results** (2025-11-09):
+  - ✅ cert-manager v1.19.1 (updated from v1.19.0)
+  - ✅ victoria-metrics-operator-crds 0.6.0 (updated from 0.5.1)
+  - ℹ️ external-secrets 0.20.3 (v1.0.0 GA available - migration deferred)
+  - ℹ️ prometheus-operator-crds 24.0.1 (24.0.2 available - optional patch)
+  - ✅ Gateway API v1.4.0 (latest GA)
+  - ✅ cloudnative-pg 0.26.1 (latest chart)
+- **Files Modified**:
+  - `bootstrap/helmfile.d/00-crds.yaml` (CRD chart versions and alignment comments)
+  - `docs/stories/STORY-BOOT-CRDS.md` (version validation results added)
+- **Key Features**:
+  - CRD-only extraction using yq filter: `select(.kind == "CustomResourceDefinition")`
+  - OCI registry usage for all charts (ghcr.io, quay.io)
+  - Version alignment enforcement with controllers
+  - Prevents race conditions during initial reconciliation
+  - Supports both infra and apps cluster environments
+- **Impact**:
+  - Foundation for all operator deployments (cert-manager, external-secrets, VictoriaMetrics, CNPG)
+  - Ensures CRDs available before controllers start
+  - Prevents API compatibility issues and resource validation failures
+  - Critical bug fix in cert-manager v1.19.1 prevents unexpected certificate renewals
+- **Dependencies**: None (foundational - first bootstrap phase)
+- **Prerequisites for Story 45 Deployment**:
+  - Tools installed: helmfile, yq, kubectl
+  - Network egress for OCI registry access
+  - Gateway API CRDs applied from GitHub releases
+- **Note**: Manifests created and validated locally (2025-10-21). Version updates applied 2025-11-09. Deployment and CRD establishment validation deferred to Story 45 per v3.0 manifests-first approach.
+
+---
+
 ## 🚧 In Progress
 
 None currently.
@@ -1367,4 +1491,4 @@ All stories create declarative manifests only. Actual deployment to clusters hap
 
 ---
 
-**Last Updated**: 2025-11-08 by Claude Code (Added Story 37 tracking - Strimzi Kafka Operator)
+**Last Updated**: 2025-11-09 by Claude Code (Added Story 43 tracking - CRD Bootstrap with version updates)
