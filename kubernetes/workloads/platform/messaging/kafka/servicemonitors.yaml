@@ -1,0 +1,68 @@
+---
+# ServiceMonitor for Kafka brokers (JMX metrics)
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: kafka-brokers
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: kafka-cluster
+      strimzi.io/kind: Kafka
+      strimzi.io/name: kafka-cluster-kafka
+
+  endpoints:
+    - port: tcp-prometheus
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+# ServiceMonitor for Kafka Exporter (consumer group lag)
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: kafka-exporter
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: kafka-cluster
+      strimzi.io/kind: Kafka
+      strimzi.io/name: kafka-cluster-kafka-exporter
+
+  endpoints:
+    - port: tcp-prometheus
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+
+---
+# ServiceMonitor for Entity Operator (topic/user operator metrics)
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: kafka-entity-operator
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: kafka-cluster
+      strimzi.io/kind: Kafka
+      strimzi.io/name: kafka-cluster-entity-operator
+
+  endpoints:
+    - port: tcp-prometheus
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

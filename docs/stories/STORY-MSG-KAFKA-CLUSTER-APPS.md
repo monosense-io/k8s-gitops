@@ -11,7 +11,9 @@ Links: docs/architecture.md §19 (Workloads & Versions); kubernetes/workloads/pl
 
 ## Story
 
-Create complete production-grade Apache Kafka cluster manifests for the apps cluster using Strimzi operator with KRaft mode (no ZooKeeper), persistent storage, TLS encryption, SCRAM-SHA-512 authentication, and comprehensive monitoring. Deploy Kafka version 3.9.0 with 3 nodes in combined controller+broker mode to provide a reliable event streaming platform for application workloads. All manifests will be validated locally before committing to git; runtime deployment and validation will occur in Story 45.
+Create complete production-grade Apache Kafka cluster manifests for the apps cluster using Strimzi operator with KRaft mode (no ZooKeeper), persistent storage, TLS encryption, SCRAM-SHA-512 authentication, and comprehensive monitoring. Deploy Kafka version 4.1.0 (latest stable) with 3 nodes in combined controller+broker mode to provide a reliable event streaming platform for application workloads. All manifests will be validated locally before committing to git; runtime deployment and validation will occur in Story 45.
+
+**Version Note**: Originally planned for Kafka 3.9.0, but upgraded to 4.1.0 (Sep 2025) as Strimzi 0.48.0 removed support for Kafka 3.9.x. Kafka 4.1.0 is the latest stable version with production-ready KRaft mode and enhanced features.
 
 ## Scope
 
@@ -41,8 +43,8 @@ Create complete production-grade Apache Kafka cluster manifests for the apps clu
 **AC1**: `kubernetes/workloads/platform/messaging/kafka/` contains Kafka CR, KafkaNodePool CR, metrics ConfigMap, ServiceMonitors, and PrometheusRule.
 
 **AC2**: `kubernetes/workloads/platform/messaging/kafka/kafka.yaml` defines Kafka cluster with:
-- Kafka version 3.9.0
-- KRaft mode enabled (annotations: `strimzi.io/kraft: "enabled"`, `strimzi.io/node-pools: "enabled"`)
+- Kafka version 4.1.0 (latest stable as of Sep 2025)
+- KRaft mode enabled (default in Strimzi 0.48.0, no annotations needed)
 - Listeners: plain (9092) and TLS (9093) with SCRAM-SHA-512 authentication
 - Production-grade configuration (replication factor 3, min.insync.replicas 2)
 - Entity Operator (Topic + User Operators) with resource limits

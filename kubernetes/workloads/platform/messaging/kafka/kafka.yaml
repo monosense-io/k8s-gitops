@@ -1,0 +1,118 @@
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: kafka-cluster
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: cluster
+    app.kubernetes.io/part-of: messaging-platform
+spec:
+  # Kafka version (4.1.0 - latest stable as of Sep 2025)
+  kafka:
+    version: 4.1.0
+
+    # Listeners configuration
+    listeners:
+      # Internal plaintext listener (within cluster)
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+        authentication:
+          type: scram-sha-512
+
+      # Internal TLS listener (within cluster, encrypted)
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+        authentication:
+          type: scram-sha-512
+
+    # Authorization configuration
+    authorization:
+      type: simple
+
+    # Kafka broker configuration
+    config:
+      # Replication settings (production-grade)
+      offsets.topic.replication.factor: 3
+      transaction.state.log.replication.factor: 3
+      transaction.state.log.min.isr: 2
+      default.replication.factor: 3
+      min.insync.replicas: 2
+
+      # Performance settings
+      num.network.threads: 8
+      num.io.threads: 16
+      socket.send.buffer.bytes: 102400
+      socket.receive.buffer.bytes: 102400
+      socket.request.max.bytes: 104857600
+
+      # Log retention (7 days default)
+      log.retention.hours: 168
+      log.retention.bytes: 1073741824  # 1GB per partition
+      log.segment.bytes: 1073741824     # 1GB segments
+      log.retention.check.interval.ms: 300000  # 5 minutes
+
+      # Compression
+      compression.type: producer  # Let producer choose compression
+
+      # Topic management
+      auto.create.topics.enable: false  # Require explicit KafkaTopic CRs
+
+      # Performance tuning for Kafka 4.x
+      replica.fetch.max.bytes: 1048576
+      replica.socket.timeout.ms: 30000
+      replica.lag.time.max.ms: 30000
+
+      # Controller settings (KRaft mode)
+      controller.quorum.election.timeout.ms: 1000
+      controller.quorum.fetch.timeout.ms: 2000
+
+    # Metrics configuration (JMX Prometheus Exporter)
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
+
+  # ZooKeeper (disabled in KRaft mode - required for backward compatibility)
+  # In Kafka 4.x with KRaft, this section is ignored but must be present
+  zookeeper:
+    replicas: 0
+
+  # Entity Operator (manages KafkaTopic and KafkaUser CRs)
+  entityOperator:
+    topicOperator:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    userOperator:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+  # Kafka Exporter (consumer group lag metrics)
+  kafkaExporter:
+    topicRegex: ".*"
+    groupRegex: ".*"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 128Mi

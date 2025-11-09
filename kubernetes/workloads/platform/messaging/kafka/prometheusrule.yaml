@@ -1,0 +1,179 @@
+---
+# PrometheusRule for Kafka cluster alerting
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: kafka-cluster-alerts
+  namespace: messaging
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+    # Availability alerts
+    - name: kafka.availability
+      interval: 30s
+      rules:
+        - alert: KafkaBrokerDown
+          expr: |
+            kafka_server_replicamanager_leadercount == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka broker {{ $labels.pod }} is down"
+            description: "Kafka broker {{ $labels.pod }} has no leader partitions for 5 minutes. This indicates the broker is down or unreachable."
+
+        - alert: KafkaUnderReplicatedPartitions
+          expr: |
+            kafka_server_replicamanager_underreplicatedpartitions > 0
+          for: 15m
+          labels:
+            severity: high
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka cluster has under-replicated partitions"
+            description: "Kafka cluster has {{ $value }} under-replicated partitions for 15 minutes. Data may be at risk if brokers fail."
+
+        - alert: KafkaOfflinePartitions
+          expr: |
+            kafka_controller_kafkacontroller_offlinepartitionscount > 0
+          for: 5m
+          labels:
+            severity: critical
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka cluster has offline partitions"
+            description: "Kafka cluster has {{ $value }} offline partitions for 5 minutes. Data is unavailable for these partitions."
+
+        - alert: KafkaISRShrinkRateHigh
+          expr: |
+            rate(kafka_server_replicamanager_isrshrinks_total[5m]) > 0
+          for: 15m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka ISR shrink rate is high"
+            description: "Kafka cluster has experienced ISR shrinks at rate {{ $value }}/sec for 15 minutes. Replicas are falling behind leader."
+
+    # Storage alerts
+    - name: kafka.storage
+      interval: 30s
+      rules:
+        - alert: KafkaDiskUsageHigh
+          expr: |
+            (kafka_log_log_size / 100000000000) > 0.8
+          for: 30m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka broker {{ $labels.pod }} disk usage is high"
+            description: "Kafka broker {{ $labels.pod }} disk usage is {{ $value | humanizePercentage }} for 30 minutes. Consider increasing retention or storage capacity."
+
+    # Consumer lag alerts
+    - name: kafka.consumers
+      interval: 30s
+      rules:
+        - alert: KafkaConsumerGroupLagHigh
+          expr: |
+            kafka_consumergroup_lag > 10000
+          for: 15m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka consumer group {{ $labels.consumergroup }} has high lag"
+            description: "Consumer group {{ $labels.consumergroup }} has lag of {{ $value }} messages on topic {{ $labels.topic }} for 15 minutes."
+
+    # Performance alerts
+    - name: kafka.performance
+      interval: 30s
+      rules:
+        - alert: KafkaLeaderElectionRateHigh
+          expr: |
+            rate(kafka_controller_kafkacontroller_leaderelectionrateandtimems_total[5m]) > 0.1
+          for: 15m
+          labels:
+            severity: high
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka leader election rate is high"
+            description: "Kafka cluster is experiencing frequent leader elections at rate {{ $value }}/sec for 15 minutes. This indicates cluster instability."
+
+        - alert: KafkaRequestHandlerIdleLow
+          expr: |
+            kafka_server_kafkarequesthandlerpool_requesthandleravgidlepercent < 0.2
+          for: 30m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka request handler idle percentage is low"
+            description: "Kafka broker {{ $labels.pod }} request handler idle is {{ $value | humanizePercentage }} for 30 minutes. Broker may be overloaded."
+
+        - alert: KafkaNetworkHandlerIdleLow
+          expr: |
+            kafka_network_processor_avgidlepercent < 0.2
+          for: 30m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka network handler idle percentage is low"
+            description: "Kafka broker {{ $labels.pod }} network handler idle is {{ $value | humanizePercentage }} for 30 minutes. High network latency expected."
+
+    # Controller alerts (KRaft mode)
+    - name: kafka.controller
+      interval: 30s
+      rules:
+        - alert: KafkaNoActiveController
+          expr: |
+            kafka_controller_kafkacontroller_activecontrollercount == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka cluster has no active controller"
+            description: "Kafka cluster has no active controller for 5 minutes. Metadata operations will be blocked."
+
+    # JVM alerts
+    - name: kafka.jvm
+      interval: 30s
+      rules:
+        - alert: KafkaBrokerHeapUsageHigh
+          expr: |
+            (jvm_memory_heap_used / jvm_memory_heap_max) > 0.9
+          for: 15m
+          labels:
+            severity: high
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka broker {{ $labels.pod }} heap usage is high"
+            description: "Kafka broker {{ $labels.pod }} heap usage is {{ $value | humanizePercentage }} for 15 minutes. Consider increasing heap size or investigating memory leaks."
+
+        - alert: KafkaBrokerGCTimeHigh
+          expr: |
+            rate(jvm_gc_collection_time_ms_total[5m]) > 100
+          for: 15m
+          labels:
+            severity: warning
+            component: kafka
+            cluster: apps
+          annotations:
+            summary: "Kafka broker {{ $labels.pod }} GC time is high"
+            description: "Kafka broker {{ $labels.pod }} is spending {{ $value }}ms/sec in GC for 15 minutes. Performance may be degraded."

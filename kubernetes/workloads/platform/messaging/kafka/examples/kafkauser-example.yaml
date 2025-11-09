@@ -1,0 +1,48 @@
+---
+# Example KafkaUser for testing
+# This is NOT deployed by default - use for testing purposes only
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: test-user
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: test
+spec:
+  # Authentication type
+  authentication:
+    type: scram-sha-512
+
+  # Authorization configuration
+  authorization:
+    type: simple
+    acls:
+      # Producer permissions for test-topic
+      - resource:
+          type: topic
+          name: test-topic
+          patternType: literal
+        operations:
+          - Write
+          - Create
+          - Describe
+
+      # Consumer permissions for test-topic
+      - resource:
+          type: topic
+          name: test-topic
+          patternType: literal
+        operations:
+          - Read
+          - Describe
+
+      # Consumer group permissions
+      - resource:
+          type: group
+          name: test-consumer-group
+          patternType: literal
+        operations:
+          - Read
+          - Describe

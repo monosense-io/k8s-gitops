@@ -1,0 +1,89 @@
+---
+# KafkaNodePool for KRaft mode (combined controller+broker)
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: controller-broker
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: nodepool
+spec:
+  # Number of nodes in the pool
+  replicas: 3
+
+  # Roles: Combined controller+broker mode (simplified 3-node cluster)
+  # In KRaft mode, controllers manage metadata, brokers handle data
+  roles:
+    - controller
+    - broker
+
+  # Storage configuration (JBOD with single volume)
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 100Gi
+        class: ${BLOCK_SC}  # rook-ceph-block from cluster-settings
+        deleteClaim: false  # Retain PVCs on deletion for data safety
+
+  # Resource allocation (aligned with best practices for 3-node cluster)
+  resources:
+    requests:
+      cpu: 1000m      # 1 CPU core baseline
+      memory: 2Gi     # 2GB baseline memory
+    limits:
+      cpu: 2000m      # 2 CPU cores max
+      memory: 4Gi     # 4GB max memory
+
+  # JVM configuration (heap sizing at 50% of memory request/limit)
+  jvmOptions:
+    -Xms: 1024m   # Initial heap: 50% of 2Gi
+    -Xmx: 2048m   # Max heap: 50% of 4Gi
+    gcLoggingEnabled: false  # Disable verbose GC logging
+    javaSystemProperties:
+      # G1GC tuning for low-latency
+      - name: "java.util.logging.manager"
+        value: "org.apache.logging.log4j.jul.LogManager"
+
+  # Pod template configuration
+  template:
+    pod:
+      # Security context (PSA restricted compliant)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Pod topology spread for high availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway  # Prefer spread, but allow scheduling if impossible
+          labelSelector:
+            matchLabels:
+              strimzi.io/cluster: kafka-cluster
+              strimzi.io/pool-name: controller-broker
+
+      # Pod anti-affinity (prefer different nodes)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    strimzi.io/cluster: kafka-cluster
+                    strimzi.io/pool-name: controller-broker
+                topologyKey: kubernetes.io/hostname
+
+    # PVC template configuration
+    persistentVolumeClaim:
+      metadata:
+        labels:
+          app.kubernetes.io/name: kafka
+          app.kubernetes.io/component: storage

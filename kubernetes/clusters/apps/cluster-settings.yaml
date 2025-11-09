@@ -143,3 +143,17 @@ data:
   GITHUB_ARC_REPO: "https://github.com/monosense/pilar"
   GITHUB_ARC_RUNNER_SET_NAME: "pilar-runner"
   GITHUB_ARC_SECRET_PATH: "kubernetes/apps/github-arc/auth"
+
+  # Kafka Configuration (Story 38)
+  KAFKA_VERSION: "4.1.0"
+  KAFKA_REPLICAS: "3"
+  KAFKA_STORAGE_SIZE: "100Gi"
+  KAFKA_CPU_REQUEST: "1000m"
+  KAFKA_CPU_LIMIT: "2000m"
+  KAFKA_MEMORY_REQUEST: "2Gi"
+  KAFKA_MEMORY_LIMIT: "4Gi"
+  KAFKA_JVM_XMS: "1024m"
+  KAFKA_JVM_XMX: "2048m"
+  KAFKA_REPLICATION_FACTOR: "3"
+  KAFKA_MIN_ISR: "2"
+  KAFKA_LOG_RETENTION_HOURS: "168"  # 7 days

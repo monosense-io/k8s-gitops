@@ -1,0 +1,37 @@
+---
+# Example KafkaTopic for testing
+# This is NOT deployed by default - use for testing purposes only
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: test-topic
+  namespace: messaging
+  labels:
+    strimzi.io/cluster: kafka-cluster
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/component: test
+spec:
+  # Partition configuration
+  partitions: 3
+  replicas: 3
+
+  # Topic configuration
+  config:
+    # Retention (7 days)
+    retention.ms: 604800000  # 7 days in milliseconds
+
+    # Compression
+    compression.type: lz4
+
+    # Durability
+    min.insync.replicas: 2
+
+    # Cleanup policy
+    cleanup.policy: delete
+
+    # Segment configuration
+    segment.bytes: 1073741824  # 1GB segments
+    segment.ms: 86400000       # 24 hours
+
+    # Message size limits
+    max.message.bytes: 1048576  # 1MB max message size
