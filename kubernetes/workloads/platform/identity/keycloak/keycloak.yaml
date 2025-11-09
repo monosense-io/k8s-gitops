@@ -10,8 +10,8 @@ spec:
   # Instance configuration
   instances: ${KEYCLOAK_REPLICAS}
 
-  # Image
-  image: quay.io/keycloak/keycloak:${KEYCLOAK_IMAGE_TAG}
+  # Image - Custom themed Keycloak
+  image: ${KEYCLOAK_REGISTRY}/${KEYCLOAK_IMAGE_NAME}:${KEYCLOAK_IMAGE_TAG}
 
   # Hostname configuration
   hostname:
@@ -79,6 +79,32 @@ spec:
     # Security hardening
     - name: spi-login-protocol-openid-connect-legacy-logout-redirect-uri
       value: "false"
+
+    # Theme configuration
+    - name: theme
+      value: "redhat"
+    - name: theme-welcome-theme
+      value: "redhat"
+    - name: theme-login-theme
+      value: "redhat"
+    - name: theme-account-theme
+      value: "redhat"
+    - name: theme-admin-theme
+      value: "keycloak"
+    - name: theme-email-theme
+      value: "redhat"
+
+    # Theme performance settings
+    - name: theme-cache-max-size
+      value: "10000"
+    - name: theme-cache-ttl
+      value: "3600"
+    - name: theme-static-max-age
+      value: "2592000"
+
+    # Theme statistics and monitoring
+    - name: theme-stats-enabled
+      value: "true"
 
   # Feature flags
   features:
