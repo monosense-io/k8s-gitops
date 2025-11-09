@@ -22,7 +22,7 @@
 # - Silent data loss or corruption
 #
 # Verified Alignments (as of 2025-11-09):
-#   cert-manager:      v1.19.1  (CRD ✓ Controller ✓) - Updated from v1.19.0
+#   cert-manager:      MANAGED BY FLUX  (CRDs installed with controller chart)
 #   external-secrets:  0.20.3   (CRD ✓ Controller ✓) - v1.0.0 GA available (requires migration)
 #
 # Future Flux Deployments (CRDs pre-installed, controllers deployed via Flux):
@@ -55,15 +55,9 @@ environments:
 
 ---
 releases:
-  # cert-manager CRDs
-  # Provides: Certificate, CertificateRequest, Issuer, ClusterIssuer, etc.
-  - name: cert-manager-crds
-    namespace: cert-manager
-    chart: oci://quay.io/jetstack/charts/cert-manager
-    version: v1.19.1
-    set:
-      - name: crds.enabled
-        value: true
+  # cert-manager CRDs - MANAGED BY FLUX
+  # CRDs are installed automatically by the cert-manager Helm chart when deployed via Flux
+  # This avoids bootstrap dependency on quay.io and ensures CRD/controller version alignment
 
   # external-secrets CRDs
   # Provides: ExternalSecret, SecretStore, ClusterSecretStore, etc.

@@ -1315,27 +1315,27 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
 #### **Story 43: STORY-BOOT-CRDS**
 - **Status**: ✅ **COMPLETE** (v2.1 - CRD Versions Updated)
 - **Sprint**: 7 | Lane: Bootstrap & Platform
-- **Commit**: `<pending>` - feat(bootstrap): update CRD versions (cert-manager v1.19.1, victoria-metrics 0.6.0) (Story 43)
-- **Date**: 2025-11-09 (Version validation and updates)
+- **Commit**: `ed70fcd` + updated - feat(bootstrap): update victoria-metrics CRDs to 0.6.0, move cert-manager to Flux
+- **Date**: 2025-11-09 (Version updates and deployment)
 - **Original Implementation**: 2025-10-21
 - **Deliverables**:
-  - **bootstrap/helmfile.d/00-crds.yaml** updated with latest CRD versions
+  - **bootstrap/helmfile.d/00-crds.yaml** updated - removed cert-manager (now Flux-managed)
   - **Version Updates**:
-    - cert-manager: v1.19.0 → v1.19.1 (critical bug fix)
-    - victoria-metrics-operator-crds: 0.5.1 → 0.6.0 (security & features)
-  - **CRD Components Configured**:
-    - cert-manager v1.19.1 (Certificate, Issuer, ClusterIssuer)
+    - cert-manager: MOVED TO FLUX (CRDs installed with controller chart)
+    - victoria-metrics-operator-crds: 0.5.1 → 0.6.0 (DEPLOYED - security & features)
+  - **CRD Components in Bootstrap**:
+    - cert-manager: MANAGED BY FLUX (CRDs installed automatically with Helm chart)
     - external-secrets 0.20.3 (ExternalSecret, SecretStore, ClusterSecretStore)
     - victoria-metrics-operator-crds 0.6.0 (VMAgent, VMAlert, VMCluster, etc.)
     - prometheus-operator-crds 24.0.1 (ServiceMonitor, PodMonitor, PrometheusRule)
     - Gateway API v1.4.0 (Gateway, HTTPRoute, GatewayClass)
     - cloudnative-pg 0.26.1 (Cluster, Pooler, Backup)
-  - **Total CRDs**: ~77 per cluster (infra and apps identical)
+  - **Total CRDs**: ~71 per cluster in bootstrap (cert-manager's 6 CRDs managed by Flux)
   - **Validation Method**: Local helmfile template + yq filtering
   - **Pattern**: Phase 0 CRD extraction → Phase 1 operator deployment
-- **Version Validation Results** (2025-11-09):
-  - ✅ cert-manager v1.19.1 (updated from v1.19.0)
-  - ✅ victoria-metrics-operator-crds 0.6.0 (updated from 0.5.1)
+- **Deployment Results** (2025-11-09):
+  - ✅ cert-manager: MOVED TO FLUX MANAGEMENT (avoids quay.io bootstrap dependency)
+  - ✅ victoria-metrics-operator-crds 0.6.0: DEPLOYED to infra & apps clusters
   - ℹ️ external-secrets 0.20.3 (v1.0.0 GA available - migration deferred)
   - ℹ️ prometheus-operator-crds 24.0.1 (24.0.2 available - optional patch)
   - ✅ Gateway API v1.4.0 (latest GA)
@@ -1350,16 +1350,17 @@ Validation:    ░░░░░░░░░░░░░   0% (0/6 stories)
   - Prevents race conditions during initial reconciliation
   - Supports both infra and apps cluster environments
 - **Impact**:
-  - Foundation for all operator deployments (cert-manager, external-secrets, VictoriaMetrics, CNPG)
+  - Foundation for all operator deployments (external-secrets, VictoriaMetrics, CNPG)
   - Ensures CRDs available before controllers start
   - Prevents API compatibility issues and resource validation failures
-  - Critical bug fix in cert-manager v1.19.1 prevents unexpected certificate renewals
+  - VictoriaMetrics 0.6.0 adds new CRD types (VLSingle, VLCluster, VTSingle, VTCluster)
+  - cert-manager now managed by Flux for better version alignment with controller
 - **Dependencies**: None (foundational - first bootstrap phase)
 - **Prerequisites for Story 45 Deployment**:
   - Tools installed: helmfile, yq, kubectl
   - Network egress for OCI registry access
   - Gateway API CRDs applied from GitHub releases
-- **Note**: Manifests created and validated locally (2025-10-21). Version updates applied 2025-11-09. Deployment and CRD establishment validation deferred to Story 45 per v3.0 manifests-first approach.
+- **Note**: Manifests created 2025-10-21. Updated victoria-metrics to 0.6.0 and moved cert-manager to Flux management on 2025-11-09. Successfully deployed updated CRDs to both infra and apps clusters. cert-manager CRDs now installed automatically by Flux when deploying the cert-manager controller.
 
 ---
 
