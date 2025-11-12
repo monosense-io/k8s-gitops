@@ -52,6 +52,7 @@ spec:
 
   cleanupPolicy:
     confirmation: ""
+    wipeDevicesFromOtherClusters: true
     sanitizeDisks:
       method: quick
       dataSource: zero
