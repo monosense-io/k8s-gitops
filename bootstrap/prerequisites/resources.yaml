@@ -23,9 +23,7 @@ metadata:
   namespace: external-secrets
 type: Opaque
 stringData:
-  # Token injected from 1Password vault via 'op inject'
-  # Format: op://vault-name/item-name/field-name
-  token: "op://Infra/shared-1password/token"
+  token: op://Infra/shared-1password/OP_CONNECT_TOKEN
 ---
 # Flux System namespace (will be created by helmfile but including here for completeness)
 apiVersion: v1
