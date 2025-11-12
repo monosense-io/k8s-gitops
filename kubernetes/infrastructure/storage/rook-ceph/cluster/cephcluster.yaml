@@ -93,21 +93,21 @@ spec:
     # - apps-02: /dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301595 (1TB TEAM)
     # - apps-03: /dev/disk/by-id/nvme-eui.6479a7726a304bbf (1TB PNY CS1031)
     nodes:
-      - name: "apps-01"
+      - name: "infra-01"
         devices:
-          - name: "/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301178"
+          - name: "/dev/disk/by-id/nvme-eui.6479a7726a304b94"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
-      - name: "apps-02"
+      - name: "infra-02"
         devices:
-          - name: "/dev/disk/by-id/nvme-TEAM_TM8FP6001T_TPBF2312120030301595"
+          - name: "/dev/disk/by-id/nvme-eui.6479a77cda30650b"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
-      - name: "apps-03"
+      - name: "infra-03"
         devices:
-          - name: "/dev/disk/by-id/nvme-eui.6479a7726a304bbf"
+          - name: "/dev/disk/by-id/nvme-eui.6479a7726a3054e5"
             config:
               deviceClass: ${ROOK_CEPH_OSD_DEVICE_CLASS}
 
