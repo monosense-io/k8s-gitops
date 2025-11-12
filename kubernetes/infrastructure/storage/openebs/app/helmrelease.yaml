@@ -74,7 +74,15 @@ spec:
           cpu: 200m
           memory: 128Mi
 
-    # Observability
+    # Disable built-in observability stack (use Victoria Metrics instead)
+    loki:
+      enabled: false
+    alloy:
+      enabled: false
+    minio:
+      enabled: false
+
+    # Observability integration with VictoriaMetrics
     serviceMonitor:
       enabled: true
 
