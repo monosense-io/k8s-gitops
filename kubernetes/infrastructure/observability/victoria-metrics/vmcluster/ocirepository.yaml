@@ -3,7 +3,6 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: victoria-metrics-k8s-stack
-  namespace: flux-system
   labels:
     app.kubernetes.io/name: victoria-metrics
     app.kubernetes.io/component: vmcluster

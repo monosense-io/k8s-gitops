@@ -3,7 +3,6 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: strimzi
-  namespace: flux-system
   labels:
     app.kubernetes.io/name: strimzi-operator
 spec:

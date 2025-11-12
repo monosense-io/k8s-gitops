@@ -3,7 +3,6 @@ apiVersion: source.toolkit.fluxcd.io/v1beta2
 kind: OCIRepository
 metadata:
   name: dragonfly-operator
-  namespace: flux-system
   labels:
     app.kubernetes.io/name: dragonfly-operator
 spec:

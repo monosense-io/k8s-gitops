@@ -11,7 +11,6 @@ spec:
   chartRef:
     kind: OCIRepository
     name: victoria-logs-single
-    namespace: flux-system
   version: "0.11.12"
   interval: 1h
   timeout: 15m

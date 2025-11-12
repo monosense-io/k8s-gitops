@@ -14,7 +14,6 @@ spec:
   chartRef:
     kind: OCIRepository
     name: strimzi
-    namespace: flux-system
 
   # CRD management
   install:

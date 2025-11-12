@@ -3,7 +3,6 @@ apiVersion: source.toolkit.fluxcd.io/v1
 kind: OCIRepository
 metadata:
   name: victoria-logs-single
-  namespace: flux-system
   labels:
     app.kubernetes.io/name: victoria-logs
 spec:
