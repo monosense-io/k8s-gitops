@@ -4,10 +4,10 @@ kind: Kustomization
 resources:
   # Cilium: Bootstrap via Helmfile, then Flux adopts via HelmRelease (buroa pattern)
   - cilium/core/ks.yaml
+  - cilium/ipam/infra/ks.yaml  # IPAM pool for LoadBalancer IPs
   - cilium/gateway/ks.yaml
   - cilium/bgp/
   - cilium/clustermesh/ks.yaml
-  # Note: cilium/ipam excluded - has both infra/apps configs, handled per-cluster
   - coredns/ks.yaml
   - spegel/ks.yaml
   - cloudflared/ks.yaml
