@@ -26,6 +26,14 @@ spec:
       name: ${CLUSTER}
       id: ${CLUSTER_ID}
 
+    # Talos Linux compatibility
+    securityContext:
+      privileged: false
+
+    # Disable sysctl init container (Talos doesn't have /etc/sysctl.d)
+    sysctlfix:
+      enabled: false
+
     # Networking
     ipv4NativeRoutingCIDR: ${POD_CIDR_STRING}
     routingMode: native
