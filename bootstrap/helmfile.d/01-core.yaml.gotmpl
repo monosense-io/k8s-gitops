@@ -168,7 +168,7 @@ releases:
             interval: 1m
             kind: GitRepository
             url: https://github.com/monosense-io/k8s-gitops
-            ref: main
+            ref: refs/heads/main
             path: kubernetes/clusters/{{ .Environment.Name }}
           components:
             - source-controller
@@ -240,16 +240,3 @@ releases:
           - --server-side
           - -f
           - ../../kubernetes/clusters/{{ .Environment.Name }}/flux-system/gotk-sync.yaml
-      # Fix GitRepository ref from 'name' to 'branch' (Flux Operator bug workaround)
-      - events: ['postsync']
-        showlogs: true
-        command: kubectl
-        args:
-          - patch
-          - gitrepository
-          - flux-system
-          - -n
-          - flux-system
-          - --type=json
-          - -p
-          - '[{"op": "replace", "path": "/spec/ref", "value": {"branch": "main"}}]'

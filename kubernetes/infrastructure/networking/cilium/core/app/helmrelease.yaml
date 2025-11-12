@@ -5,9 +5,13 @@ metadata:
   namespace: kube-system
 spec:
   interval: 5m
+  timeout: 15m
   chartRef:
     kind: OCIRepository
     name: cilium-charts
+  # Wait for resources to be ready before marking release as successful
+  # Required because Cilium components need to be healthy for networking to work
+  wait: true
   install:
     createNamespace: true
     crds: CreateReplace
