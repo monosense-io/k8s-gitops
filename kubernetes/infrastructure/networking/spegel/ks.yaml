@@ -18,9 +18,10 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  dependsOn:
-    - name: cilium-core
-      namespace: flux-system
+  # Cilium is deployed via Helmfile (no cilium-core dependency needed)
+  # dependsOn:
+  #   - name: cilium-core
+  #     namespace: flux-system
   targetNamespace: kube-system
   postBuild:
     substituteFrom:
