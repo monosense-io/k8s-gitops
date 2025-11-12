@@ -1,53 +1,30 @@
-# Development Guide - k8s-gitops
-
-> **Generated:** 2025-11-09
-> **Project:** Multi-Cluster Kubernetes GitOps Infrastructure
-> **For:** Local development and contribution
-
-## Table of Contents
-
-1. [Prerequisites](#prerequisites)
-2. [Environment Setup](#environment-setup)
-3. [Local Development Workflow](#local-development-workflow)
-4. [Validation & Testing](#validation--testing)
-5. [Common Development Tasks](#common-development-tasks)
-6. [Troubleshooting](#troubleshooting)
-
----
+# Development Guide
 
 ## Prerequisites
 
 ### Required Tools
 
-| Tool | Version | Purpose | Installation |
-|------|---------|---------|--------------|
-| **Task** | Latest | Automation orchestration | `brew install go-task/tap/go-task` |
-| **kubectl** | 1.28+ | Kubernetes CLI | `brew install kubectl` |
-| **flux** | 2.x | Flux CD CLI | `brew install fluxcd/tap/flux` |
-| **talosctl** | Latest | Talos Linux CLI | `brew install siderolabs/tap/talosctl` |
-| **kubeconform** | Latest | Kubernetes manifest validation | `brew install kubeconform` |
-| **yamllint** | Latest | YAML linting | `brew install yamllint` |
-| **yq** | 4.x | YAML processor | `brew install yq` |
-| **kustomize** | 5.x | Kustomize CLI | `brew install kustomize` |
-| **mise** | Latest | Environment manager | `brew install mise` |
+| Tool | Version | Installation | Purpose |
+|------|---------|--------------|---------|
+| **kubectl** | v1.28+ | `brew install kubectl` | Kubernetes CLI |
+| **talosctl** | Latest | `brew install siderolabs/tap/talosctl` | Talos CLI |
+| **flux** | v2.x | `brew install fluxcd/tap/flux` | Flux CLI |
+| **helmfile** | Latest | `brew install helmfile` | Helmfile automation |
+| **helm** | v3.x | `brew install helm` | Helm package manager |
+| **task** | v3.x | `brew install go-task` | Task automation |
+| **yq** | v4.x | `brew install yq` | YAML processor |
+| **jq** | Latest | `brew install jq` | JSON processor |
+| **kustomize** | Latest | `brew install kustomize` | Kustomize CLI |
+| **minijinja-cli** | Latest | `brew install minijinja-cli` | Template renderer |
 
 ### Optional Tools
 
 | Tool | Purpose | Installation |
 |------|---------|--------------|
-| **trivy** | Container image scanning | `brew install aquasecurity/trivy/trivy` |
-| **gitleaks** | Secret scanning | `brew install gitleaks` |
-| **helm** | Helm chart management | `brew install helm` |
-| **jq** | JSON processor | `brew install jq` |
-| **age** | Encryption (for SOPS) | `brew install age` |
-| **sops** | Secret encryption | `brew install sops` |
-
-### Access Requirements
-
-- **1Password:** Access to "Infra" vault for secrets
-- **Cloudflare:** API token for DNS management (if testing DNS automation)
-- **GitHub:** Repository access with write permissions
-- **SSH Keys:** Configured for Git operations
+| **op** (1Password CLI) | Secret injection | [1Password CLI](https://1password.com/downloads/command-line/) |
+| **kubeconform** | Manifest validation | `brew install kubeconform` |
+| **age** | SOPS encryption | `brew install age` |
+| **sops** | Secrets encryption | `brew install sops` |
 
 ---
 
@@ -56,468 +33,513 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/trosvald/home-ops.git k8s-gitops
+git clone https://github.com/trosvald/k8s-gitops.git
 cd k8s-gitops
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure Credentials
 
-The repository uses **mise** (formerly rtx) for environment management:
-
+#### 1Password CLI Setup
 ```bash
-# Install mise (if not already installed)
-brew install mise
+# Sign in to 1Password
+eval $(op signin)
 
-# Load environment configuration
-mise install
+# Test secret injection
+op inject -i bootstrap/prerequisites/resources.yaml
 ```
 
-**Environment variables automatically set by `.mise.toml`:**
-- `KUBECONFIG` → `kubernetes/kubeconfig`
-- `TALOSCONFIG` → `talos/talosconfig`
-- `MINIJINJA_CONFIG_FILE` → `.minijinja.toml`
-
-### 3. Verify Task Installation
-
+#### SOPS/Age Setup (for encrypted files)
 ```bash
-task --list
+# Generate Age key
+age-keygen -o ~/.config/sops/age/keys.txt
+
+# Add public key to .sops.yaml
 ```
 
-**Expected output:** List of available task modules:
-- `cluster:*` - Cluster lifecycle operations
-- `bootstrap:*` - Bootstrap procedures
-- `kubernetes:*` - Kubernetes operations
-- `talos:*` - Talos node management
-- `volsync:*` - Backup/restore automation
-- `workstation:*` - Local environment setup
-- `op:*` - 1Password integration
-- `synergyflow:*` - Workflow orchestration
-
-### 4. Install Pre-commit Hooks (Optional)
-
-Create `.git/hooks/pre-commit`:
+### 3. Configure Kubeconfig
 
 ```bash
-#!/bin/bash
-set -e
+# Kubeconfig will be generated during bootstrap
+export KUBECONFIG=$PWD/kubernetes/kubeconfig
 
-echo "Running validation checks..."
-
-# YAML linting
-yamllint kubernetes/
-
-# Cilium core validation
-./scripts/validate-cilium-core.sh
-
-echo "✓ All checks passed"
+# After bootstrap:
+kubectl config get-contexts
+kubectl config use-context admin@infra  # or admin@apps
 ```
 
-Make executable:
+### 4. Configure Talosconfig
+
 ```bash
-chmod +x .git/hooks/pre-commit
+# Talosconfig will be generated during Talos bootstrap
+export TALOSCONFIG=$PWD/talos/talosconfig
+
+# List nodes
+talosctl config info
 ```
 
 ---
 
-## Local Development Workflow
+## Development Workflow
 
-### 1. Create Feature Branch
+### Task-Based Development
 
-```bash
-git checkout -b feature/add-new-component
-```
-
-### 2. Make Changes
-
-**For infrastructure changes:**
-- Add manifests to `kubernetes/infrastructure/{category}/`
-- Reference operators from `kubernetes/bases/` if needed
-- Update cluster-specific variables in `kubernetes/clusters/{infra,apps}/cluster-settings.yaml`
-
-**For workload changes:**
-- Add manifests to `kubernetes/workloads/platform/` or `kubernetes/workloads/tenants/`
-- Include NetworkPolicy baseline (reference `kubernetes/components/networkpolicy/`)
-
-**For Talos changes:**
-- Modify Jinja2 template: `talos/machineconfig-multicluster.yaml.j2`
-- Regenerate node configs (if applicable)
-
-### 3. Validate Changes Locally
+All operations use `task` automation:
 
 ```bash
-# Validate YAML syntax
-yamllint kubernetes/
+# List all available tasks
+task --list
 
-# Validate Kubernetes schemas
-kubeconform -summary -output json kubernetes/infrastructure/**/*.yaml
+# List bootstrap tasks
+task bootstrap --list
 
-# Validate Flux builds
-flux build kustomization infra-infrastructure \
-  --path kubernetes/clusters/infra/ \
-  --kustomization-file kubernetes/clusters/infra/infrastructure.yaml
-
-# Validate Cilium core
-./scripts/validate-cilium-core.sh
+# List Talos tasks
+task talos --list
 ```
 
-### 4. Test with Dry Run (if cluster access available)
+### Common Development Tasks
+
+#### **View Cluster Status**
+```bash
+# Show bootstrap status
+task bootstrap:status CLUSTER=infra
+
+# Show Flux status
+flux get kustomizations -A
+
+# Show all resources
+kubectl get all -A
+```
+
+#### **Reconcile Changes**
+```bash
+# Force Flux reconciliation
+task kubernetes:reconcile CLUSTER=infra
+
+# Reconcile specific Kustomization
+flux reconcile kustomization <name> -n flux-system
+```
+
+#### **Validate Manifests Locally**
+```bash
+# Validate Cilium core (no cluster required)
+task validate-cilium-core
+
+# Validate all manifests with kubeconform
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict -summary
+```
+
+#### **Apply Node Configuration**
+```bash
+# Apply Talos config to a node
+task talos:apply-node NODE=10.25.11.11 CLUSTER=infra
+
+# Reboot node
+task talos:reboot-node NODE=10.25.11.11
+
+# Upgrade Talos
+task talos:upgrade-node NODE=10.25.11.11
+```
+
+---
+
+## Cluster Bootstrap Process
+
+### Full Bootstrap (Recommended)
 
 ```bash
-# Flux dry-run reconciliation
-flux reconcile kustomization <name> --with-source --dry-run
+# Bootstrap complete infra cluster (Talos + K8s + Flux)
+task bootstrap:infra
 
-# Kubectl dry-run
-kubectl apply -f <manifest> --dry-run=client
-kubectl apply -f <manifest> --dry-run=server
+# Bootstrap complete apps cluster
+task bootstrap:apps
 ```
 
-### 5. Commit Changes
+### Phase-by-Phase Bootstrap (Advanced)
+
+```bash
+# Phase -1: Talos only
+task bootstrap:talos CLUSTER=infra
+
+# Phase 0: Prerequisites (namespaces, secrets)
+task bootstrap:phase:0 CLUSTER=infra
+
+# Phase 1: CRDs
+task bootstrap:phase:1 CLUSTER=infra
+
+# Phase 2: Core infrastructure (Cilium, CoreDNS, Flux)
+task bootstrap:phase:2 CLUSTER=infra
+
+# Phase 3: Validate deployment
+task bootstrap:phase:3 CLUSTER=infra
+```
+
+### Dry-Run Mode
+
+```bash
+# Preview what bootstrap will do
+task bootstrap:dry-run CLUSTER=infra
+
+# Dry-run specific phase
+task bootstrap:phase:1 CLUSTER=infra DRY_RUN=true
+```
+
+---
+
+## Making Infrastructure Changes
+
+### 1. Modify Manifests
+
+```bash
+# Edit infrastructure component
+vim kubernetes/infrastructure/networking/cilium/core/app/helmrelease.yaml
+
+# Edit workload
+vim kubernetes/workloads/platform/databases/cloudnative-pg/shared-cluster/cluster.yaml
+```
+
+### 2. Validate Changes
+
+```bash
+# Validate with kustomize build
+kubectl kustomize kubernetes/infrastructure/networking/cilium/core/app
+
+# Validate with kubeconform
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict
+```
+
+### 3. Commit and Push
 
 ```bash
 git add .
-git commit -m "feat(networking): add external-dns configuration for apps cluster"
+git commit -m "feat(cilium): update to v1.19.0"
+git push origin main
 ```
 
-**Commit message conventions:**
-- `feat(category):` - New feature
-- `fix(category):` - Bug fix
-- `docs:` - Documentation changes
-- `refactor(category):` - Code refactoring
-- `chore:` - Maintenance tasks
+### 4. Flux Auto-Reconciles
 
-### 6. Push and Create Pull Request
+Flux watches the main branch and reconciles changes automatically (default interval: 10m).
 
+**Force immediate reconciliation:**
 ```bash
-git push origin feature/add-new-component
-```
-
-Create PR on GitHub. CI/CD will automatically:
-- Validate YAML syntax
-- Validate Kubernetes schemas with kubeconform
-- Run Flux builds for both clusters
-- Scan for secrets with Gitleaks
-- Scan container images with Trivy
-- Validate Talos configs
-- Check for configuration drift
-
----
-
-## Validation & Testing
-
-### Local Validation Scripts
-
-#### Cilium Core Validation
-```bash
-./scripts/validate-cilium-core.sh
-```
-
-**What it validates:**
-1. YAML syntax (yamllint)
-2. Kustomize build (kustomize build)
-3. Kubernetes schema (kubeconform)
-4. Flux build with variable substitution
-
-#### CRD Wait Set Validation
-```bash
-./scripts/validate-crd-waitset.sh
-```
-
-**Validates CRD establishment for:**
-- `monitoring.coreos.com`
-- `external-secrets.io`
-- `cert-manager.io`
-- `gateway.networking.k8s.io`
-
-#### Story Sequence Validation
-```bash
-./scripts/validate-story-sequences.sh
-```
-
-**Validates:** Story/epic dependency ordering
-
-### CI/CD Validation Pipeline
-
-**Triggered on:** Every pull request
-
-**Stages:**
-1. **Flux Build Validation** - Validates Kustomization builds for infra and apps clusters
-2. **YAML Linting** - yamllint with 160-char line limit
-3. **Schema Validation** - kubeconform validates against OpenAPI schemas
-4. **Secret Scanning** - Gitleaks detects leaked credentials
-5. **Image Scanning** - Trivy scans container images for vulnerabilities
-6. **Talos Validation** - Jinja2 template syntax validation
-7. **Drift Detection** - flux diff checks for configuration drift
-
-**View workflow:** `.github/workflows/validate-infrastructure.yaml`
-
-### Manual Testing Commands
-
-```bash
-# Test Flux reconciliation (dry-run)
-flux reconcile kustomization infra-infrastructure --with-source --dry-run
-
-# Test Kustomize build
-kustomize build kubernetes/clusters/infra/ | less
-
-# Test variable substitution
-flux build kustomization infra-infrastructure \
-  --path kubernetes/clusters/infra/ \
-  --kustomization-file kubernetes/clusters/infra/infrastructure.yaml \
-  | grep -A 5 "CILIUM_VERSION"
-
-# Validate all YAML files
-find kubernetes/ -name "*.yaml" -exec yamllint {} \;
-
-# Validate specific manifest against schema
-kubeconform -summary kubernetes/infrastructure/networking/cilium/core/app/helmrelease.yaml
+task kubernetes:reconcile CLUSTER=infra
 ```
 
 ---
 
-## Common Development Tasks
+## Working with Helm Charts
 
-### Add New Infrastructure Component
+### Update Chart Versions
 
-1. **Create directory structure:**
-   ```bash
-   mkdir -p kubernetes/infrastructure/{category}/{component}
-   ```
+```bash
+# Edit HelmRelease
+vim kubernetes/infrastructure/observability/victoria-metrics/app/helmrelease.yaml
 
-2. **Add Kustomization:**
-   ```yaml
-   # kubernetes/infrastructure/{category}/{component}/kustomization.yaml
-   apiVersion: kustomize.config.k8s.io/v1beta1
-   kind: Kustomization
-   resources:
-     - ./app
-   ```
+# Change version
+spec:
+  chart:
+    spec:
+      version: 0.38.0  # Update this
+```
 
-3. **Add HelmRelease or manifests:**
-   ```bash
-   mkdir kubernetes/infrastructure/{category}/{component}/app
-   # Add helmrelease.yaml or plain manifests
-   ```
+### Test Helm Template Locally
 
-4. **Reference in parent Kustomization:**
-   Edit `kubernetes/infrastructure/{category}/kustomization.yaml`:
-   ```yaml
-   resources:
-     - existing-component
-     - {component}  # Add this line
-   ```
-
-5. **Test build:**
-   ```bash
-   kustomize build kubernetes/infrastructure/{category}/{component}/
-   ```
-
-### Add New Operator (via bases/)
-
-1. **Create base structure:**
-   ```bash
-   mkdir -p kubernetes/bases/{operator-name}/operator
-   ```
-
-2. **Add HelmRelease:**
-   ```yaml
-   # kubernetes/bases/{operator-name}/operator/helmrelease.yaml
-   apiVersion: helm.toolkit.fluxcd.io/v2
-   kind: HelmRelease
-   metadata:
-     name: {operator-name}
-     namespace: {operator-namespace}
-   spec:
-     interval: 30m
-     chart:
-       spec:
-         chart: {chart-name}
-         version: {version}
-         sourceRef:
-           kind: HelmRepository
-           name: {repo-name}
-           namespace: flux-system
-   ```
-
-3. **Add Kustomization:**
-   ```yaml
-   # kubernetes/bases/{operator-name}/operator/kustomization.yaml
-   apiVersion: kustomize.config.k8s.io/v1beta1
-   kind: Kustomization
-   resources:
-     - helmrelease.yaml
-   ```
-
-4. **Reference from infrastructure:**
-   ```yaml
-   # kubernetes/infrastructure/{category}/{operator-name}/kustomization.yaml
-   apiVersion: kustomize.config.k8s.io/v1beta1
-   kind: Kustomization
-   resources:
-     - ../../../bases/{operator-name}/operator
-   ```
-
-### Update Cluster Configuration
-
-1. **Edit cluster-settings:**
-   ```bash
-   vim kubernetes/clusters/infra/cluster-settings.yaml
-   # or
-   vim kubernetes/clusters/apps/cluster-settings.yaml
-   ```
-
-2. **Add or modify variables:**
-   ```yaml
-   data:
-     EXAMPLE_VAR: "value"
-   ```
-
-3. **Use in manifests with substitution:**
-   ```yaml
-   spec:
-     values:
-       example: ${EXAMPLE_VAR}
-   ```
-
-4. **Validate substitution:**
-   ```bash
-   flux build kustomization infra-infrastructure \
-     --path kubernetes/clusters/infra/ \
-     --kustomization-file kubernetes/clusters/infra/infrastructure.yaml \
-     | grep "EXAMPLE_VAR"
-   ```
-
-### Add Network Policy
-
-1. **Use baseline templates:**
-   ```yaml
-   # In your workload namespace
-   apiVersion: kustomize.config.k8s.io/v1beta1
-   kind: Kustomization
-   resources:
-     - ../../components/networkpolicy/deny-all
-     - ../../components/networkpolicy/allow-dns
-     - ../../components/networkpolicy/allow-kube-api
-   ```
-
-2. **Add workload-specific policies:**
-   ```yaml
-   # custom-policy.yaml
-   apiVersion: cilium.io/v2
-   kind: CiliumNetworkPolicy
-   metadata:
-     name: allow-specific-egress
-   spec:
-     endpointSelector:
-       matchLabels:
-         app: myapp
-     egress:
-       - toEndpoints:
-           - matchLabels:
-               app: backend
-   ```
-
-### Update Component Version
-
-1. **For operators in bases/:**
-   ```bash
-   vim kubernetes/bases/{operator}/operator/helmrelease.yaml
-   ```
-   Update `spec.chart.spec.version`
-
-2. **For infrastructure components:**
-   Update version in HelmRelease or cluster-settings ConfigMap variable
-
-3. **Commit with semantic version:**
-   ```bash
-   git commit -m "chore(databases): upgrade cnpg-operator to v0.27.0"
-   ```
+```bash
+# Render Helm chart
+helm template my-release oci://ghcr.io/victoriametrics/charts/victoria-metrics-operator \
+  --version 0.38.0 \
+  -f kubernetes/infrastructure/observability/victoria-metrics/app/values.yaml
+```
 
 ---
 
-## Troubleshooting
+## Debugging
 
-### Common Issues
+### View Logs
 
-#### 1. Flux Build Fails with "unable to find variable"
-
-**Cause:** Missing variable in cluster-settings ConfigMap
-
-**Solution:**
 ```bash
-# Check cluster-settings for the variable
-grep "MISSING_VAR" kubernetes/clusters/infra/cluster-settings.yaml
+# Flux controller logs
+kubectl logs -n flux-system deploy/source-controller -f
+kubectl logs -n flux-system deploy/kustomize-controller -f
+kubectl logs -n flux-system deploy/helm-controller -f
 
-# Add missing variable
-vim kubernetes/clusters/infra/cluster-settings.yaml
+# Application logs
+kubectl logs -n <namespace> <pod-name> -f
+
+# Talos system logs
+talosctl logs --context infra --nodes 10.25.11.11
 ```
 
-#### 2. Kustomize Build Fails
+### Describe Resources
 
-**Cause:** Invalid Kustomization structure
-
-**Solution:**
 ```bash
-# Test individual kustomization
-kustomize build kubernetes/infrastructure/{category}/{component}/
+# Describe Flux Kustomization
+kubectl describe kustomization -n flux-system <name>
 
-# Check for syntax errors
-yamllint kubernetes/infrastructure/{category}/{component}/kustomization.yaml
+# Describe HelmRelease
+kubectl describe helmrelease -n <namespace> <name>
+
+# Describe pod
+kubectl describe pod -n <namespace> <pod-name>
 ```
 
-#### 3. Schema Validation Fails
+### Check Flux Status
 
-**Cause:** Manifest doesn't match Kubernetes schema
-
-**Solution:**
 ```bash
-# Validate specific manifest
-kubeconform -summary -verbose kubernetes/path/to/manifest.yaml
+# Get all Flux resources
+flux get all -A
 
-# Check CRD schema
-kubectl explain <resource>.<field>
+# Check for failed reconciliations
+flux get kustomizations -A --status-selector ready=false
+
+# Get Flux events
+kubectl get events -n flux-system --sort-by='.lastTimestamp'
 ```
 
-#### 4. Secret Scanning False Positive
+### Suspend/Resume Flux Reconciliation
 
-**Cause:** Gitleaks detects pattern that isn't a real secret
-
-**Solution:**
-Add to `.gitleaks.toml`:
-```toml
-[allowlist]
-paths = [
-    '''path/to/false/positive\.yaml''',
-]
-```
-
-#### 5. Pre-commit Hook Blocks Commit
-
-**Cause:** Validation failure in pre-commit hook
-
-**Solution:**
 ```bash
-# Fix validation errors, or skip hook (not recommended)
-git commit --no-verify -m "message"
+# Suspend (for maintenance)
+flux suspend kustomization <name> -n flux-system
+
+# Resume
+flux resume kustomization <name> -n flux-system
 ```
-
-### Getting Help
-
-1. **Check existing component READMEs:** Many components have specific documentation
-2. **Review Flux documentation:** [fluxcd.io/docs](https://fluxcd.io/docs)
-3. **Check Talos documentation:** [talos.dev](https://www.talos.dev/)
-4. **Review CI/CD logs:** GitHub Actions workflow logs show detailed validation errors
-5. **Ask in repository discussions:** Use GitHub Discussions for questions
 
 ---
 
-## Next Steps
+## Testing
 
-After setting up your local development environment:
+### Unit Testing (Manifest Validation)
 
-1. **Explore the codebase:** Review [Source Tree Analysis](./source-tree-analysis.md)
-2. **Understand architecture:** Read [Project Overview](./project-overview.md)
-3. **Review components:** Check [Infrastructure Components](./infrastructure-components.md)
-4. **Try a small change:** Update a component version or add a simple NetworkPolicy
-5. **Run validation:** Test local validation scripts before pushing
+```bash
+# Validate all manifests
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict -summary
 
-For deployment operations, see [Deployment Guide](./deployment-guide.md).
+# Validate specific component
+kubectl kustomize kubernetes/infrastructure/networking/cilium/core/app | kubeconform -strict
+```
+
+### Integration Testing (CI/CD)
+
+GitHub Actions workflows run on every PR:
+- `validate-infrastructure.yaml` - Validates all Kubernetes manifests
+- `validate-cilium-core.yml` - Validates Cilium configuration
+- `backup-compliance-validation.yaml` - Validates backup policies
+
+```bash
+# Run locally using act (GitHub Actions locally)
+act pull_request -W .github/workflows/validate-infrastructure.yaml
+```
+
+---
+
+## Common Troubleshooting
+
+### Flux Kustomization Stuck
+
+```bash
+# Check status
+kubectl describe kustomization -n flux-system <name>
+
+# Force reconciliation
+flux reconcile kustomization <name> -n flux-system --with-source
+
+# Check dependencies
+kubectl get kustomization -n flux-system -o yaml | yq '.items[] | select(.metadata.name == "<name>") | .spec.dependsOn'
+```
+
+### HelmRelease Failed
+
+```bash
+# Check HelmRelease status
+kubectl describe helmrelease -n <namespace> <name>
+
+# Check Helm release
+helm list -n <namespace>
+
+# Check Helm history
+helm history -n <namespace> <release-name>
+
+# Rollback
+helm rollback -n <namespace> <release-name> <revision>
+```
+
+### Node Not Ready
+
+```bash
+# Check node status
+kubectl get nodes
+talosctl health --context infra
+
+# Check kubelet logs
+talosctl logs --context infra --nodes <node-ip> kubelet
+
+# Reboot node
+task talos:reboot-node NODE=<node-ip>
+```
+
+### CRD Not Found
+
+```bash
+# Check if CRDs are installed
+kubectl get crds | grep <crd-name>
+
+# Re-apply CRDs
+task bootstrap:phase:1 CLUSTER=infra
+```
+
+---
+
+## Best Practices
+
+### 1. Always Validate Before Commit
+
+```bash
+# Run local validation
+task validate-cilium-core
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict
+```
+
+### 2. Use Feature Branches
+
+```bash
+git checkout -b feature/update-cilium
+# Make changes
+git commit -m "feat(cilium): update to v1.19.0"
+git push origin feature/update-cilium
+# Create PR on GitHub
+```
+
+### 3. Test in Infra Cluster First
+
+Test infrastructure changes in the infra cluster before applying to apps cluster.
+
+### 4. Monitor Flux Reconciliation
+
+```bash
+# Watch Flux status
+watch -n 5 "flux get kustomizations -A"
+
+# Watch pod status
+watch -n 5 "kubectl get pods -A"
+```
+
+### 5. Use Dry-Run for Risky Changes
+
+```bash
+# Preview changes without applying
+kubectl diff -k kubernetes/infrastructure/networking/cilium/core/app
+
+# Dry-run Helm upgrade
+helm upgrade --dry-run --debug <release> <chart>
+```
+
+---
+
+## Directory-Specific Development
+
+### Adding New Infrastructure Component
+
+```bash
+# Create directory structure
+mkdir -p kubernetes/infrastructure/<category>/<component>/app
+
+# Create Flux Kustomization (ks.yaml)
+cat > kubernetes/infrastructure/<category>/<component>/ks.yaml <<EOF
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: <component>
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./kubernetes/infrastructure/<category>/<component>/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: false
+  timeout: 5m
+EOF
+
+# Create kustomization.yaml
+cat > kubernetes/infrastructure/<category>/<component>/app/kustomization.yaml <<EOF
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - helmrelease.yaml
+  - namespace.yaml
+EOF
+
+# Add to parent kustomization
+echo "  - <component>/ks.yaml" >> kubernetes/infrastructure/<category>/kustomization.yaml
+```
+
+### Adding New Workload
+
+```bash
+# Create directory
+mkdir -p kubernetes/workloads/platform/<service>/app
+
+# Follow same pattern as infrastructure components
+```
+
+---
+
+## Performance Tips
+
+### Reduce Flux Reconciliation Interval (Development)
+
+```yaml
+# Edit Flux Kustomization
+spec:
+  interval: 1m  # Default is 10m
+```
+
+### Parallel Reconciliation
+
+Flux reconciles Kustomizations in parallel unless `dependsOn` is set.
+
+### Suspend Unused Kustomizations
+
+```bash
+flux suspend kustomization <name> -n flux-system
+```
+
+---
+
+## Useful Aliases
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+# Kubectl
+alias k='kubectl'
+alias kgp='kubectl get pods'
+alias kgpa='kubectl get pods -A'
+alias kgs='kubectl get svc'
+alias kgn='kubectl get nodes'
+
+# Flux
+alias fga='flux get all -A'
+alias fgk='flux get kustomizations -A'
+alias fgh='flux get helmreleases -A'
+
+# Task
+alias t='task'
+alias tl='task --list'
+
+# Talos
+alias tc='talosctl'
+alias tch='talosctl health'
+```
+
+---
+
+## References
+
+- **Main README**: `README.md`
+- **Bootstrap Architecture**: `bootstrap/helmfile.d/README.md`
+- **Taskfile**: `Taskfile.yaml`
+- **Technology Stack**: `docs/technology-stack.md`
+- **Source Tree**: `docs/source-tree-analysis.md`

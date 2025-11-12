@@ -2,7 +2,7 @@
 # This tracks progress through BMM methodology phases
 # Phase 3/4 (Implementation) is tracked separately in sprint-status.yaml
 
-# generated: 2025-11-09
+# generated: 2025-11-12
 # project: k8s-gitops
 # project_type: software
 # selected_track: method
@@ -21,7 +21,7 @@
 #   - {file-path}: File created/found (e.g., "docs/product-brief.md")
 #   - skipped: Optional/conditional workflow that was skipped
 
-generated: "2025-11-09"
+generated: "2025-11-12"
 project: "k8s-gitops"
 project_type: "software"
 selected_track: "method"
@@ -29,20 +29,23 @@ field_type: "brownfield"
 workflow_path: "method-brownfield.yaml"
 
 workflow_status:
+  # Prerequisite: Documentation
+  document-project: optional  # agent: analyst
+
   # Phase 0: Discovery (Optional)
-  brainstorm-project: docs/brainstorming-session-results-2025-11-09.md
-  research: docs/comprehensive-technical-research-gitops-infrastructure-2025.md
-  product-brief: optional
+  brainstorm-project: skipped  # agent: analyst
+  research: skipped  # agent: analyst
+  product-brief: skipped  # agent: analyst
 
   # Phase 1: Planning
-  prd: docs/PRD.md
-  validate-prd: optional
-  create-design: conditional
+  prd: required  # agent: pm
+  validate-prd: optional  # agent: pm
+  create-design: conditional  # agent: ux-designer
 
   # Phase 2: Solutioning
-  create-architecture: recommended
-  validate-architecture: optional
-  solutioning-gate-check: required
+  create-architecture: docs/architecture.md  # agent: architect
+  validate-architecture: optional  # agent: architect
+  solutioning-gate-check: required  # agent: architect
 
   # Phase 3: Implementation
-  sprint-planning: required
+  sprint-planning: required  # agent: sm

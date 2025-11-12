@@ -180,4 +180,4 @@ cypress/screenshots/
 # Keycloakify build artifacts
 .keycloakify/
 *storybook.log
-bmad/
+.bmad/

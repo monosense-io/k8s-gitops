@@ -1,294 +1,370 @@
 # k8s-gitops Documentation Index
 
-> **Project:** Multi-Cluster Kubernetes GitOps Infrastructure
-> **Generated:** 2025-11-09
-> **Type:** Infrastructure (Monolithic)
-> **Owner:** monosense
+> **Your AI-Assisted Development Entry Point** 👈
+>
+> This index provides comprehensive documentation for the k8s-gitops multi-cluster infrastructure project.
 
 ---
 
-## 📊 Project Overview
+## 📋 Quick Navigation
 
-**Type:** Monolithic Infrastructure-as-Code
-**Primary Technology:** Kubernetes multi-cluster on Talos Linux with Flux CD GitOps
-**Architecture:** Multi-cluster (infra + apps) with shared infrastructure layer
+<details open>
+<summary><b>🚀 Getting Started (Click to expand)</b></summary>
 
-### Quick Reference
+- **New to this project?** Start with [Project Overview](./project-overview.md)
+- **Want to bootstrap a cluster?** See [Development Guide § Bootstrap](./development-guide.md#cluster-bootstrap-process)
+- **Looking for architecture details?** Read [Architecture Documentation](./architecture.md)
+- **Need to make changes?** Follow [Development Guide](./development-guide.md)
 
-| Aspect | Details |
-|--------|---------|
-| **Operating System** | Talos Linux (immutable, API-driven) |
-| **Orchestration** | Kubernetes (2x 3-node clusters) |
-| **GitOps** | Flux CD (automated reconciliation) |
-| **CNI** | Cilium (eBPF, BGP, ClusterMesh, Gateway API) |
-| **Storage** | Rook-Ceph v1.18.6, OpenEBS v4.3.3 |
-| **Databases** | CloudNativePG v0.26.1, DragonflyDB v1.3.0 |
-| **Messaging** | Strimzi Kafka v0.48.0 |
-| **Observability** | Victoria Metrics, Victoria Logs v0.11.12 |
-| **Security** | cert-manager, external-secrets v0.20.4, NetworkPolicies |
-| **Entry Points** | `kubernetes/clusters/{infra,apps}/` |
-| **Nodes** | 6 bare-metal (3 infra + 3 apps) |
-
-### Cluster Architecture
-
-**Infra Cluster (10.25.11.11-13):**
-- Platform services (storage, databases, observability, security)
-- Pod CIDR: 10.244.0.0/16, Service CIDR: 10.245.0.0/16
-- BGP ASN: 64512
-
-**Apps Cluster (10.25.11.14-16):**
-- Application workloads (GitLab, Harbor, Kafka, tenants)
-- Pod CIDR: 10.246.0.0/16, Service CIDR: 10.247.0.0/16
-- BGP ASN: 64513
+</details>
 
 ---
 
-## 📚 Generated Documentation
+## 🎯 Project At A Glance
 
-### Core Documentation
-- **[Project Overview](./project-overview.md)** - Executive summary, technology stack, architecture, hardware
-- **[Source Tree Analysis](./source-tree-analysis.md)** - Annotated directory structure with explanations
-- **[Infrastructure Components](./infrastructure-components.md)** - Complete inventory of 30+ infrastructure components
+| Attribute | Value |
+|-----------|-------|
+| **Project Type** | Multi-Cluster Kubernetes GitOps Infrastructure |
+| **Clusters** | 2x 3-node Talos clusters (infra + apps) |
+| **Architecture** | Platform services (infra) + Application workloads (apps) |
+| **GitOps Engine** | Flux CD v2 |
+| **Tech Stack** | 50+ technologies (Talos, K8s, Cilium, Rook-Ceph, Victoria Metrics, PostgreSQL) |
+| **Repository Type** | Monolith (single repo manages both clusters) |
 
-### Operational Documentation
-- **[Development Guide](./development-guide.md)** - Local development setup, validation, common tasks
-- **[Deployment Guide](./deployment-guide.md)** - Cluster deployment, bootstrap, operations
-
----
-
-## 📖 Existing Documentation
-
-### Root Documentation
-- **[README.md](../README.md)** - Main project overview, hardware specs, cluster status badges
-
-### Component Documentation (Kubernetes)
-- **[Network Policy Templates](../kubernetes/components/networkpolicy/README.md)** - Baseline security policies
-- **[Network Policy: allow-dns](../kubernetes/components/networkpolicy/allow-dns/README.md)** - DNS egress policy
-- **[Network Policy: deny-all](../kubernetes/components/networkpolicy/deny-all/README.md)** - Default deny baseline
-- **[Network Policy: allow-fqdn](../kubernetes/components/networkpolicy/allow-fqdn/README.md)** - FQDN-based egress
-- **[Network Policy: allow-kube-api](../kubernetes/components/networkpolicy/allow-kube-api/README.md)** - API server access
-- **[Network Policy: allow-internal](../kubernetes/components/networkpolicy/allow-internal/README.md)** - Cluster-internal
-- **[Dragonfly Component](../kubernetes/components/dragonfly/README.md)** - Dragonfly instance configuration
-
-### Operator Documentation (Bases)
-- **[Rook-Ceph Operator](../kubernetes/bases/rook-ceph-operator/operator/README.md)** - Distributed storage operator
-
-### Workload Documentation
-- **[GitHub Actions Runner System](../kubernetes/workloads/platform/cicd/actions-runner-system/README.md)** - Self-hosted runners
-- **[Harbor Registry](../kubernetes/workloads/platform/registry/harbor/README.md)** - OCI artifact registry
-- **[GitLab](../kubernetes/workloads/tenants/gitlab/README.md)** - Self-hosted Git and CI/CD
-- **[GitLab Monitoring](../kubernetes/workloads/tenants/gitlab/monitoring/)** - GitLab observability
-
-### Bootstrap Documentation
-- **[Bootstrap Helmfile](../bootstrap/helmfile.d/README.md)** - Three-phase bootstrap strategy
-
-### CI/CD & Automation
-- **[Validate Infrastructure Workflow](../.github/workflows/validate-infrastructure.yaml)** - Multi-stage validation pipeline
-- **[Backup Compliance Validation Workflow](../.github/workflows/backup-compliance-validation.yaml)** - OPA policy validation
-- **[Validate Cilium Core Workflow](../.github/workflows/validate-cilium-core.yml)** - Cilium-specific validation
-- **[Auto-add to Project Workflow](../.github/workflows/auto-add-to-project.yml)** - GitHub automation
-
-### Scripts & Utilities
-- **[validate-cilium-core.sh](../scripts/validate-cilium-core.sh)** - Cilium manifest validation
-- **[validate-crd-waitset.sh](../scripts/validate-crd-waitset.sh)** - CRD establishment checker
-- **[validate-story-sequences.sh](../scripts/validate-story-sequences.sh)** - Story dependency validation
-- **[fix-story-sequences.sh](../scripts/fix-story-sequences.sh)** - Story sequence fixer
-- **[resequence-stories.sh](../scripts/resequence-stories.sh)** - Story resequencing automation
-- **[generate-clustermesh-1password-item.sh](../scripts/generate-clustermesh-1password-item.sh)** - ClusterMesh secret generation
+**Quick Tech Summary:**
+- **OS**: Talos Linux (immutable, API-only)
+- **Networking**: Cilium (eBPF, BGP, Gateway API, ClusterMesh)
+- **Storage**: Rook-Ceph (distributed) + OpenEBS (local)
+- **Databases**: CloudNativePG (PostgreSQL), Dragonfly (Redis)
+- **Observability**: Victoria Metrics + Victoria Logs + Fluent Bit
+- **Security**: cert-manager, External Secrets (1Password), SOPS
 
 ---
 
-## 🚀 Getting Started
+## 📚 Core Documentation
 
-### For Developers
+### 🏢 Project Documentation
+| Document | Description | When to Read |
+|----------|-------------|--------------|
+| **[Project Overview](./project-overview.md)** | High-level project summary, purpose, and goals | **Start here if new to the project** |
+| **[Architecture](./architecture.md)** | Complete architecture documentation (network, storage, security, etc.) | When you need to understand system design |
+| **[Technology Stack](./technology-stack.md)** | Comprehensive inventory of all technologies used | When evaluating tech choices or versions |
+| **[Source Tree Analysis](./source-tree-analysis.md)** | Repository structure deep-dive with explanations | When navigating the codebase |
 
-1. **Understand the Repository Structure**
-   - Read [Source Tree Analysis](./source-tree-analysis.md) for directory layout
-   - Review [Project Overview](./project-overview.md) for architecture understanding
-   - Explore [Infrastructure Components](./infrastructure-components.md) for component inventory
+### 🛠️ Operational Documentation
+| Document | Description | When to Read |
+|----------|-------------|--------------|
+| **[Development Guide](./development-guide.md)** | Development workflow, tasks, debugging, troubleshooting | **Daily development reference** |
+| **[Bootstrap README](../bootstrap/helmfile.d/README.md)** | Phased bootstrap architecture and process | When bootstrapping clusters |
 
-2. **Local Development Setup** _(Development Guide to be generated)_
-   - Install prerequisites: Task, kubectl, flux, talosctl, kubeconform, yamllint
-   - Configure environment: `.mise.toml` for environment management
-   - Review Taskfile: `task --list` to see available automation
-
-3. **Explore Component Documentation**
-   - Check component-specific READMEs in `kubernetes/` directories
-   - Understand GitOps workflow via Flux Kustomizations
-
-### For Operators
-
-1. **Cluster Lifecycle Operations** _(Deployment Guide to be generated)_
-   - Review Task automation: `task --list`
-   - Understand three-phase bootstrap: [Bootstrap Helmfile README](../bootstrap/helmfile.d/README.md)
-   - Familiarize with Talos configuration: `talos/` directory
-
-2. **Operational Tasks**
-   - **Bootstrap new cluster:** `task cluster:create`
-   - **Validate manifests:** `task validate-cilium-core`
-   - **Reconcile Flux:** `task kubernetes:reconcile`
-   - **Manage Talos nodes:** `task talos:*`
-   - **Backup/restore:** `task volsync:*`
-
-3. **Monitoring & Troubleshooting**
-   - Check cluster status: Flux dashboards, Victoria Metrics
-   - Review logs: Victoria Logs (centralized logging)
-   - Network debugging: Hubble CLI (Cilium observability)
-
-### For Contributors
-
-1. **GitOps Workflow**
-   - All infrastructure changes go through Git pull requests
-   - Every PR validated by CI/CD pipelines (`.github/workflows/validate-infrastructure.yaml`)
-   - Flux automatically reconciles approved changes
-
-2. **Pre-commit Validation**
-   - Run local validation: `./scripts/validate-cilium-core.sh`
-   - Test Flux builds: `flux build kustomization <name> --path kubernetes/clusters/infra/`
-   - Lint YAML: `yamllint kubernetes/`
-   - Schema validation: `kubeconform <manifest>`
-
-3. **Code Standards**
-   - Follow existing directory structure patterns
-   - Use Kustomize for composition (avoid Helm for cluster resources)
-   - Apply baseline NetworkPolicies to all namespaces
-   - Document changes in component READMEs
+### 📖 Reference Documentation
+| Document | Description | When to Read |
+|----------|-------------|--------------|
+| **[Main README](../README.md)** | Project README with quick start | GitHub landing page |
+| **[LICENSE](../LICENSE)** | Apache 2.0 license | Legal/licensing questions |
+| **[Taskfile.yaml](../Taskfile.yaml)** | Main task automation orchestrator | Finding available tasks |
 
 ---
 
-## 🏗️ Architecture Patterns
+## 🗂️ Documentation by Topic
 
-### GitOps Layering
-```
-kubernetes/bases/          → Reusable operators (version-pinned)
-  ↓ referenced by
-kubernetes/infrastructure/ → Shared infrastructure layer (both clusters)
-  ↓ depends on
-kubernetes/workloads/      → Application instances
+### Networking
+- **[Architecture § Network Architecture](./architecture.md#network-architecture)** - Cilium, BGP, Gateway API
+- **[Technology Stack § Networking](./technology-stack.md#networking)** - Complete networking stack
+
+### Storage
+- **[Architecture § Storage Architecture](./architecture.md#storage-architecture)** - Rook-Ceph, OpenEBS
+- **[Technology Stack § Storage](./technology-stack.md#storage)** - Storage technologies
+
+### Databases
+- **[Architecture § Database Architecture](./architecture.md#database-architecture)** - CloudNativePG, Dragonfly
+- **[Technology Stack § Databases](./technology-stack.md#databases)** - Database stack
+
+### Observability
+- **[Architecture § Observability Architecture](./architecture.md#observability-architecture)** - Victoria Metrics, Victoria Logs
+- **[Technology Stack § Observability](./technology-stack.md#observability)** - Observability stack
+
+### Security
+- **[Architecture § Security Architecture](./architecture.md#security-architecture)** - Secrets, certificates, encryption
+- **[Technology Stack § Security](./technology-stack.md#security)** - Security technologies
+
+### GitOps
+- **[Architecture § GitOps-First Architecture](./architecture.md#1-gitops-first-architecture)** - Flux CD patterns
+- **[Development Guide § Making Infrastructure Changes](./development-guide.md#making-infrastructure-changes)** - GitOps workflow
+
+### Bootstrap Process
+- **[Bootstrap README](../bootstrap/helmfile.d/README.md)** - Complete bootstrap documentation
+- **[Development Guide § Cluster Bootstrap](./development-guide.md#cluster-bootstrap-process)** - Bootstrap commands
+
+---
+
+## 🚀 Common Tasks (Quick Reference)
+
+### Bootstrap a Cluster
+```bash
+# Complete infra cluster bootstrap
+task bootstrap:infra
+
+# Complete apps cluster bootstrap
+task bootstrap:apps
+
+# Check status
+task bootstrap:status CLUSTER=infra
 ```
 
-### Multi-Cluster Configuration
-```
-kubernetes/clusters/{infra,apps}/cluster-settings.yaml
-  ↓ (200+ variables)
-postBuild.substituteFrom → Injects cluster-specific values
-  ↓
-Same infrastructure/ deployed to both clusters with different configs
+**Documentation**: [Development Guide § Bootstrap Process](./development-guide.md#cluster-bootstrap-process)
+
+### Make Infrastructure Changes
+```bash
+# 1. Edit manifests
+vim kubernetes/infrastructure/networking/cilium/core/app/helmrelease.yaml
+
+# 2. Validate locally
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict
+
+# 3. Commit and push
+git add . && git commit -m "feat(cilium): update config" && git push
+
+# 4. Force reconciliation (or wait 10m for auto-sync)
+task kubernetes:reconcile CLUSTER=infra
 ```
 
-### Three-Phase Bootstrap
-```
-Phase 0: CRDs only
-  ↓
-Phase 1: Core infrastructure (Cilium, Flux)
-  ↓
-Phase 2: Full stack deployment
+**Documentation**: [Development Guide § Making Infrastructure Changes](./development-guide.md#making-infrastructure-changes)
+
+### Debug Flux Issues
+```bash
+# Check Flux status
+flux get all -A
+
+# Check for failures
+flux get kustomizations -A --status-selector ready=false
+
+# Force reconciliation
+flux reconcile kustomization <name> -n flux-system --with-source
+
+# View logs
+kubectl logs -n flux-system deploy/kustomize-controller -f
 ```
 
-### Health Check Dependencies
-```yaml
-dependsOn:
-  - name: parent-kustomization
-healthChecks:
-  - apiVersion: apps/v1
-    kind: Deployment
-    name: component
+**Documentation**: [Development Guide § Debugging](./development-guide.md#debugging)
+
+### Apply Talos Node Changes
+```bash
+# Apply config to a node
+task talos:apply-node NODE=10.25.11.11 CLUSTER=infra
+
+# Reboot node
+task talos:reboot-node NODE=10.25.11.11
+
+# Upgrade Talos
+task talos:upgrade-node NODE=10.25.11.11
+```
+
+**Documentation**: [Development Guide § Apply Node Configuration](./development-guide.md#apply-node-configuration)
+
+---
+
+## 📂 Repository Structure
+
+```
+k8s-gitops/
+├── bootstrap/              # Bootstrap configs (Phase 0-2)
+├── talos/                  # Talos node configurations
+├── kubernetes/             # ☸️ GitOps source (Flux watches this)
+│   ├── clusters/           # Per-cluster entry points
+│   ├── infrastructure/     # Shared infrastructure
+│   ├── workloads/          # Applications (platform + tenants)
+│   ├── bases/              # Operator bases (6 operators)
+│   └── components/         # Reusable Kustomize components
+├── scripts/                # Utility scripts
+├── .taskfiles/             # Modular tasks (8 modules)
+├── .github/workflows/      # CI/CD validation
+├── docs/                   # 📚 Documentation (THIS FOLDER)
+├── Taskfile.yaml           # Main task orchestrator
+└── README.md               # Main README
+```
+
+**Deep Dive**: [Source Tree Analysis](./source-tree-analysis.md)
+
+---
+
+## 🔧 Development Workflow
+
+### 1. Initial Setup
+```bash
+# Install tools
+brew install kubectl talosctl flux helmfile helm task yq jq
+
+# Clone repo
+git clone https://github.com/trosvald/k8s-gitops.git
+cd k8s-gitops
+
+# Configure credentials (1Password, SOPS)
+# See: Development Guide § Environment Setup
+```
+
+### 2. Bootstrap Cluster (One-Time)
+```bash
+task bootstrap:infra   # or task bootstrap:apps
+```
+
+### 3. Daily Development
+```bash
+# Edit manifests → Validate → Commit → Push → Reconcile
+# See: Development Guide § Making Infrastructure Changes
+```
+
+### 4. Monitor & Debug
+```bash
+flux get all -A          # Check Flux status
+kubectl get pods -A      # Check pod status
+task bootstrap:status    # Bootstrap status
+```
+
+**Full Workflow**: [Development Guide](./development-guide.md)
+
+---
+
+## 🎓 Learning Path
+
+### For New Team Members
+
+1. **Week 1: Understanding**
+   - Read [Project Overview](./project-overview.md)
+   - Read [Architecture Documentation](./architecture.md)
+   - Explore [Source Tree Analysis](./source-tree-analysis.md)
+   - Review [Technology Stack](./technology-stack.md)
+
+2. **Week 2: Hands-On**
+   - Bootstrap a test cluster: [Development Guide § Bootstrap](./development-guide.md#cluster-bootstrap-process)
+   - Make a simple change: [Development Guide § Making Changes](./development-guide.md#making-infrastructure-changes)
+   - Debug an issue: [Development Guide § Debugging](./development-guide.md#debugging)
+
+3. **Week 3+: Mastery**
+   - Understand Flux reconciliation loops
+   - Learn Talos node management
+   - Explore advanced networking (BGP, ClusterMesh)
+   - Deep-dive into storage (Rook-Ceph operations)
+
+### For AI-Assisted Development
+
+**Best Practice**: Always provide this `index.md` to AI agents when working on this project. It contains:
+- ✅ Complete technology stack
+- ✅ Repository structure
+- ✅ Links to detailed documentation
+- ✅ Common tasks and commands
+
+**Example prompt to AI**:
+```
+I'm working on the k8s-gitops project. Here's the documentation index:
+[paste docs/index.md]
+
+I need to [your specific task].
 ```
 
 ---
 
-## 🔍 Quick Navigation
+## 🌐 External Resources
 
-### By Infrastructure Category
+### Upstream Documentation
+- **Talos Linux**: https://www.talos.dev/
+- **Flux CD**: https://fluxcd.io/
+- **Cilium**: https://cilium.io/
+- **Rook**: https://rook.io/
+- **CloudNativePG**: https://cloudnative-pg.io/
+- **Victoria Metrics**: https://victoriametrics.com/
 
-| Category | Components | Documentation |
-|----------|-----------|---------------|
-| **Networking** | Cilium, CoreDNS, ExternalDNS, Cloudflared, Spegel | [Infrastructure Components](./infrastructure-components.md#networking) |
-| **Security** | cert-manager, external-secrets, NetworkPolicies | [Infrastructure Components](./infrastructure-components.md#security) |
-| **Storage** | Rook-Ceph, OpenEBS | [Infrastructure Components](./infrastructure-components.md#storage) |
-| **Databases** | CloudNativePG, DragonflyDB | [Infrastructure Components](./infrastructure-components.md#databases) |
-| **Messaging** | Strimzi Kafka | [Infrastructure Components](./infrastructure-components.md#messaging) |
-| **Observability** | Victoria Metrics, Victoria Logs, Fluent-bit | [Infrastructure Components](./infrastructure-components.md#observability) |
-| **GitOps** | Flux CD, OCI Repositories | [Infrastructure Components](./infrastructure-components.md#gitops) |
-| **Operations** | Reloader | [Infrastructure Components](./infrastructure-components.md#operations) |
-
-### By Cluster
-
-| Cluster | Workloads | Entry Point |
-|---------|-----------|-------------|
-| **Infra** | Platform services, storage, databases, observability | `kubernetes/clusters/infra/` |
-| **Apps** | Application workloads, Kafka, GitLab, Harbor | `kubernetes/clusters/apps/` |
-
-### By Use Case
-
-| Use Case | Starting Point |
-|----------|----------------|
-| **Add new infrastructure component** | Create in `kubernetes/infrastructure/`, reference `kubernetes/bases/` if using operator |
-| **Deploy new application** | Add to `kubernetes/workloads/platform/` or `kubernetes/workloads/tenants/` |
-| **Modify cluster configuration** | Edit `kubernetes/clusters/{infra,apps}/cluster-settings.yaml` |
-| **Update operator version** | Modify HelmRelease in `kubernetes/bases/{operator}/operator/` |
-| **Add network policy** | Use templates from `kubernetes/components/networkpolicy/` |
-| **Bootstrap new cluster** | Follow [Bootstrap Helmfile README](../bootstrap/helmfile.d/README.md), use `task cluster:create` |
+### Inspiration Projects
+- **buroa/k8s-gitops**: https://github.com/buroa/k8s-gitops (phased bootstrap pattern)
+- **onedr0p/cluster-template**: https://github.com/onedr0p/cluster-template (Flux structure)
 
 ---
 
-## 📊 Project Metrics
+## 🐛 Troubleshooting Quick Links
 
-- **Kubernetes Manifests:** 298+ YAML files
-- **Infrastructure Components:** 30+ across 8 categories
-- **Operators:** 5 (CloudNativePG, Dragonfly, Strimzi Kafka, Rook-Ceph, Fluent-bit)
-- **Clusters:** 2 (infra, apps)
-- **Nodes:** 6 bare-metal (ThinkCentre/ThinkStation)
-- **GitHub Actions Workflows:** 4 (validation, compliance, Cilium, automation)
-- **Task Modules:** 8 (cluster, bootstrap, kubernetes, talos, volsync, workstation, onepassword, synergyflow)
-- **Validation Scripts:** 6 specialized validators
-- **Existing Component READMEs:** 15+
+| Issue | Documentation |
+|-------|---------------|
+| Flux Kustomization stuck | [Development Guide § Flux Kustomization Stuck](./development-guide.md#flux-kustomization-stuck) |
+| HelmRelease failed | [Development Guide § HelmRelease Failed](./development-guide.md#helmrelease-failed) |
+| Node not ready | [Development Guide § Node Not Ready](./development-guide.md#node-not-ready) |
+| CRD not found | [Development Guide § CRD Not Found](./development-guide.md#crd-not-found) |
+| Bootstrap failures | [Bootstrap README § Troubleshooting](../bootstrap/helmfile.d/README.md#troubleshooting) |
 
 ---
 
-## 🔗 External Resources
+## 📊 Project Statistics
 
-- **Status Page:** [status.monosense.io](https://status.monosense.io)
-- **Cluster Template Inspiration:** [onedr0p/cluster-template](https://github.com/onedr0p/cluster-template)
-- **Talos Linux:** [talos.dev](https://www.talos.dev/)
-- **Flux CD:** [fluxcd.io](https://fluxcd.io)
-- **Cilium:** [cilium.io](https://cilium.io)
-
----
-
-## 📝 Documentation Maintenance
-
-This documentation was auto-generated by the BMad document-project workflow using an **exhaustive scan**. To update:
-
-1. **Re-run documentation workflow:** `/bmad:bmm:workflows:document-project`
-2. **Manually edit specific files:** All markdown files in `docs/` are editable
-3. **Component-specific docs:** Update READMEs in component directories
-
-**Last Generated:** 2025-11-09
-**Scan Level:** Exhaustive
-**Files Generated:** 4 (index.md, project-overview.md, source-tree-analysis.md, infrastructure-components.md)
+| Metric | Value |
+|--------|-------|
+| **Total Files** | ~500+ (excluding node_modules, .backup, .git) |
+| **Kubernetes Manifests** | ~300+ YAML files |
+| **Flux Kustomizations** | ~50+ ks.yaml files |
+| **HelmReleases** | ~30+ helmrelease.yaml files |
+| **Operators** | 6 (CNPG, Dragonfly, Fluent Bit, Keycloak, Rook-Ceph, Strimzi) |
+| **Infrastructure Components** | 8 categories (databases, gitops, messaging, networking, observability, operations, security, storage) |
+| **Platform Services** | 5 (CI/CD, databases, identity, messaging, registry) |
+| **Tenant Applications** | 2 (GitLab, GitLab Runner) |
+| **Task Modules** | 8 (.taskfiles/\*) |
+| **Scripts** | 7 (scripts/\*) |
+| **GitHub Workflows** | 4 (.github/workflows/\*) |
 
 ---
 
-## 🎯 Next Steps
+## 🎯 Status & Roadmap
 
-### Immediate Actions
-1. Review the [Project Overview](./project-overview.md) for comprehensive architecture understanding
-2. Explore the [Source Tree Analysis](./source-tree-analysis.md) to navigate the repository effectively
-3. Check [Infrastructure Components](./infrastructure-components.md) for detailed component inventory
+### ✅ Production-Ready Features
+- Multi-cluster Talos Kubernetes (infra + apps)
+- Flux CD GitOps automation
+- Cilium CNI (BGP, Gateway API, ClusterMesh)
+- Rook-Ceph distributed storage
+- CloudNativePG PostgreSQL
+- Victoria Metrics observability
+- cert-manager + External Secrets
+- Keycloak SSO
+- GitLab, Harbor, Kafka
 
-### For New Feature Development
-1. Identify which cluster (infra vs apps) the feature belongs to
-2. Determine if it's infrastructure (shared) or workload (instance-specific)
-3. Check existing patterns in similar components
-4. Create GitOps manifests in appropriate directory
-5. Add NetworkPolicies from baseline templates
-6. Test with Flux dry-run: `flux build kustomization <name> --path <path>`
-7. Submit PR for CI/CD validation
+### 🚧 In Progress
+- SPIRE/SPIFFE workload identity
+- Enhanced ArgoCD integration
 
-### For Troubleshooting
-1. Check Flux reconciliation status: `flux get kustomizations -A`
-2. Review component health checks in Kustomization manifests
-3. Inspect logs via Victoria Logs or `kubectl logs`
-4. Use Hubble for network debugging: `hubble observe --namespace <ns>`
-5. Validate manifests locally: `./scripts/validate-cilium-core.sh`
+### 📋 Planned
+- Dev/staging/prod separation
+- Multi-region deployment
+- Advanced service mesh
+- Distributed tracing
+
+**Full Roadmap**: [Project Overview § Project Status](./project-overview.md#project-status)
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! See [Project Overview § How to Contribute](./project-overview.md#how-to-contribute)
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/trosvald/k8s-gitops/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/trosvald/k8s-gitops/discussions)
+
+---
+
+## 📄 License
+
+Apache License 2.0 - See [LICENSE](../LICENSE)
+
+---
+
+## 📅 Document Metadata
+
+| Attribute | Value |
+|-----------|-------|
+| **Last Generated** | 2025-11-12 |
+| **Documentation Version** | v2.0 |
+| **Workflow** | BMAD document-project (exhaustive scan) |
+| **Project Version** | v2.0 (Multi-Cluster Architecture) |
+
+---
+
+**🎯 Pro Tip**: Bookmark this page! It's your central hub for all k8s-gitops documentation.

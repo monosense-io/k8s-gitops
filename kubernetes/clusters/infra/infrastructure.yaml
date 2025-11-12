@@ -15,9 +15,10 @@ spec:
     name: flux-system
     namespace: flux-system
   path: ./kubernetes/infrastructure
-  dependsOn:
-    - name: cilium-core
-      namespace: flux-system
+  # Cilium is deployed via Helmfile bootstrap (not managed by Flux GitOps)
+  # dependsOn:
+  #   - name: cilium-core
+  #     namespace: flux-system
   postBuild:
     substituteFrom:
       - kind: ConfigMap

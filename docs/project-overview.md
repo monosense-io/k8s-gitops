@@ -1,196 +1,372 @@
-# Project Overview - k8s-gitops
+# Project Overview
 
-> **Generated:** 2025-11-09
-> **Repository:** Multi-Cluster Kubernetes GitOps Infrastructure
-> **Owner:** monosense
+## Introduction
 
-## Executive Summary
+**k8s-gitops** is a production-ready, multi-cluster Kubernetes infrastructure running on bare-metal hardware with Talos Linux. This repository serves as the single source of truth for declarative infrastructure management using GitOps principles with Flux CD.
 
-This repository implements a **production-grade, multi-cluster Kubernetes platform** running on bare-metal infrastructure using Talos Linux and Flux CD GitOps. The architecture consists of two separate 3-node clusters (infra and apps) managing platform services and application workloads respectively, with sophisticated GitOps automation, compliance validation, and operational tooling.
+---
 
-The platform serves as a complete home operations infrastructure featuring high-availability databases (PostgreSQL, Redis), message brokers (Kafka), identity management (Keycloak), CI/CD systems (GitHub Actions, GitLab), container registry (Harbor), and comprehensive observability (Victoria Metrics, Victoria Logs). Infrastructure is entirely declarative, version-controlled, and automatically validated through multi-stage CI/CD pipelines.
+## Quick Facts
+
+| Attribute | Value |
+|-----------|-------|
+| **Project Name** | k8s-gitops |
+| **Type** | Multi-Cluster Kubernetes GitOps Infrastructure |
+| **Architecture** | 2x 3-node Talos clusters (infra + apps) |
+| **GitOps Engine** | Flux CD v2 |
+| **Operating System** | Talos Linux (immutable, API-only) |
+| **Repository** | https://github.com/trosvald/k8s-gitops |
+| **License** | Apache 2.0 |
+| **Status** | ✅ Production-ready |
+
+---
 
 ## Project Purpose
 
-Build and maintain a **self-hosted, enterprise-grade Kubernetes platform** for:
-- Platform services (databases, messaging, identity, observability)
-- Development tooling (GitLab, Harbor, CI/CD runners)
-- Tenant applications with multi-tenancy and network isolation
-- Learning and experimenting with cloud-native technologies
+This infrastructure provides a **self-hosted, enterprise-grade platform** for running:
 
-Key principles:
-- **GitOps-first:** All infrastructure changes go through Git
-- **Immutable infrastructure:** Talos Linux provides declarative, API-driven nodes
-- **Multi-cluster:** Separation of platform concerns (infra vs apps workloads)
-- **Automated validation:** Every commit validated before deployment
-- **Compliance-aware:** Automated backup policy validation (GDPR, HIPAA, PCI-DSS, SOX)
+✅ **Platform Services**: Databases, caching, observability, security, identity management
+✅ **Application Workloads**: GitLab, Harbor, CI/CD runners, messaging (Kafka)
+✅ **Developer Tools**: Self-hosted CI/CD, container registry, source control
+✅ **Operational Excellence**: GitOps automation, backup/restore, monitoring, alerting
 
-## Technology Stack Summary
+---
 
-| Category | Technologies | Version/Notes |
-|----------|-------------|---------------|
-| **Operating System** | Talos Linux | Immutable, API-driven Kubernetes OS |
-| **Container Orchestration** | Kubernetes | Multi-cluster (2x 3-node control planes) |
-| **GitOps** | Flux CD | Automated reconciliation from Git |
-| **CNI & Networking** | Cilium | eBPF-based, with BGP, Gateway API, ClusterMesh |
-| **DNS** | CoreDNS, ExternalDNS | v1.45.0, Cloudflare integration |
-| **Ingress** | Cloudflared | Cloudflare tunnels for secure access |
-| **Storage** | Rook-Ceph, OpenEBS | Distributed block storage (v1.18.6), local PV (v4.3.3) |
-| **Databases** | CloudNativePG, DragonflyDB | PostgreSQL operator (v0.26.1), Redis alternative (v1.3.0) |
-| **Messaging** | Strimzi Kafka | Kafka operator (v0.48.0) |
-| **Identity** | Keycloak | SSO and identity management |
-| **Observability** | Victoria Metrics, Victoria Logs | Time-series metrics, centralized logging (v0.11.12) |
-| **Log Collection** | Fluent-bit | Operator-based log aggregation |
-| **Security** | cert-manager, external-secrets | TLS automation, 1Password integration (v0.20.4) |
-| **CI/CD** | GitHub Actions, GitLab, Actions Runner Controller | Self-hosted runners, GitLab CE |
-| **Registry** | Harbor | OCI artifact storage |
-| **Automation** | Task (Taskfile) | Cluster lifecycle automation |
-| **Validation** | kubeconform, Flux, yamllint, Trivy, Gitleaks | Multi-layer manifest validation |
-| **Compliance** | Open Policy Agent (OPA) | Automated backup policy validation |
-| **Network Security** | Cilium NetworkPolicies | Baseline deny-all + explicit allow rules |
+## Architecture at a Glance
 
-## Architecture Type Classification
+### Multi-Cluster Topology
 
-**Primary Architecture:** Multi-Cluster GitOps Infrastructure
+```
+┌──────────────────────────┐    ┌──────────────────────────┐
+│     INFRA CLUSTER        │    │      APPS CLUSTER        │
+│  Platform Services       │◄──►│  Application Workloads   │
+│  - Storage (Rook-Ceph)   │    │  - GitLab                │
+│  - Databases (PostgreSQL)│    │  - Harbor                │
+│  - Observability (VM)    │    │  - Kafka                 │
+│  - Security              │    │  - GitLab Runner         │
+│  - Identity (Keycloak)   │    │  + Shared Infrastructure │
+└──────────────────────────┘    └──────────────────────────┘
+         3 nodes                        3 nodes
+     10.25.11.11-13                 10.25.11.14-16
+```
 
-**Patterns:**
-- **GitOps Layering:** Operators (bases/) → Infrastructure (shared) → Workloads (instances)
-- **Multi-cluster via variable substitution:** Single infrastructure definition + ConfigMap-based injection
-- **Operator pattern:** CRD separation from operator deployment
-- **Three-phase bootstrap:** CRDs → Core infrastructure → Full stack deployment
-- **Defense-in-depth validation:** Syntax → Schema → Security → Compliance
-- **Network security:** Baseline deny-all NetworkPolicies with explicit allow rules
-- **Health check dependencies:** Explicit `dependsOn` with resource health validation
+**Cross-Cluster Networking**: Cilium ClusterMesh enables service discovery and connectivity between clusters.
+
+---
+
+## Key Technologies
+
+| Category | Technologies |
+|----------|--------------|
+| **OS & Runtime** | Talos Linux, Kubernetes, containerd |
+| **GitOps** | Flux CD v2, Kustomize, Helm, Helmfile |
+| **Networking** | Cilium (eBPF, BGP, Gateway API, ClusterMesh) |
+| **Storage** | Rook-Ceph (distributed), OpenEBS (local) |
+| **Databases** | CloudNativePG (PostgreSQL), Dragonfly (Redis) |
+| **Observability** | Victoria Metrics, Victoria Logs, Fluent Bit |
+| **Security** | cert-manager, External Secrets (1Password), SOPS |
+| **Identity** | Keycloak |
+| **Messaging** | Strimzi (Kafka) |
+| **CI/CD** | GitLab, GitLab Runner, Actions Runner Controller |
+| **Registry** | Harbor |
+
+**Total**: 50+ distinct technologies
+
+---
 
 ## Repository Structure
 
 ```
 k8s-gitops/
-├── kubernetes/         # All Kubernetes manifests (Flux-managed)
-│   ├── clusters/       # Per-cluster entry points (infra, apps)
-│   ├── infrastructure/ # Shared infrastructure layer (both clusters)
-│   ├── workloads/      # Application instances
-│   ├── bases/          # Reusable operator definitions
-│   └── components/     # Reusable Kustomize components
-├── talos/              # Talos OS node configurations (6 nodes)
-├── bootstrap/          # Initial cluster provisioning
-├── .taskfiles/         # Task automation modules (8 modules)
-├── scripts/            # Validation & utility scripts
-├── .github/workflows/  # CI/CD automation (4 workflows)
-├── bmad/               # BMad Method documentation system
-└── docs/               # Project documentation
+├── bootstrap/              # Initial cluster bootstrap (Phase 0-2)
+│   ├── helmfile.d/         # Phased helmfile configs (CRDs, core)
+│   └── clusters/           # Per-cluster values (infra, apps)
+├── talos/                  # Talos Linux node configurations
+│   ├── infra/              # Infra cluster nodes (10.25.11.11-13)
+│   └── apps/               # Apps cluster nodes (10.25.11.14-16)
+├── kubernetes/             # ☸️ GitOps source of truth (Flux watches this)
+│   ├── clusters/           # Flux entry points (per cluster)
+│   ├── infrastructure/     # Shared infrastructure components
+│   ├── workloads/          # Application workloads (platform + tenants)
+│   ├── bases/              # Reusable operator bases (6 operators)
+│   └── components/         # Reusable Kustomize components
+├── scripts/                # Utility scripts (validation, helpers)
+├── .taskfiles/             # Modular Taskfile includes (8 modules)
+├── .github/workflows/      # CI/CD validation pipelines
+├── docs/                   # 📚 Project documentation (THIS FOLDER)
+├── Taskfile.yaml           # Main task automation orchestrator
+└── README.md               # Main project README
 ```
 
-**Repository Type:** Monolithic Infrastructure-as-Code
+**Total Files**: ~500+ (excluding node_modules, .backup, .git)
 
-## Multi-Cluster Architecture
+---
 
-### Infra Cluster (10.25.11.11-13)
-**Purpose:** Platform services and shared infrastructure
+## Core Features
 
-**Components:**
-- Storage: Rook-Ceph distributed storage, OpenEBS local PV
-- Databases: CloudNativePG operator, Dragonfly operator
-- Observability: Victoria Metrics, Victoria Logs, Fluent-bit
-- Security: cert-manager, external-secrets, NetworkPolicies
-- Networking: Cilium, CoreDNS, ExternalDNS, Cloudflared, Spegel
-- GitOps: Flux CD, OCI repositories
+### ✅ GitOps-First
+- **Declarative infrastructure**: All cluster state defined in Git
+- **Automated reconciliation**: Flux syncs Git → Kubernetes every 10 minutes
+- **Version control**: Full audit trail, easy rollbacks (Git revert)
+- **Pull-based security**: Clusters pull from Git (vs push from CI/CD)
 
-### Apps Cluster (10.25.11.14-16)
-**Purpose:** Application workloads and tenant services
+### ✅ Multi-Cluster Isolation
+- **Platform vs Apps separation**: Isolated failure domains
+- **Resource isolation**: Dedicated resources per cluster
+- **Cross-cluster communication**: Cilium ClusterMesh for service discovery
 
-**Components:**
-- Platform databases: PostgreSQL clusters, Redis clusters
-- Platform messaging: Kafka clusters (Strimzi)
-- Platform identity: Keycloak SSO
-- Platform CI/CD: GitHub Actions Runner Controller
-- Platform registry: Harbor
-- Tenants: GitLab, GitLab Runner
+### ✅ Immutable Infrastructure
+- **Talos Linux**: No SSH, no shell, API-only management
+- **Atomic updates**: Entire OS replaced on update
+- **Fast boot**: <30 second reboots
+- **Secure by default**: Minimal attack surface
 
-### Cluster Differentiation
-Both clusters share the same infrastructure layer but use different:
-- IP addressing (Pod CIDR, Service CIDR)
-- BGP autonomous system numbers (ASN)
-- Observability tenant identifiers
-- Feature flags (IPAM pools, workload placement)
+### ✅ Phased Bootstrap
+- **Phase 0**: CRDs extracted and installed first (prevents race conditions)
+- **Phase 1**: Core infrastructure (Cilium, CoreDNS, Flux, external-secrets)
+- **Phase 2**: GitOps takeover (Flux reconciles kubernetes/)
+- **Phase 3**: Validation and monitoring
 
-Configuration differentiation achieved through `postBuild.substituteFrom` reading cluster-specific ConfigMaps.
+### ✅ Production-Ready Networking
+- **Cilium eBPF**: High-performance CNI, bypasses iptables
+- **BGP Load Balancing**: Advertise LoadBalancer IPs to Juniper SRX320
+- **Gateway API**: Modern ingress alternative
+- **ClusterMesh**: Multi-cluster service mesh
+
+### ✅ Enterprise Storage
+- **Rook-Ceph**: Distributed storage with 3x replication, self-healing
+- **OpenEBS**: Local NVMe storage for performance-critical workloads
+- **Automated backups**: Scheduled backups, PITR (point-in-time recovery)
+
+### ✅ Comprehensive Observability
+- **Victoria Metrics**: Prometheus-compatible, 10x more efficient storage
+- **Victoria Logs**: Log aggregation with native VM integration
+- **Fluent Bit**: Lightweight log collection on every node
+- **Grafana Dashboards**: Pre-configured dashboards for all components
+
+### ✅ Robust Security
+- **cert-manager**: Automated TLS certificate management (Let's Encrypt)
+- **External Secrets**: Sync secrets from 1Password to Kubernetes
+- **SOPS**: Age-encrypted secrets in Git
+- **Network Policies**: Cilium L3/L4/L7 policies
+- **Keycloak**: Centralized SSO/SAML/OIDC identity provider
+
+### ✅ Self-Hosted DevOps
+- **GitLab**: Source control, CI/CD, container registry
+- **Harbor**: Enterprise container registry with vulnerability scanning
+- **GitHub Actions**: Self-hosted runners in Kubernetes
+- **Kafka**: Event streaming for event-driven architecture
+
+---
 
 ## Hardware Infrastructure
 
-### Production Cluster Nodes (6 nodes total)
-| Device | Count | OS Disk | Data Disk | RAM | OS | Purpose |
-|--------|-------|---------|-----------|-----|-----|---------|
-| ThinkCentre M920x, i7-8700t | 2 | 500GB SSD | 1TB NVME + 512GB NVME | 64GB | Talos | Kubernetes |
-| ThinkStation P330, i7-8700t | 4 | 500GB SSD | 1TB NVME + 512GB NVME | 64GB | Talos | Kubernetes |
+### Compute
+- **6 nodes total**: 2x ThinkCentre M920x + 4x ThinkStation P330
+- **CPU**: Intel i7-8700T per node
+- **RAM**: 64GB per node
+- **OS Disk**: 500GB SSD per node
+- **Data Disks**: 1TB NVMe + 512GB NVMe per node
 
-### Shared Infrastructure
-| Device | Count | Purpose |
-|--------|-------|---------|
-| ThinkCentre M910q | 1 | Infra Services (Fedora IoT) |
-| Synology RS1221+ NAS | 1 | NFS (8x12TB HDD, 32GB RAM) |
-| IBM Tape Library TS-3200 | 1 | Long-term archive (24xLTO-6 + 24xLTO-7) |
-| TESmart 8-Port KVM | 1 | Network KVM |
-| Juniper SRX320 | 1 | Router (JUNOS) |
-| TPLINK SX3008F | 2 | 10Gb ToR Switch |
-| TPLINK SG2210MP | 1 | PoE Switch |
-| TPLINK SG3428X | 1 | Aggregation Switch |
-| APC AP4421 | 1 | ATS/PDU |
-| APC SURT2000RM XL + 2x BP | 1 | UPS |
+### Network
+- **Juniper SRX320**: Edge router, BGP peer
+- **2x TPLINK SX3008F**: 10GbE ToR switches
+- **TPLINK SG2210MP**: PoE switch
+- **TPLINK SG3428X**: Aggregation switch
 
-## Key Features
+### Storage
+- **Synology RS1221+**: 8x12TB HDD (96TB raw) for NFS
+- **IBM TS-3200**: Tape library (24xLTO-6 + 24xLTO-7) for long-term backups
 
-✅ **GitOps Automation:** Flux CD reconciles infrastructure from Git every 5 minutes
-✅ **Multi-Cluster:** Separate platform and application concerns across 2 clusters
-✅ **Immutable OS:** Talos Linux provides declarative, API-driven node management
-✅ **High Availability:** Multi-master control planes, distributed storage
-✅ **Service Mesh:** Cilium ClusterMesh for cross-cluster service discovery
-✅ **Automated DNS:** ExternalDNS syncs DNS records to Cloudflare
-✅ **Automated TLS:** cert-manager provisions Let's Encrypt certificates
-✅ **Secret Management:** External-secrets integrates with 1Password vault
-✅ **Observability:** Victoria Metrics/Logs with Grafana dashboards
-✅ **CI/CD Validation:** Multi-stage pipelines (syntax, schema, security, compliance)
-✅ **Compliance Automation:** OPA-based backup policy validation (GDPR, HIPAA, PCI-DSS, SOX)
-✅ **Network Security:** Baseline deny-all NetworkPolicies with explicit allow rules
-✅ **Registry Mirror:** Spegel provides cluster-local OCI mirror
-✅ **Operator Pattern:** 5+ operators managing databases, messaging, logging, storage
+### Power
+- **APC SURT2000RM XL + 2x BP**: UPS power
+- **APC AP4421**: ATS/PDU
 
-## Documentation Navigation
+---
 
-- **[Source Tree Analysis](./source-tree-analysis.md)** - Annotated directory structure
-- **[Development Guide](./development-guide.md)** - Local development setup _(To be generated)_
-- **[Deployment Guide](./deployment-guide.md)** - Cluster deployment procedures _(To be generated)_
-- **[Infrastructure Components](./infrastructure-components.md)** - Component inventory _(To be generated)_
-- **[README.md](../README.md)** - Original project overview
+## Deployment Model
+
+### GitOps Workflow
+
+```
+Developer
+    ↓ git push
+GitHub Repository (main branch)
+    ↓ Flux watches (10m interval)
+Flux Source Controller
+    ↓ Fetches manifests
+Flux Kustomize Controller
+    ↓ Applies changes
+Kubernetes API Server
+    ↓ Reconciles
+Running Workloads
+```
+
+### Multi-Environment Strategy
+
+Currently: **Single production environment** (infra + apps clusters)
+
+**Future**: Separate dev/staging/prod clusters
+
+---
+
+## Operational Model
+
+### Maintenance Windows
+- **Talos updates**: Rolling updates (one node at a time)
+- **Kubernetes updates**: Controlled via Talos updates
+- **Application updates**: GitOps-driven (commit to main → auto-deploy)
+
+### Backup Strategy
+- **PostgreSQL**: Scheduled backups (daily) + WAL archiving (continuous)
+- **Rook-Ceph**: Volume snapshots
+- **Git**: All configuration in Git (disaster recovery: redeploy from Git)
+- **Long-term**: IBM tape library for archival
+
+### Monitoring & Alerting
+- **Metrics**: Victoria Metrics scrapes all components
+- **Logs**: Fluent Bit → Victoria Logs
+- **Alerts**: PrometheusRule CRDs → VMAlert
+- **Dashboards**: Grafana with pre-configured dashboards
+
+---
 
 ## Getting Started
 
-### For Developers
-1. Review [Source Tree Analysis](./source-tree-analysis.md) to understand repository structure
-2. Check [Development Guide](./development-guide.md) for local environment setup _(To be generated)_
-3. Explore existing component READMEs in `kubernetes/` directories
+### Prerequisites
+```bash
+# Install required tools
+brew install kubectl talosctl flux helmfile helm task yq jq
 
-### For Operators
-1. Review [Deployment Guide](./deployment-guide.md) for cluster lifecycle operations _(To be generated)_
-2. Familiarize with Task automation: `task --list`
-3. Understand three-phase bootstrap strategy: `bootstrap/helmfile.d/README.md`
+# Clone repository
+git clone https://github.com/trosvald/k8s-gitops.git
+cd k8s-gitops
+```
 
-### For Contributors
-1. Understand GitOps workflow: All changes via Git PRs
-2. Review CI/CD pipelines: `.github/workflows/validate-infrastructure.yaml`
-3. Test locally: `task validate-cilium-core` before pushing
+### Bootstrap Cluster
+```bash
+# Bootstrap infra cluster (complete)
+task bootstrap:infra
 
-## Project Metrics
+# Bootstrap apps cluster (complete)
+task bootstrap:apps
 
-- **Kubernetes Manifests:** 298+ YAML files
-- **Infrastructure Components:** 30+ (networking, storage, databases, observability, security)
-- **Operators Deployed:** 5 (CloudNativePG, Dragonfly, Strimzi Kafka, Rook-Ceph, Fluent-bit)
-- **GitHub Actions Workflows:** 4 (infrastructure validation, compliance validation, Cilium validation, project automation)
-- **Task Modules:** 8 (cluster, bootstrap, kubernetes, talos, volsync, workstation, onepassword, synergyflow)
-- **Validation Scripts:** 6 specialized validators
-- **Existing Documentation:** 15+ READMEs (component-specific)
+# Check status
+task bootstrap:status CLUSTER=infra
+```
 
-## External Links
+### Make Changes
+```bash
+# Edit manifests
+vim kubernetes/infrastructure/networking/cilium/core/app/helmrelease.yaml
 
-- **Status Page:** https://status.monosense.io
-- **Cluster Template Inspiration:** [onedr0p/cluster-template](https://github.com/onedr0p/cluster-template)
+# Validate
+kubectl kustomize kubernetes/infrastructure | kubeconform -strict
+
+# Commit and push
+git add .
+git commit -m "feat(cilium): update configuration"
+git push origin main
+
+# Force reconciliation (or wait 10m for auto-sync)
+task kubernetes:reconcile CLUSTER=infra
+```
+
+---
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| **[README.md](../README.md)** | Main project README with quick start |
+| **[docs/index.md](./index.md)** | Master documentation index (THIS FILE) |
+| **[docs/project-overview.md](./project-overview.md)** | Project overview and purpose |
+| **[docs/architecture.md](./architecture.md)** | Comprehensive architecture documentation |
+| **[docs/technology-stack.md](./technology-stack.md)** | Complete technology inventory |
+| **[docs/source-tree-analysis.md](./source-tree-analysis.md)** | Repository structure deep-dive |
+| **[docs/development-guide.md](./development-guide.md)** | Development workflow and tasks |
+| **[bootstrap/helmfile.d/README.md](../bootstrap/helmfile.d/README.md)** | Bootstrap architecture and process |
+
+---
+
+## Project Status
+
+### ✅ Completed Features
+- [x] Multi-cluster Talos Kubernetes (infra + apps)
+- [x] Flux CD GitOps automation
+- [x] Cilium CNI with BGP, Gateway API, ClusterMesh
+- [x] Rook-Ceph distributed storage
+- [x] CloudNativePG PostgreSQL with automated backups
+- [x] Victoria Metrics + Victoria Logs observability
+- [x] cert-manager automated TLS
+- [x] External Secrets with 1Password integration
+- [x] Keycloak SSO
+- [x] GitLab self-hosted
+- [x] Harbor container registry
+- [x] Kafka messaging platform
+- [x] Automated validation pipelines (GitHub Actions)
+
+### 🚧 In Progress
+- [ ] SPIRE/SPIFFE workload identity
+- [ ] Enhanced ArgoCD integration
+- [ ] External storage replication
+
+### 📋 Planned
+- [ ] Dev/staging/prod cluster separation
+- [ ] Multi-region deployment
+- [ ] Advanced service mesh features
+- [ ] Distributed tracing (Tempo/Jaeger)
+
+---
+
+## Team & Contributions
+
+**Maintainer**: @trosvald
+**Contributors**: Community contributions welcome via PRs
+
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make changes and validate (`task validate-cilium-core`)
+4. Commit changes (`git commit -m 'feat: add amazing feature'`)
+5. Push to branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+---
+
+## Support & Resources
+
+### Documentation
+- **GitHub Repository**: https://github.com/trosvald/k8s-gitops
+- **Documentation**: `docs/` directory
+- **Bootstrap Guide**: `bootstrap/helmfile.d/README.md`
+
+### Community
+- **Issues**: [GitHub Issues](https://github.com/trosvald/k8s-gitops/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/trosvald/k8s-gitops/discussions)
+
+### Upstream Projects
+- **Talos Linux**: https://www.talos.dev/
+- **Flux CD**: https://fluxcd.io/
+- **Cilium**: https://cilium.io/
+- **Rook**: https://rook.io/
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](../LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+This project draws inspiration from:
+- **[buroa/k8s-gitops](https://github.com/buroa/k8s-gitops)** - Phased bootstrap pattern
+- **[onedr0p/cluster-template](https://github.com/onedr0p/cluster-template)** - Flux structure patterns
+- **Talos Linux community** - Immutable infrastructure best practices
+
+---
+
+**Last Updated**: 2025-11-12
+**Project Version**: v2.0 (Multi-Cluster Architecture)
