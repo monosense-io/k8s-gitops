@@ -12,7 +12,7 @@ spec:
   retryInterval: 1m
   timeout: 10m
   prune: true
-  wait: true
+  wait: false  # Disabled to prevent blocking on HelmRelease install timeout
   path: ./kubernetes/infrastructure/networking/cilium/core/app
   sourceRef:
     kind: GitRepository
