@@ -9,6 +9,7 @@ resources:
   - cilium/bgp/
   - cilium/clustermesh/ks.yaml
   - coredns/ks.yaml
-  - spegel/ks.yaml
+  # DISABLED: spegel incompatible with Talos Linux read-only filesystem
+  # - spegel/ks.yaml
   - cloudflared/ks.yaml
   - external-dns/
