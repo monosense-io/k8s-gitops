@@ -18,9 +18,10 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  dependsOn:
-    - name: cilium-core
-      namespace: flux-system
+  # CoreDNS is deployed via Helmfile bootstrap (not dependent on cilium-core)
+  # dependsOn:
+  #   - name: cilium-core
+  #     namespace: flux-system
   targetNamespace: kube-system
   postBuild:
     substituteFrom:
