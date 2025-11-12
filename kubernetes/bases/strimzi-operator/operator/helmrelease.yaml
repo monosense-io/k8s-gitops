@@ -11,16 +11,10 @@ metadata:
 spec:
   interval: 30m
   timeout: 10m
-
-  chart:
-    spec:
-      chart: strimzi-kafka-operator
-      version: 0.48.0  # Exact version pinning
-      sourceRef:
-        kind: HelmRepository
-        name: strimzi
-        namespace: flux-system
-      interval: 12h
+  chartRef:
+    kind: OCIRepository
+    name: strimzi
+    namespace: flux-system
 
   # CRD management
   install:

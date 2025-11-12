@@ -1,0 +1,16 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: strimzi
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: strimzi-operator
+spec:
+  interval: 12h
+  url: oci://quay.io/strimzi-helm/strimzi-kafka-operator
+  ref:
+    tag: "0.48.0"
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy

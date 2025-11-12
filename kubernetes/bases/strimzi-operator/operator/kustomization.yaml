@@ -6,7 +6,7 @@ namespace: strimzi-operator-system
 
 resources:
   - namespace.yaml
-  - helmrepository.yaml
+  - ocirepository.yaml
   - helmrelease.yaml
   - servicemonitor.yaml
   - prometheusrule.yaml

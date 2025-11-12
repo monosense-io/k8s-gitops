@@ -8,6 +8,6 @@ metadata:
     app.kubernetes.io/name: dragonfly-operator
 spec:
   interval: 12h
-  url: oci://ghcr.io/dragonflydb/dragonfly-operator
+  url: oci://ghcr.io/dragonflydb/dragonfly-operator/helm/dragonfly-operator
   ref:
     tag: "v1.3.0"  # Exact version pinning
