@@ -12,7 +12,7 @@ spec:
       chart: cloudnative-pg
       version: 0.26.1
       sourceRef:
-        kind: OCIRepository
+        kind: HelmRepository
         name: cloudnative-pg
         namespace: flux-system
       interval: 12h

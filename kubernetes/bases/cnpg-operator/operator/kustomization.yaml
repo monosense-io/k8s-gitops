@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: cnpg-system
 resources:
   - namespace.yaml
-  - ocirepository.yaml
+  - helmrepository.yaml
   - helmrelease.yaml
   - pdb.yaml
   - podmonitor.yaml
