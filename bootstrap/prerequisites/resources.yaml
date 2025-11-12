@@ -14,8 +14,7 @@ metadata:
     pod-security.kubernetes.io/warn: restricted
 ---
 # 1Password Connect Token secret
-# Note: Update token value with actual credentials or use 'op inject' to populate
-#       Example: op inject -i bootstrap/prerequisites/resources.yaml | kubectl apply -f -
+# Usage: op inject -i bootstrap/prerequisites/resources.yaml | kubectl --context=infra apply -f -
 # This token is used by ESO to authenticate to your local 1Password Connect Server
 apiVersion: v1
 kind: Secret
@@ -24,9 +23,9 @@ metadata:
   namespace: external-secrets
 type: Opaque
 stringData:
-  # Placeholder token - update this with your actual 1Password Connect token
-  # Or use: op inject -i bootstrap/prerequisites/resources.yaml | kubectl apply -f -
-  token: "PLACEHOLDER_TOKEN_UPDATE_AFTER_BOOTSTRAP"
+  # Token injected from 1Password vault via 'op inject'
+  # Format: op://vault-name/item-name/field-name
+  token: "op://homelab/onepassword-connect/credential"
 ---
 # Flux System namespace (will be created by helmfile but including here for completeness)
 apiVersion: v1
