@@ -26,11 +26,7 @@ spec:
       name: ${CLUSTER}
       id: ${CLUSTER_ID}
 
-    # Talos Linux compatibility
-    securityContext:
-      privileged: false
-
-    # Disable sysctl init container (Talos doesn't have /etc/sysctl.d)
+    # Talos Linux compatibility: Disable sysctl init container (Talos doesn't have /etc/sysctl.d)
     sysctlfix:
       enabled: false
 
