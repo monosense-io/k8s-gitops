@@ -2,7 +2,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - cilium/  # Includes gateway, bgp, clustermesh, ipam
+  # Cilium components (do not include cilium/ directory - it has both infra and apps configs)
+  - cilium/gateway/ks.yaml
+  - cilium/bgp/
+  - cilium/clustermesh/ks.yaml
+  # Note: cilium/core and cilium/ipam are excluded - Cilium deployed via Helmfile
   - coredns/ks.yaml
   - spegel/ks.yaml
   - cloudflared/ks.yaml
