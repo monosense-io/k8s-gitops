@@ -18,11 +18,9 @@ spec:
     kind: GitRepository
     name: flux-system
     namespace: flux-system
-  # Cilium is deployed via Helmfile, only depend on cilium-ipam
+  # Cilium core managed by Flux after bootstrap, gateway depends on it
   dependsOn:
-    # - name: cilium-core
-    #   namespace: flux-system
-    - name: cilium-ipam
+    - name: cilium-core
       namespace: flux-system
   targetNamespace: kube-system
   postBuild:
