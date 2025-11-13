@@ -111,3 +111,10 @@ spec:
       config:
         enabled: false
         domain: mesh.cilium.io
+
+    # Policy configuration
+    # DISABLED: enableNonDefaultDenyPolicies blocks all egress by default
+    # This is causing "connect: operation not permitted" errors cluster-wide
+    policy:
+      enabled: true
+      enableNonDefaultDenyPolicies: false
