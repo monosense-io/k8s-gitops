@@ -8,8 +8,9 @@ resources:
   - cilium/gateway/ks.yaml
   - cilium/bgp/
   - cilium/clustermesh/ks.yaml
+  # ENABLED: coredns deployed by Flux (disabled in Talos)
   - coredns/ks.yaml
-  # DISABLED: spegel incompatible with Talos Linux read-only filesystem
-  # - spegel/ks.yaml
+  # ENABLED: spegel with fixed configuration
+  - spegel/ks.yaml
   - cloudflared/ks.yaml
   - external-dns/

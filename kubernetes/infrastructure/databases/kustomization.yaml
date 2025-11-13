@@ -5,3 +5,4 @@ resources:
   - cloudnative-pg/operator/ks.yaml
   - cloudnative-pg/shared-cluster/ks.yaml
   - dragonfly-operator/ks.yaml
+  - ../workloads/platform/databases/dragonfly/ks.yaml

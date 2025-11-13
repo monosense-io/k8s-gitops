@@ -1,84 +1,35 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: coredns-charts
+spec:
+  interval: 15m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: "1.45.0"
+  url: oci://ghcr.io/coredns/charts/coredns
+---
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: coredns
   namespace: kube-system
 spec:
-  interval: 30m
+  interval: 1h
   chartRef:
     kind: OCIRepository
     name: coredns-charts
-  install:
-    remediation:
-      retries: 3
-  upgrade:
-    cleanupOnFail: true
-    remediation:
-      retries: 3
   values:
+    fullnameOverride: coredns
+    image:
+      repository: mirror.gcr.io/coredns/coredns
     replicaCount: ${COREDNS_REPLICAS}
-
     service:
       name: kube-dns
       clusterIP: ${COREDNS_CLUSTER_IP}
-
-    # High availability topology spread
-    topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-        labelSelector:
-          matchLabels:
-            k8s-app: kube-dns
-
-    # Pod disruption budget for HA
-    podDisruptionBudget:
-      enabled: true
-      minAvailable: 1
-
-    # Resource limits for 3-node home lab
-    resources:
-      requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 200m
-        memory: 256Mi
-
-    # Security hardening
-    securityContext:
-      runAsNonRoot: true
-      runAsUser: 10001
-      readOnlyRootFilesystem: true
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-          - ALL
-
-    # Health and readiness probes
-    livenessProbe:
-      httpGet:
-        path: /health
-        port: 8080
-      initialDelaySeconds: 60
-      periodSeconds: 10
-
-    readinessProbe:
-      httpGet:
-        path: /ready
-        port: 8181
-      initialDelaySeconds: 5
-      periodSeconds: 10
-
-    # Prometheus metrics
-    prometheus:
-      service:
-        enabled: true
-        annotations:
-          prometheus.io/scrape: "true"
-          prometheus.io/port: "9153"
-
-    # ServiceMonitor disabled until Prometheus CRDs exist
-    # Enable in observability story
-    serviceMonitor:
-      enabled: false
+    servers:
+      - zones:
+          - zone: .

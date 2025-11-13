@@ -22,6 +22,7 @@ resources:
 
   # Database namespaces
   - cnpg-system
+  # ENABLED: dragonfly-system namespace now exists
   - dragonfly-system
   - dragonfly-operator-system
 
@@ -29,6 +30,6 @@ resources:
   - keycloak-operator-system
   - keycloak-system
 
-  # Application namespaces (future)
-  - harbor
-  - gitlab-system
+  # DISABLED: Application namespaces (not deployed yet)
+  # - harbor
+  # - gitlab-system
