@@ -1,0 +1,32 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: external-secrets-allow-dns
+  namespace: external-secrets
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: external-secrets
+  egress:
+  # Allow DNS lookups to kube-dns
+  - toServices:
+    - k8sServiceSelector:
+        selector:
+          matchLabels:
+            k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      - port: "53"
+        protocol: TCP
+  # Allow access to 1Password Connect server
+  - toFQDNs:
+    - matchPattern: opconnect.monosense.dev
+    toPorts:
+    - ports:
+      - port: "80"
+        protocol: TCP
+      - port: "443"
+        protocol: TCP

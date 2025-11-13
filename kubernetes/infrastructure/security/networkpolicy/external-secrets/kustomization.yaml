@@ -8,3 +8,8 @@ components:
   - ../../../../components/networkpolicy/allow-dns
   - ../../../../components/networkpolicy/allow-kube-api
   - ../../../../components/networkpolicy/allow-internal
+  - ../../../../components/networkpolicy/allow-kube-dns-service
+  - ../../../../components/networkpolicy/allow-1password-connect
+
+resources:
+  - allow-dns.yaml
